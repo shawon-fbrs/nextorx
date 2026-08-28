@@ -26,7 +26,6 @@
 html, body {
   height: 100%;
   width: 100%;
-  overflow: hidden;
   background-color: #1a1e28;
   color: #93a0b5;
   font-family: 'Roboto', Arial, Helvetica, sans-serif;

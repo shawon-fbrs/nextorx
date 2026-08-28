@@ -1,0 +1,150 @@
+'use client';
+
+const profileFields = [
+  { label: 'First Name', value: 'John', type: 'text' },
+  { label: 'Last Name', value: 'Doe', type: 'text' },
+  { label: 'Email', value: 'user@example.com', type: 'email' },
+  { label: 'Phone', value: '+1 (555) 123-4567', type: 'tel' },
+];
+
+const securityItems = [
+  { label: 'Two-Factor Authentication', desc: 'Add an extra layer of security', enabled: false },
+  { label: 'Login Notifications', desc: 'Get alerted on new logins', enabled: true },
+  { label: 'API Access', desc: 'Manage API keys', enabled: false },
+];
+
+export default function AccountPage() {
+  return (
+    <div className="bg-background text-text h-full overflow-y-auto">
+      <div className="px-6 py-6">
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-white">Account Settings</h1>
+          <p className="text-sm text-text-dark mt-1">Manage your profile and security</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="col-span-2 bg-surface border border-border rounded-xl p-5">
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-14 h-14 rounded-full bg-blue/15 flex items-center justify-center">
+                <svg className="w-7 h-7 text-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">Profile</h2>
+                <p className="text-xs text-text-dark">Update your personal details</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {profileFields.map((field) => (
+                <div key={field.label}>
+                  <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">{field.label}</label>
+                  <input
+                    type={field.type} defaultValue={field.value}
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  />
+                </div>
+              ))}
+            </div>
+            <button className="mt-4 bg-blue hover:bg-blue-hover text-white text-xs font-bold px-5 py-2.5 rounded-lg transition-colors">
+              Save Changes
+            </button>
+          </div>
+
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-green/15 flex items-center justify-center">
+                <svg className="w-5 h-5 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white">Verification</h2>
+                <p className="text-[11px] text-text-dark">Status</p>
+              </div>
+            </div>
+            <div className="bg-background rounded-lg p-3.5 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-orange/15 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <div>
+                  <span className="text-xs font-semibold text-white block">Pending</span>
+                  <span className="text-[10px] text-text-dark">Upload ID to verify</span>
+                </div>
+              </div>
+            </div>
+            <button className="w-full bg-green hover:bg-green-hover text-white text-xs font-bold py-2.5 rounded-lg transition-colors">
+              Verify Now
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-orange/15 flex items-center justify-center">
+                <svg className="w-5 h-5 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white">Security</h2>
+                <p className="text-[11px] text-text-dark">Protect your account</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {securityItems.map((item) => (
+                <div key={item.label} className="bg-background rounded-lg p-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-white block">{item.label}</span>
+                    <span className="text-[10px] text-text-dark">{item.desc}</span>
+                  </div>
+                  <button className={`w-10 h-[22px] rounded-full relative transition-colors ${item.enabled ? 'bg-green' : 'bg-border/50'}`}>
+                    <div className={`w-4 h-4 bg-white rounded-full absolute top-[3px] transition-transform ${item.enabled ? 'left-[22px]' : 'left-[3px]'}`} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red/15 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white">Danger Zone</h2>
+                <p className="text-[11px] text-text-dark">Irreversible actions</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="bg-background rounded-lg p-3 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-white block">Change Password</span>
+                  <span className="text-[10px] text-text-dark">Update regularly</span>
+                </div>
+                <button className="text-blue hover:text-blue-hover text-[11px] font-bold transition-colors">
+                  Change
+                </button>
+              </div>
+              <div className="bg-background rounded-lg p-3 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-white block">Delete Account</span>
+                  <span className="text-[10px] text-text-dark">Permanently delete</span>
+                </div>
+                <button className="text-red hover:text-red-hover text-[11px] font-bold transition-colors">
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

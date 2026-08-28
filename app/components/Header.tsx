@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, ReactNode } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export type AccountType = 'demo' | 'real' | 'funded' | 'tournament';
 
 interface HeaderProps {
   balance: number;
-  accountType?: AccountType;
 }
 
 const accountData: Record<AccountType, { icon: ReactNode; color: string; label: string; balance: number }> = {
@@ -89,30 +90,31 @@ const accountLevels = [
   },
 ];
 
-export function Header({ balance, accountType = 'demo' }: HeaderProps) {
+export function Header({ balance }: HeaderProps) {
+  const pathname = usePathname();
+  const accountTypeMatch = pathname.match(/\/trade\/(\w+)/);
+  const accountType = (accountTypeMatch ? accountTypeMatch[1] : 'real') as AccountType;
   const [expanded, setExpanded] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [activeType, setActiveType] = useState<AccountType>(accountType);
   const [hidden, setHidden] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<typeof accountLevels[0] | null>(null);
-  const active = accountData[activeType];
+  const active = accountData[accountType];
 
   return (
     <header className="h-16 min-w-full bg-background border-b border-border flex items-center z-50 flex-shrink-0 px-4 gap-4">
-      {/* Left side - Logo */}
       <div className="flex items-center gap-4">
-        <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24">
-          <rect fill="currentColor" height="12" rx="1" width="3" x="2" y="6" />
-          <rect fill="currentColor" height="18" rx="1" width="3" x="7" y="3" />
-          <rect fill="currentColor" height="8" rx="1" width="3" x="12" y="8" />
-          <rect fill="currentColor" height="14" rx="1" width="3" x="17" y="5" />
-        </svg>
-        <span className="text-white font-bold text-xl tracking-wide">NEXTORX</span>
+        <Link href={`/trade/${accountType}`} className="flex items-center gap-4">
+          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24">
+            <rect fill="currentColor" height="12" rx="1" width="3" x="2" y="6" />
+            <rect fill="currentColor" height="18" rx="1" width="3" x="7" y="3" />
+            <rect fill="currentColor" height="8" rx="1" width="3" x="12" y="8" />
+            <rect fill="currentColor" height="14" rx="1" width="3" x="17" y="5" />
+          </svg>
+          <span className="text-white font-bold text-xl tracking-wide">NEXTORX</span>
+        </Link>
       </div>
 
-      {/* Right side - Actions */}
       <div className="flex items-center gap-5 ml-auto">
-        {/* Notification bell */}
         <div className="relative">
           <button
             onClick={() => { setNotifOpen(!notifOpen); setExpanded(false); }}
@@ -127,9 +129,7 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
             </span>
           </button>
 
-          {/* Notification dropdown */}
           <div className={`absolute top-full right-0 mt-2 w-96 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-50 ${notifOpen ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
-            {/* Header */}
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-white font-bold">Notifications</span>
@@ -138,7 +138,6 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
               <button className="text-[11px] text-blue hover:text-blue-hover transition-colors font-semibold">Mark all read</button>
             </div>
 
-            {/* Tabs */}
             <div className="px-5 flex gap-4 border-b border-border">
               <button className="pb-2.5 text-xs font-bold text-white border-b-2 border-blue">All</button>
               <button className="pb-2.5 text-xs font-semibold text-text-dark hover:text-text transition-colors">Trades</button>
@@ -146,9 +145,7 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
               <button className="pb-2.5 text-xs font-semibold text-text-dark hover:text-text transition-colors">Promotions</button>
             </div>
 
-            {/* Notifications list */}
             <div className="max-h-80 overflow-y-auto">
-              {/* Unread */}
               <div className="px-5 py-3.5 hover:bg-surface-hover transition-colors cursor-pointer border-l-2 border-l-blue bg-blue/5">
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-xl bg-green/15 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -200,7 +197,6 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
                 </div>
               </div>
 
-              {/* Read */}
               <div className="px-5 py-3.5 hover:bg-surface-hover transition-colors cursor-pointer border-l-2 border-l-transparent opacity-60">
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-xl bg-surface flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -236,7 +232,6 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="px-5 py-3 border-t border-border">
               <button className="w-full text-center text-xs font-semibold text-blue hover:text-blue-hover transition-colors py-1.5">
                 View All Notifications
@@ -247,7 +242,6 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
 
         <div className="w-px h-8 bg-border" />
 
-        {/* Balance card with click dropdown */}
         <div className="relative">
           <button
             onClick={() => { setExpanded(!expanded); setNotifOpen(false); }}
@@ -263,10 +257,7 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
             </svg>
           </button>
 
-          {/* Expanded panel */}
           <div className={`absolute top-full right-0 mt-2 w-96 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-50 ${expanded ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
-
-            {/* Account Levels Section */}
             <div className="p-5 border-b border-border">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs text-text font-bold uppercase tracking-wider">Account Levels</span>
@@ -303,7 +294,6 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
               </div>
             </div>
 
-            {/* Account Info Section */}
             <div className="px-5 py-4 border-b border-border">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs text-text font-bold uppercase tracking-wider">Account Details</span>
@@ -368,7 +358,6 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
               </div>
             </div>
 
-            {/* Account Types Section */}
             <div className="p-5">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs text-text font-bold uppercase tracking-wider">Switch Account</span>
@@ -376,11 +365,12 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
               <div className="space-y-2">
                 {(Object.keys(accountData) as AccountType[]).map((type) => {
                   const acc = accountData[type];
-                  const isActive = type === activeType;
+                  const isActive = type === accountType;
                   return (
-                    <button
+                    <Link
                       key={type}
-                      onClick={() => setActiveType(type)}
+                      href={`/trade/${type}`}
+                      onClick={() => setExpanded(false)}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                         isActive
                           ? 'bg-background border border-border shadow-md'
@@ -403,7 +393,7 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
                       ) : (
                         <div className="w-6 h-6 rounded-full border-2 border-border" />
                       )}
-                    </button>
+                    </Link>
                   );
                 })}
               </div>
@@ -413,23 +403,24 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
 
         <div className="w-px h-8 bg-border" />
 
-        <button className="bg-green hover:bg-green-hover text-white font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-green/20">
+        <Link
+          href={`/trade/${accountType}`}
+          className="bg-green hover:bg-green-hover text-white font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-green/20"
+        >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
           </svg>
           Deposit
-        </button>
+        </Link>
 
         <button className="bg-surface border border-border hover:bg-surface-hover text-text-light font-medium text-sm px-6 py-2.5 rounded-xl transition-colors">
           Withdrawal
         </button>
       </div>
 
-      {/* Level detail dialog */}
       {selectedLevel && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedLevel(null)}>
           <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[420px] overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-            {/* Dialog Header */}
             <div className={`px-6 pt-6 pb-4 ${
               selectedLevel.name === 'Standard' ? 'bg-gradient-to-br from-blue/10 to-transparent' :
               selectedLevel.name === 'Pro' ? 'bg-gradient-to-br from-green/10 to-transparent' :
@@ -470,7 +461,6 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
                 </button>
               </div>
 
-              {/* Profit Display */}
               <div className="bg-background rounded-xl p-5 text-center">
                 <span className="text-xs text-text-dark font-semibold uppercase tracking-wider">Profit Boost</span>
                 <div className="mt-2">
@@ -484,7 +474,6 @@ export function Header({ balance, accountType = 'demo' }: HeaderProps) {
               </div>
             </div>
 
-            {/* Dialog Body */}
             <div className="px-6 pb-6">
               {selectedLevel.requirement && (
                 <div className="bg-background/50 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
