@@ -124,6 +124,13 @@ Configured in `globals.css` via `@theme inline` block. NOT using `tailwind.confi
 - Use `ReactNode` not `JSX.Element` (React 19 / TS5 compatibility)
 - No `Math.random()` during render — use `useEffect` + `mounted` state
 
+## Team Ownership
+
+| Area | Owner | Routes |
+|------|-------|--------|
+| **Admin Console** | Shawon + AI | `/console-panel/*` |
+| **Trader Frontend** | Other members | `/` |
+
 ## Team Guidelines
 
 ### Branch Naming
