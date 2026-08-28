@@ -133,8 +133,8 @@ export function Chart({ candles, currentPrice, onDrawToggle, drawOpen = false, o
   const viewH = 500;
   const padL = 10;
   const padR = 70;
-  const padT = 40;
-  const padB = 40;
+  const padT = 10;
+  const padB = 30;
   const plotW = viewW - padL - padR;
   const plotH = viewH - padT - padB;
 
@@ -147,7 +147,7 @@ export function Chart({ candles, currentPrice, onDrawToggle, drawOpen = false, o
   const priceY = toY(currentPrice);
 
   return (
-    <div ref={chartRef} className="absolute inset-0 bg-[#161a22]">
+    <div ref={chartRef} className="absolute inset-0 bg-[#161a22] overflow-hidden">
       <svg width="100%" height="100%" viewBox={`0 0 ${viewW} ${viewH}`} preserveAspectRatio="none" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
         {/* Grid */}
         {priceLabels.map((p, i) => (
@@ -189,7 +189,7 @@ export function Chart({ candles, currentPrice, onDrawToggle, drawOpen = false, o
       </svg>
 
       {/* Chart info rows */}
-      <div style={{ position: 'absolute', top: 64, left: 16, display: 'flex', flexDirection: 'column', gap: 4, zIndex: 10 }}>
+      <div style={{ position: 'absolute', top: 80, left: 16, display: 'flex', flexDirection: 'column', gap: 4, zIndex: 10 }}>
         {/* Row 1: Time */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontFamily: 'monospace' }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#00c365' }} />
@@ -216,15 +216,15 @@ export function Chart({ candles, currentPrice, onDrawToggle, drawOpen = false, o
       </div>
 
       {/* Trade lines */}
-      <div style={{ position: 'absolute', top: 96, bottom: 40, left: '62%', width: 1, borderLeft: '1px dashed rgba(147,160,181,0.3)', zIndex: 10, pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', top: 110, bottom: 30, left: '62%', width: 1, borderLeft: '1px dashed rgba(147,160,181,0.3)', zIndex: 10, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', top: -10, left: -16, fontSize: 9, color: 'rgba(147,160,181,0.6)', whiteSpace: 'nowrap', background: 'rgba(26,30,40,0.6)', padding: '1px 4px', borderRadius: 3 }}>Entry</div>
       </div>
-      <div style={{ position: 'absolute', top: 96, bottom: 40, left: '63%', width: 1, background: 'rgba(255,73,84,0.3)', zIndex: 10, pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', top: 110, bottom: 30, left: '63%', width: 1, background: 'rgba(255,73,84,0.3)', zIndex: 10, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', top: -10, left: -16, fontSize: 9, color: 'rgba(147,160,181,0.6)', whiteSpace: 'nowrap', background: 'rgba(26,30,40,0.6)', padding: '1px 4px', borderRadius: 3 }}>End</div>
       </div>
 
       {/* Left toolbar */}
-      <div style={{ position: 'absolute', bottom: 40, left: 12, display: 'flex', flexDirection: 'column', gap: 2, background: '#242a38', border: '1px solid #31394c', borderRadius: 10, padding: 4, zIndex: 20 }}>
+      <div style={{ position: 'absolute', bottom: 50, left: 12, display: 'flex', flexDirection: 'column', gap: 2, background: '#242a38', border: '1px solid #31394c', borderRadius: 10, padding: 4, zIndex: 20 }}>
         {/* Drawing tools */}
         <button title="Drawing Tools" onClick={handleDrawToggle} style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', color: drawOpen ? '#fff' : '#93a0b5', background: drawOpen ? '#2a3142' : 'transparent', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s' }}
           onMouseEnter={(e) => { if (!drawOpen) { e.currentTarget.style.background = '#2a3142'; e.currentTarget.style.color = '#fff'; } }}
@@ -286,7 +286,7 @@ export function Chart({ candles, currentPrice, onDrawToggle, drawOpen = false, o
 
       {/* Timeframe dropdown */}
       {tfOpen && (
-        <div style={{ position: 'absolute', bottom: 40, left: 64, width: 200, background: '#242a38', border: '1px solid #31394c', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: 6, zIndex: 100, animation: tfClosing ? 'slideOut 0.2s ease-in forwards' : 'slideIn 0.2s ease-out' }}>
+        <div style={{ position: 'absolute', bottom: 50, left: 64, width: 200, background: '#242a38', border: '1px solid #31394c', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: 6, zIndex: 100, animation: tfClosing ? 'slideOut 0.2s ease-in forwards' : 'slideIn 0.2s ease-out' }}>
           <div style={{ padding: '4px 8px', fontSize: 9, fontWeight: 700, color: '#5c677f', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Seconds</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, marginBottom: 6 }}>
             {timeframes.filter(t => t.category === 'seconds').map((tf) => (
@@ -325,7 +325,7 @@ export function Chart({ candles, currentPrice, onDrawToggle, drawOpen = false, o
 
       {/* Candlestick type dropdown */}
       {ctOpen && (
-        <div style={{ position: 'absolute', bottom: 40, left: 64, width: 180, background: '#242a38', border: '1px solid #31394c', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: 6, zIndex: 100, animation: ctClosing ? 'slideOut 0.2s ease-in forwards' : 'slideIn 0.2s ease-out' }}>
+        <div style={{ position: 'absolute', bottom: 50, left: 64, width: 180, background: '#242a38', border: '1px solid #31394c', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: 6, zIndex: 100, animation: ctClosing ? 'slideOut 0.2s ease-in forwards' : 'slideIn 0.2s ease-out' }}>
           <div style={{ padding: '4px 8px', fontSize: 9, fontWeight: 700, color: '#5c677f', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Chart Type</div>
           {candleTypes.map((ct) => (
             <button key={ct.label} onClick={() => handleCtSelect(ct.label)}
@@ -387,7 +387,7 @@ export function Chart({ candles, currentPrice, onDrawToggle, drawOpen = false, o
       )}
 
       {/* Zoom */}
-      <div style={{ position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)', display: 'flex', background: '#242a38', border: '1px solid #31394c', borderRadius: 8, overflow: 'hidden', zIndex: 20 }}>
+      <div style={{ position: 'absolute', bottom: 50, left: '50%', transform: 'translateX(-50%)', display: 'flex', background: '#242a38', border: '1px solid #31394c', borderRadius: 8, overflow: 'hidden', zIndex: 20 }}>
         <button style={{ width: 32, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#93a0b5', fontSize: 12, borderRight: '1px solid #31394c', cursor: 'pointer' }}>-</button>
         <button style={{ width: 32, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#93a0b5', fontSize: 12, cursor: 'pointer' }}>+</button>
       </div>

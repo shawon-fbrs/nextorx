@@ -94,7 +94,7 @@ export default function TradingPage() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden">
+    <div className="flex h-full min-h-0 overflow-hidden">
       {drawOpen && (
         <div className="w-52 bg-surface border-r border-border flex-shrink-0 flex flex-col overflow-hidden" style={{ animation: drawClosing ? 'slideOutLeft 0.35s ease-in forwards' : 'slideInLeft 0.35s ease-out' }}>
           <div className="px-3.5 pt-3.5 pb-2.5 border-b border-border flex items-center justify-between">
@@ -158,8 +158,8 @@ export default function TradingPage() {
         </div>
       )}
 
-      <main className="flex-1 flex flex-col min-w-0 relative overflow-hidden">
-        <div className="flex-1 relative overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 relative overflow-hidden h-full">
+        <div className="flex-1 relative overflow-hidden h-full">
           <AssetTabs symbols={SYMBOLS} activeSymbol={activeSymbol} onSelect={setActiveSymbol} />
           <Chart candles={candles} currentPrice={currentPrice} onDrawToggle={handleDrawToggle} drawOpen={drawOpen} onIndToggle={handleIndToggle} indOpen={indOpen} investment={investment} setInvestment={setInvestment} payoutAmount={payoutAmount} onTrade={handleTrade} symbolName={activeSymbol.name} payoutPercent={activeSymbol.payout} timeStr={timeStr} onTimeChange={handleTimeChange} />
         </div>
