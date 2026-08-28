@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { mockKyc, MockKyc } from '@/lib/mock-data/kyc';
 import { SearchInput } from '@/components/admin/ui/search-input';
 import { Badge } from '@/components/admin/ui/badge';
@@ -11,6 +11,7 @@ import { Textarea } from '@/components/admin/ui/textarea';
 import { StatsCard } from '@/components/admin/ui/stats-card';
 import { Tabs } from '@/components/admin/ui/tabs';
 import { Alert } from '@/components/admin/ui/alert';
+import { Skeleton } from '@/components/admin/ui/skeleton';
 
 export default function KycPage() {
   const [search, setSearch] = useState('');
@@ -18,6 +19,57 @@ export default function KycPage() {
   const [selectedKyc, setSelectedKyc] = useState<MockKyc | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-32 mb-2" />
+          <Skeleton className="h-4 w-56" />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-surface border border-border rounded-xl p-4 space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-6 w-12" />
+            </div>
+          ))}
+        </div>
+        <Card>
+          <CardContent>
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i}>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-3/4" />
+                  <div className="flex gap-2">
+                    <Skeleton className="h-8 flex-1" />
+                    <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const filteredKyc = useMemo(() => {
     let result = [...mockKyc];

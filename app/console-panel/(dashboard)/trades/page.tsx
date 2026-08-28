@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { mockTrades, MockTrade } from '@/lib/mock-data/trades';
 import { DataTable } from '@/components/admin/ui/data-table';
 import { SearchInput } from '@/components/admin/ui/search-input';
@@ -11,6 +11,7 @@ import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/
 import { Button } from '@/components/admin/ui/button';
 import { StatsCard } from '@/components/admin/ui/stats-card';
 import { Tabs } from '@/components/admin/ui/tabs';
+import { Skeleton } from '@/components/admin/ui/skeleton';
 
 export default function TradesPage() {
   const [search, setSearch] = useState('');
@@ -19,6 +20,44 @@ export default function TradesPage() {
   const [selectedTrade, setSelectedTrade] = useState<MockTrade | null>(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [activeTab, setActiveTab] = useState('all');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-32 mb-2" />
+          <Skeleton className="h-4 w-52" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="bg-surface border border-border rounded-xl p-4 space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-6 w-16" />
+            </div>
+          ))}
+        </div>
+        <Card>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Skeleton className="h-10 flex-1" />
+              <Skeleton className="h-10 w-36" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const allTrades = useMemo(() => {
     let result = [...mockTrades];

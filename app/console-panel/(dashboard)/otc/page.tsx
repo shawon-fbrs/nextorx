@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { mockAssets, MockAsset } from '@/lib/mock-data/assets';
 import { SearchInput } from '@/components/admin/ui/search-input';
 import { Badge } from '@/components/admin/ui/badge';
@@ -14,6 +14,7 @@ import { Tabs } from '@/components/admin/ui/tabs';
 import { StatsCard } from '@/components/admin/ui/stats-card';
 import { Progress } from '@/components/admin/ui/progress';
 import { Alert } from '@/components/admin/ui/alert';
+import { Skeleton } from '@/components/admin/ui/skeleton';
 
 export default function OtcPage() {
   const [search, setSearch] = useState('');
@@ -24,6 +25,50 @@ export default function OtcPage() {
   const [editMaxPayout, setEditMaxPayout] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [assets, setAssets] = useState(mockAssets);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-40 mb-2" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-surface border border-border rounded-xl p-4 space-y-2">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-6 w-12" />
+            </div>
+          ))}
+        </div>
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i}>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                  <Skeleton className="h-16 w-full" />
+                  <div className="grid grid-cols-3 gap-2">
+                    {[1, 2, 3].map((j) => <Skeleton key={j} className="h-8 w-full" />)}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const filteredAssets = useMemo(() => {
     let result = [...assets];

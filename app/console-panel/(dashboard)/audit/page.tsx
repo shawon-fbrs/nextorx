@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { mockAuditLogs, MockAuditLog } from '@/lib/mock-data/audit-logs';
 import { SearchInput } from '@/components/admin/ui/search-input';
 import { Badge } from '@/components/admin/ui/badge';
@@ -8,11 +8,50 @@ import { Card, CardContent } from '@/components/admin/ui/card';
 import { Select } from '@/components/admin/ui/select';
 import { DataTable } from '@/components/admin/ui/data-table';
 import { StatsCard } from '@/components/admin/ui/stats-card';
+import { Skeleton } from '@/components/admin/ui/skeleton';
 
 export default function AuditPage() {
   const [search, setSearch] = useState('');
   const [targetTypeFilter, setTargetTypeFilter] = useState('all');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-24 mb-2" />
+          <Skeleton className="h-4 w-56" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-surface border border-border rounded-xl p-4 space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-6 w-12" />
+            </div>
+          ))}
+        </div>
+        <Card>
+          <CardContent>
+            <div className="flex gap-4">
+              <Skeleton className="h-10 flex-1" />
+              <Skeleton className="h-10 w-36" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const filteredLogs = useMemo(() => {
     let result = [...mockAuditLogs];

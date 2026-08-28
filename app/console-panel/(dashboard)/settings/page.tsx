@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/admin/ui/card';
 import { Input } from '@/components/admin/ui/input';
 import { Button } from '@/components/admin/ui/button';
@@ -10,6 +10,7 @@ import { Textarea } from '@/components/admin/ui/textarea';
 import { Tabs } from '@/components/admin/ui/tabs';
 import { Alert } from '@/components/admin/ui/alert';
 import { Badge } from '@/components/admin/ui/badge';
+import { Skeleton } from '@/components/admin/ui/skeleton';
 import { payoutRules, withdrawalRules } from '@/lib/mock-data/treasury';
 
 export default function SettingsPage() {
@@ -17,6 +18,36 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [rules, setRules] = useState(payoutRules);
   const [wRules, setWRules] = useState(withdrawalRules);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-20 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Skeleton className="h-10 w-96" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[1, 2].map((i) => (
+            <Card key={i}>
+              <CardHeader><Skeleton className="h-5 w-32" /></CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const handleSave = () => {
     setSaved(true);

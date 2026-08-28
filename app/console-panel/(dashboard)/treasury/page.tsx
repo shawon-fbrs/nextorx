@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/admin/ui/card';
 import { StatsCard } from '@/components/admin/ui/stats-card';
 import { Badge } from '@/components/admin/ui/badge';
 import { Progress } from '@/components/admin/ui/progress';
 import { Alert } from '@/components/admin/ui/alert';
+import { Skeleton } from '@/components/admin/ui/skeleton';
 import { treasurySnapshot, treasuryHistory } from '@/lib/mock-data/treasury';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
@@ -13,6 +14,78 @@ import {
 } from 'recharts';
 
 export default function TreasuryPage() {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-7 w-28 mb-2" />
+            <Skeleton className="h-4 w-44" />
+          </div>
+          <Skeleton className="h-6 w-20" />
+        </div>
+        <Card>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-4">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-10 w-48" />
+                <div className="grid grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="space-y-1">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-6 w-28" />
+                      <Skeleton className="h-2 w-16" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col items-center">
+                <Skeleton className="h-40 w-40 rounded-full" />
+                <div className="flex gap-4 mt-3">
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-3 w-12" />)}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-surface border border-border rounded-xl p-4 space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-6 w-20" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardHeader><Skeleton className="h-5 w-36" /></CardHeader>
+              <CardContent><Skeleton className="h-64 w-full" /></CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardHeader><Skeleton className="h-5 w-44" /></CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const snap = treasurySnapshot;
   const history = treasuryHistory;
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { mockTransactions, MockTransaction } from '@/lib/mock-data/transactions';
 import { DataTable } from '@/components/admin/ui/data-table';
 import { SearchInput } from '@/components/admin/ui/search-input';
@@ -13,6 +13,7 @@ import { StatsCard } from '@/components/admin/ui/stats-card';
 import { Tabs } from '@/components/admin/ui/tabs';
 import { Alert } from '@/components/admin/ui/alert';
 import { Textarea } from '@/components/admin/ui/textarea';
+import { Skeleton } from '@/components/admin/ui/skeleton';
 
 export default function FinancePage() {
   const [search, setSearch] = useState('');
@@ -22,6 +23,44 @@ export default function FinancePage() {
   const [rejectReason, setRejectReason] = useState('');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [activeTab, setActiveTab] = useState('all');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-20 mb-2" />
+          <Skeleton className="h-4 w-44" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-surface border border-border rounded-xl p-4 space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-6 w-20" />
+            </div>
+          ))}
+        </div>
+        <Card>
+          <CardContent>
+            <div className="flex gap-4">
+              <Skeleton className="h-10 flex-1" />
+              <Skeleton className="h-10 w-36" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const allTxns = useMemo(() => {
     let result = [...mockTransactions];

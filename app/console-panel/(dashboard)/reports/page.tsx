@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/admin/ui/card';
 import { StatsCard } from '@/components/admin/ui/stats-card';
 import { Tabs } from '@/components/admin/ui/tabs';
 import { Button } from '@/components/admin/ui/button';
 import { Select } from '@/components/admin/ui/select';
+import { Skeleton } from '@/components/admin/ui/skeleton';
 import { dashboardStats, revenueData, weeklyRevenueData, dailyRevenueData, topAssets } from '@/lib/mock-data/stats';
 import { exportToCSV } from '@/lib/export';
 import {
@@ -18,6 +19,43 @@ const COLORS = ['#007aff', '#00c365', '#ff4954', '#ff8c00', '#a855f7', '#06b6d4'
 export default function ReportsPage() {
   const [period, setPeriod] = useState('monthly');
   const [activeTab, setActiveTab] = useState('revenue');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-7 w-44 mb-2" />
+            <Skeleton className="h-4 w-56" />
+          </div>
+          <Skeleton className="h-9 w-28" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-surface border border-border rounded-xl p-4 space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-6 w-24" />
+            </div>
+          ))}
+        </div>
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {[1, 2].map((i) => (
+            <Card key={i}>
+              <CardHeader><Skeleton className="h-5 w-28" /></CardHeader>
+              <CardContent><Skeleton className="h-64 w-full" /></CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const pieData = topAssets.slice(0, 6).map((a, i) => ({
     name: a.name,

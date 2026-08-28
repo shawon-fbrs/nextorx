@@ -4,6 +4,8 @@ export interface TreasuryDay {
   deposits: number;
   withdrawals: number;
   volume: number;
+  winnersStake: number;
+  losersStake: number;
   winnersPayout: number;
   losersKeep: number;
   revenue: number;
@@ -31,19 +33,18 @@ export interface TreasurySnapshot {
   status: 'healthy' | 'caution' | 'warning' | 'critical';
 }
 
-export const treasurySnapshot: TreasurySnapshot = {
-  totalBalance: 55212,
-  userLiabilities: 32100,
-  availableReserve: 23112,
-  pendingWithdrawals: 4500,
-  netAvailable: 18612,
-  reservePercent: 41.8,
-  dailyDeposits: 1800,
-  dailyWithdrawals: 640,
-  dailyVolume: 3500,
-  dailyRevenue: 476,
-  status: 'healthy',
-};
+function calcRevenue(volume: number, payout: number, winRate: number): number {
+  const lossRate = 1 - winRate;
+  const losersKeep = volume * lossRate;
+  const winnersStake = volume * winRate;
+  const winnersPayout = winnersStake * payout;
+  return losersKeep - winnersPayout;
+}
+
+function calcReserve(total: number, liabilities: number, pending: number): number {
+  const available = total - liabilities - pending;
+  return available > 0 ? (available / total) * 100 : 0;
+}
 
 export const treasuryHistory: TreasuryDay[] = [
   {
@@ -51,128 +52,156 @@ export const treasuryHistory: TreasuryDay[] = [
     opening: 20000,
     deposits: 7240,
     withdrawals: 600,
-    volume: 12000,
-    winnersPayout: 5760,
-    losersKeep: 7800,
-    revenue: 2040,
-    closing: 28680,
+    volume: 10200,
+    winnersStake: 4896,
+    losersStake: 5304,
+    winnersPayout: 3917,
+    losersKeep: 5304,
+    revenue: 1387,
+    closing: 27987,
     reservePercent: 34.5,
     activeUsers: 750,
     newUsers: 42,
     churnedUsers: 0,
-    winRate: 48.0,
-    payoutPercent: 80,
+    winRate: 0.48,
+    payoutPercent: 0.80,
     status: 'healthy',
   },
   {
     date: '2026-08-23',
-    opening: 28680,
+    opening: 27987,
     deposits: 6560,
     withdrawals: 1440,
-    volume: 12960,
-    winnersPayout: 4976,
-    losersKeep: 6768,
-    revenue: 1792,
-    closing: 35592,
+    volume: 11000,
+    winnersStake: 5280,
+    losersStake: 5720,
+    winnersPayout: 4224,
+    losersKeep: 5720,
+    revenue: 1496,
+    closing: 34603,
     reservePercent: 36.2,
     activeUsers: 720,
     newUsers: 38,
     churnedUsers: 30,
-    winRate: 48.2,
-    payoutPercent: 80,
+    winRate: 0.48,
+    payoutPercent: 0.80,
     status: 'healthy',
   },
   {
     date: '2026-08-24',
-    opening: 35592,
+    opening: 34603,
     deposits: 9240,
     withdrawals: 2500,
-    volume: 20400,
-    winnersPayout: 7834,
-    losersKeep: 10560,
-    revenue: 2726,
-    closing: 45058,
+    volume: 17500,
+    winnersStake: 8400,
+    losersStake: 9100,
+    winnersPayout: 6720,
+    losersKeep: 9100,
+    revenue: 2380,
+    closing: 43723,
     reservePercent: 41.2,
     activeUsers: 850,
     newUsers: 52,
     churnedUsers: 22,
-    winRate: 48.1,
-    payoutPercent: 82,
+    winRate: 0.48,
+    payoutPercent: 0.82,
     status: 'healthy',
   },
   {
     date: '2026-08-25',
-    opening: 45058,
+    opening: 43723,
     deposits: 4760,
     withdrawals: 6750,
-    volume: 9520,
-    winnersPayout: 3747,
-    losersKeep: 4982,
-    revenue: 1235,
-    closing: 44303,
+    volume: 7800,
+    winnersStake: 3744,
+    losersStake: 4056,
+    winnersPayout: 2924,
+    losersKeep: 4056,
+    revenue: 1132,
+    closing: 42865,
     reservePercent: 38.1,
     activeUsers: 680,
     newUsers: 28,
     churnedUsers: 45,
-    winRate: 47.8,
-    payoutPercent: 78,
+    winRate: 0.48,
+    payoutPercent: 0.78,
     status: 'caution',
   },
   {
     date: '2026-08-26',
-    opening: 44303,
+    opening: 42865,
     deposits: 8500,
     withdrawals: 3600,
-    volume: 15600,
-    winnersPayout: 5841,
-    losersKeep: 8024,
-    revenue: 2183,
-    closing: 51386,
+    volume: 13000,
+    winnersStake: 6240,
+    losersStake: 6760,
+    winnersPayout: 4867,
+    losersKeep: 6760,
+    revenue: 1893,
+    closing: 49658,
     reservePercent: 42.5,
     activeUsers: 780,
     newUsers: 45,
     churnedUsers: 18,
-    winRate: 48.3,
-    payoutPercent: 80,
+    winRate: 0.48,
+    payoutPercent: 0.80,
     status: 'healthy',
   },
   {
     date: '2026-08-27',
-    opening: 51386,
+    opening: 49658,
     deposits: 2700,
     withdrawals: 1200,
-    volume: 5400,
-    winnersPayout: 2074,
-    losersKeep: 2764,
-    revenue: 690,
-    closing: 53576,
+    volume: 4200,
+    winnersStake: 2016,
+    losersStake: 2184,
+    winnersPayout: 1613,
+    losersKeep: 2184,
+    revenue: 571,
+    closing: 51729,
     reservePercent: 44.8,
     activeUsers: 450,
     newUsers: 15,
     churnedUsers: 12,
-    winRate: 48.0,
-    payoutPercent: 80,
+    winRate: 0.48,
+    payoutPercent: 0.80,
     status: 'healthy',
   },
   {
     date: '2026-08-28',
-    opening: 53576,
+    opening: 51729,
     deposits: 1800,
     withdrawals: 640,
-    volume: 3500,
-    winnersPayout: 1344,
-    losersKeep: 1820,
-    revenue: 476,
-    closing: 55212,
+    volume: 2800,
+    winnersStake: 1344,
+    losersStake: 1456,
+    winnersPayout: 1075,
+    losersKeep: 1456,
+    revenue: 381,
+    closing: 53270,
     reservePercent: 45.6,
     activeUsers: 350,
     newUsers: 10,
     churnedUsers: 8,
-    winRate: 48.2,
-    payoutPercent: 80,
+    winRate: 0.48,
+    payoutPercent: 0.80,
     status: 'healthy',
   },
 ];
+
+export const treasurySnapshot: TreasurySnapshot = {
+  totalBalance: 53270,
+  userLiabilities: 28900,
+  availableReserve: 24370,
+  pendingWithdrawals: 4500,
+  netAvailable: 19870,
+  reservePercent: 45.6,
+  dailyDeposits: 1800,
+  dailyWithdrawals: 640,
+  dailyVolume: 2800,
+  dailyRevenue: 381,
+  status: 'healthy',
+};
 
 export interface PayoutRule {
   id: string;
@@ -236,7 +265,7 @@ export interface DailyOperation {
 }
 
 export const dailyOperations: DailyOperation[] = [
-  { id: 'op1', time: '06:00', name: 'Morning Treasury Check', status: 'completed', details: 'Treasury: $55,212 | Reserve: 45.6% | Status: Healthy' },
+  { id: 'op1', time: '06:00', name: 'Morning Treasury Check', status: 'completed', details: 'Treasury: $53,270 | Reserve: 45.6% | Status: Healthy' },
   { id: 'op2', time: '06:05', name: 'Payout Calculation', status: 'completed', details: 'Payout set to 80% — reserve > 30%' },
   { id: 'op3', time: '08:00', name: 'Withdrawal Queue Review', status: 'completed', details: '12 auto-approved, 3 pending manual review' },
   { id: 'op4', time: '08:15', name: 'Large Deposit Check', status: 'completed', details: 'No deposits > $500 today' },
@@ -275,11 +304,32 @@ export interface PnLRecord {
 }
 
 export const pnlHistory: PnLRecord[] = [
-  { date: '2026-08-22', expectedRevenue: 2400, actualRevenue: 2040, variance: -360, variancePercent: -15.0 },
-  { date: '2026-08-23', expectedRevenue: 2592, actualRevenue: 1792, variance: -800, variancePercent: -30.9 },
-  { date: '2026-08-24', expectedRevenue: 4080, actualRevenue: 2726, variance: -1354, variancePercent: -33.2 },
-  { date: '2026-08-25', expectedRevenue: 1904, actualRevenue: 1235, variance: -669, variancePercent: -35.1 },
-  { date: '2026-08-26', expectedRevenue: 3120, actualRevenue: 2183, variance: -937, variancePercent: -30.0 },
-  { date: '2026-08-27', expectedRevenue: 1080, actualRevenue: 690, variance: -390, variancePercent: -36.1 },
-  { date: '2026-08-28', expectedRevenue: 700, actualRevenue: 476, variance: -224, variancePercent: -32.0 },
+  { date: '2026-08-22', expectedRevenue: 2040, actualRevenue: 1387, variance: -653, variancePercent: -32.0 },
+  { date: '2026-08-23', expectedRevenue: 2200, actualRevenue: 1496, variance: -704, variancePercent: -32.0 },
+  { date: '2026-08-24', expectedRevenue: 3500, actualRevenue: 2380, variance: -1120, variancePercent: -32.0 },
+  { date: '2026-08-25', expectedRevenue: 1560, actualRevenue: 1132, variance: -428, variancePercent: -27.4 },
+  { date: '2026-08-26', expectedRevenue: 2600, actualRevenue: 1893, variance: -707, variancePercent: -27.2 },
+  { date: '2026-08-27', expectedRevenue: 840, actualRevenue: 571, variance: -269, variancePercent: -32.0 },
+  { date: '2026-08-28', expectedRevenue: 560, actualRevenue: 381, variance: -179, variancePercent: -32.0 },
 ];
+
+export function calcDailyRevenue(volume: number, payoutPercent: number): number {
+  const lossRate = 0.52;
+  const winRate = 0.48;
+  const losersKeep = volume * lossRate;
+  const winnersStake = volume * winRate;
+  const winnersPayout = winnersStake * payoutPercent;
+  return losersKeep - winnersPayout;
+}
+
+export function calcTreasuryClosing(
+  opening: number,
+  deposits: number,
+  withdrawals: number,
+  volume: number,
+  payoutPercent: number
+): { closing: number; revenue: number } {
+  const revenue = calcDailyRevenue(volume, payoutPercent);
+  const closing = opening + deposits - withdrawals + revenue;
+  return { closing, revenue };
+}

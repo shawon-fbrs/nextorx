@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useMemo, ReactNode } from 'react';
+import { useState, useMemo, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { mockUsers, MockUser } from '@/lib/mock-data/users';
 import { DataTable } from '@/components/admin/ui/data-table';
 import { SearchInput } from '@/components/admin/ui/search-input';
 import { Badge } from '@/components/admin/ui/badge';
 import { Card, CardContent } from '@/components/admin/ui/card';
+import { Skeleton } from '@/components/admin/ui/skeleton';
 
 const columns = [
   {
@@ -83,6 +84,38 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-16 mb-2" />
+          <Skeleton className="h-4 w-40" />
+        </div>
+        <Card>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Skeleton className="h-10 flex-1" />
+              <div className="flex gap-2">
+                {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-16" />)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const filteredUsers = useMemo(() => {
     let result = [...mockUsers];

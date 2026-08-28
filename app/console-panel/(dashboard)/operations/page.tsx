@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/admin/ui/card';
 import { Badge } from '@/components/admin/ui/badge';
 import { Button } from '@/components/admin/ui/button';
 import { Tabs } from '@/components/admin/ui/tabs';
 import { Progress } from '@/components/admin/ui/progress';
 import { Alert } from '@/components/admin/ui/alert';
+import { Skeleton } from '@/components/admin/ui/skeleton';
 import { alerts, dailyOperations, userRisks, pnlHistory } from '@/lib/mock-data/treasury';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -14,6 +15,44 @@ import {
 
 export default function OperationsPage() {
   const [activeTab, setActiveTab] = useState('alerts');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-7 w-28 mb-2" />
+            <Skeleton className="h-4 w-60" />
+          </div>
+          <Skeleton className="h-6 w-28" />
+        </div>
+        <Skeleton className="h-10 w-96" />
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardContent>
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-3 w-3 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-72" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                  <Skeleton className="h-8 w-24" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const unreadAlerts = alerts.filter((a) => !a.read).length;
 
