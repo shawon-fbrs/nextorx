@@ -12,16 +12,21 @@ import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/
 import { Input } from '@/components/admin/ui/input';
 import { Tabs } from '@/components/admin/ui/tabs';
 import { StatsCard } from '@/components/admin/ui/stats-card';
+import { Progress } from '@/components/admin/ui/progress';
+import { Alert } from '@/components/admin/ui/alert';
 
 export default function OtcPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedAsset, setSelectedAsset] = useState<MockAsset | null>(null);
-  const [editPayout, setEditPayout] = useState('');
+  const [editBasePayout, setEditBasePayout] = useState('');
+  const [editMinPayout, setEditMinPayout] = useState('');
+  const [editMaxPayout, setEditMaxPayout] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [assets, setAssets] = useState(mockAssets);
 
   const filteredAssets = useMemo(() => {
-    let result = [...mockAssets];
+    let result = [...assets];
     if (search) {
       const s = search.toLowerCase();
       result = result.filter((a) => a.name.toLowerCase().includes(s) || a.symbol.toLowerCase().includes(s));
@@ -30,45 +35,64 @@ export default function OtcPage() {
     if (activeTab === 'otc') result = result.filter((a) => a.isOtc);
     if (activeTab === 'regular') result = result.filter((a) => !a.isOtc);
     return result;
-  }, [search, categoryFilter, activeTab]);
+  }, [search, categoryFilter, activeTab, assets]);
 
   const stats = useMemo(() => ({
-    total: mockAssets.length,
-    enabled: mockAssets.filter((a) => a.enabled).length,
-    disabled: mockAssets.filter((a) => !a.enabled).length,
-    otc: mockAssets.filter((a) => a.isOtc).length,
-    avgPayout: Math.round(mockAssets.reduce((s, a) => s + a.payoutPercent, 0) / mockAssets.length),
-  }), []);
+    total: assets.length,
+    enabled: assets.filter((a) => a.enabled).length,
+    disabled: assets.filter((a) => !a.enabled).length,
+    otc: assets.filter((a) => a.isOtc).length,
+    avgPayout: Math.round(assets.filter((a) => a.enabled).reduce((s, a) => s + a.currentPayout, 0) / assets.filter((a) => a.enabled).length),
+    totalVolume: assets.reduce((s, a) => s + a.dailyVolume, 0),
+    totalTrades: assets.reduce((s, a) => s + a.dailyTrades, 0),
+  }), [assets]);
 
   const handleSavePayout = () => {
     if (selectedAsset) {
-      alert(`Updated ${selectedAsset.name} payout to ${editPayout}%`);
+      setAssets(assets.map((a) =>
+        a.id === selectedAsset.id
+          ? {
+              ...a,
+              basePayout: Number(editBasePayout),
+              currentPayout: Number(editBasePayout),
+              minPayout: Number(editMinPayout),
+              maxPayout: Number(editMaxPayout),
+            }
+          : a
+      ));
       setSelectedAsset(null);
     }
   };
 
+  const getPayoutColor = (current: number, base: number) => {
+    if (current > base) return 'text-green';
+    if (current < base) return 'text-red';
+    return 'text-white';
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white">Asset Management</h1>
-        <p className="text-sm text-textDark">Manage trading assets, payouts, and OTC pairs</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-white">Asset Management</h1>
+          <p className="text-sm text-textDark">Manage trading assets, per-pair payouts, and OTC configuration</p>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard title="Total Assets" value={stats.total} />
-        <StatsCard title="Enabled" value={stats.enabled} />
-        <StatsCard title="Disabled" value={stats.disabled} />
-        <StatsCard title="OTC Pairs" value={stats.otc} />
+        <StatsCard title="Active Pairs" value={stats.enabled} />
         <StatsCard title="Avg Payout" value={`${stats.avgPayout}%`} />
+        <StatsCard title="Daily Volume" value={`$${stats.totalVolume.toLocaleString()}`} />
       </div>
 
       {/* Tabs */}
       <Tabs
         tabs={[
-          { id: 'all', label: 'All', count: mockAssets.length },
-          { id: 'regular', label: 'Regular', count: mockAssets.filter((a) => !a.isOtc).length },
-          { id: 'otc', label: 'OTC', count: mockAssets.filter((a) => a.isOtc).length },
+          { id: 'all', label: 'All', count: assets.length },
+          { id: 'regular', label: 'Regular', count: assets.filter((a) => !a.isOtc).length },
+          { id: 'otc', label: 'OTC', count: assets.filter((a) => a.isOtc).length },
         ]}
         onChange={(id) => setActiveTab(id)}
       />
@@ -93,7 +117,6 @@ export default function OtcPage() {
                   { value: 'forex', label: 'Forex' },
                   { value: 'crypto', label: 'Crypto' },
                   { value: 'commodities', label: 'Commodities' },
-                  { value: 'stocks', label: 'Stocks' },
                 ]}
               />
             </div>
@@ -112,34 +135,48 @@ export default function OtcPage() {
                   <p className="text-[11px] text-textDark">{asset.description}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {asset.isOtc && (
-                    <Badge variant="info">OTC</Badge>
-                  )}
+                  {asset.isOtc && <Badge variant="info">OTC</Badge>}
                   <Badge variant={asset.enabled ? 'success' : 'danger'}>
                     {asset.enabled ? 'Active' : 'Disabled'}
                   </Badge>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <p className="text-[10px] text-textDark uppercase">Payout</p>
-                  <p className="text-sm font-bold text-green">{asset.payoutPercent}%</p>
+              {/* Payout Section */}
+              <div className="p-3 bg-background rounded-lg border border-border mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-textDark uppercase">Current Payout</span>
+                  <span className={`text-lg font-bold ${getPayoutColor(asset.currentPayout, asset.basePayout)}`}>
+                    {asset.currentPayout}%
+                  </span>
                 </div>
-                <div>
-                  <p className="text-[10px] text-textDark uppercase">Spread</p>
-                  <p className="text-sm text-text">{asset.spread}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-textDark uppercase">Min Trade</p>
-                  <p className="text-sm text-text">${asset.minTrade}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-textDark uppercase">Max Trade</p>
-                  <p className="text-sm text-text">${asset.maxTrade.toLocaleString()}</p>
+                <Progress value={asset.currentPayout} max={100} size="sm" color={asset.currentPayout >= asset.basePayout ? 'green' : 'orange'} />
+                <div className="flex justify-between mt-1 text-[9px] text-textDark">
+                  <span>Min: {asset.minPayout}%</span>
+                  <span>Base: {asset.basePayout}%</span>
+                  <span>Max: {asset.maxPayout}%</span>
                 </div>
               </div>
 
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div>
+                  <p className="text-[9px] text-textDark uppercase">Volume</p>
+                  <p className="text-xs font-medium text-white">${asset.dailyVolume.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-textDark uppercase">Trades</p>
+                  <p className="text-xs font-medium text-white">{asset.dailyTrades.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-textDark uppercase">Win Rate</p>
+                  <p className={`text-xs font-medium ${asset.winRate >= 48 ? 'text-green' : 'text-orange'}`}>
+                    {asset.winRate > 0 ? `${asset.winRate}%` : '-'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
               <div className="flex items-center justify-between pt-3 border-t border-border">
                 <p className="text-[10px] text-textDark">{asset.tradingHours}</p>
                 <div className="flex gap-2">
@@ -148,7 +185,9 @@ export default function OtcPage() {
                     variant="ghost"
                     onClick={() => {
                       setSelectedAsset(asset);
-                      setEditPayout(asset.payoutPercent.toString());
+                      setEditBasePayout(asset.basePayout.toString());
+                      setEditMinPayout(asset.minPayout.toString());
+                      setEditMaxPayout(asset.maxPayout.toString());
                     }}
                   >
                     Edit Payout
@@ -156,7 +195,7 @@ export default function OtcPage() {
                   <Toggle
                     checked={asset.enabled}
                     size="sm"
-                    onChange={() => alert(`${asset.enabled ? 'Disabled' : 'Enabled'} ${asset.name}`)}
+                    onChange={() => setAssets(assets.map((a) => a.id === asset.id ? { ...a, enabled: !a.enabled } : a))}
                   />
                 </div>
               </div>
@@ -170,18 +209,69 @@ export default function OtcPage() {
         <DialogHeader onClose={() => setSelectedAsset(null)}>
           <h2 className="text-lg font-bold text-white">Edit Payout — {selectedAsset?.name}</h2>
         </DialogHeader>
-        <DialogContent>
-          <Input
-            label="Payout Percentage"
-            type="number"
-            value={editPayout}
-            onChange={(e) => setEditPayout(e.target.value)}
-            min={50}
-            max={95}
-          />
-          <p className="text-[11px] text-textDark mt-2">
-            Recommended range: 70%–85%. Higher payouts attract more traders but reduce house edge.
-          </p>
+        <DialogContent className="space-y-4">
+          <Alert variant="info" title="Dynamic Payout">
+            Set the base payout and allowed range. The payout engine will auto-adjust within this range based on treasury health.
+          </Alert>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Base Payout (%)"
+              type="number"
+              value={editBasePayout}
+              onChange={(e) => setEditBasePayout(e.target.value)}
+              min={50}
+              max={95}
+            />
+            <div className="flex items-end">
+              <p className="text-[11px] text-textDark">
+                House Edge: <span className="text-white font-medium">{100 - Number(editBasePayout || 0)}%</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Min Payout (%)"
+              type="number"
+              value={editMinPayout}
+              onChange={(e) => setEditMinPayout(e.target.value)}
+              min={50}
+              max={95}
+              helperText="Lowest payout when treasury is low"
+            />
+            <Input
+              label="Max Payout (%)"
+              type="number"
+              value={editMaxPayout}
+              onChange={(e) => setEditMaxPayout(e.target.value)}
+              min={50}
+              max={95}
+              helperText="Highest payout when treasury is healthy"
+            />
+          </div>
+
+          <div className="p-3 bg-background rounded-lg border border-border">
+            <p className="text-[10px] text-textDark uppercase mb-2">Payout Range Preview</p>
+            <div className="relative h-4 bg-border rounded-full overflow-hidden">
+              <div
+                className="absolute h-full bg-blue rounded-full"
+                style={{
+                  left: `${Number(editMinPayout) || 0}%`,
+                  width: `${(Number(editMaxPayout) || 100) - (Number(editMinPayout) || 0)}%`,
+                }}
+              />
+              <div
+                className="absolute h-full w-1 bg-white rounded-full"
+                style={{ left: `${Number(editBasePayout) || 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-1 text-[9px] text-textDark">
+              <span>{editMinPayout}% (Min)</span>
+              <span>{editBasePayout}% (Base)</span>
+              <span>{editMaxPayout}% (Max)</span>
+            </div>
+          </div>
         </DialogContent>
         <DialogFooter>
           <Button variant="secondary" onClick={() => setSelectedAsset(null)}>Cancel</Button>
