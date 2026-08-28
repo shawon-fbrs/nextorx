@@ -7,6 +7,7 @@ import { Tabs } from '@/components/admin/ui/tabs';
 import { Button } from '@/components/admin/ui/button';
 import { Select } from '@/components/admin/ui/select';
 import { dashboardStats, revenueData, weeklyRevenueData, dailyRevenueData, topAssets } from '@/lib/mock-data/stats';
+import { exportToCSV } from '@/lib/export';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -31,7 +32,7 @@ export default function ReportsPage() {
           <h1 className="text-xl font-bold text-white">Reports & Analytics</h1>
           <p className="text-sm text-textDark">Platform performance and user analytics</p>
         </div>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => exportToCSV(topAssets, 'asset_report')}>
           <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" className="mr-1.5">
             <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
