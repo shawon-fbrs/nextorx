@@ -12,7 +12,7 @@ export default function AdminLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen bg-background overflow-hidden">
       <AdminHeader
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isSidebarOpen={isSidebarOpen}
@@ -21,8 +21,8 @@ export default function AdminLayout({
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
-      <main className="pt-16 lg:pl-64">
-        <div className="p-6">{children}</div>
+      <main className="h-16 pt-16 lg:pl-64 overflow-y-auto">
+        <div className="p-6 min-h-[calc(100vh-4rem)]">{children}</div>
       </main>
     </div>
   );
