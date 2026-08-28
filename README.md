@@ -65,7 +65,12 @@ nextorx/
         └── stats.ts              # Dashboard stats & chart data
 ```
 
-## Getting Started
+## Clone
+
+```bash
+git clone git@github.com:shawon-fbrs/nextorx.git
+cd nextorx
+```
 
 ```bash
 # Install dependencies
