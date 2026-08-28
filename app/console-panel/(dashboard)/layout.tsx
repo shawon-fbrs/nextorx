@@ -21,8 +21,8 @@ export default function AdminLayout({
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
-      <main className="h-16 pt-16 lg:pl-64 overflow-y-auto">
-        <div className="p-6 min-h-[calc(100vh-4rem)]">{children}</div>
+      <main className="fixed top-16 bottom-0 left-0 right-0 lg:left-64 overflow-y-auto">
+        <div className="p-6">{children}</div>
       </main>
     </div>
   );
