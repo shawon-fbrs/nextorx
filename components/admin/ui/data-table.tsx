@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 interface Column<T> {
   key: string;
-  header: string;
+  header: string | (() => ReactNode);
   sortable?: boolean;
   render?: (item: T) => ReactNode;
 }
@@ -48,7 +48,7 @@ export function DataTable<T extends Record<string, any>>({
                     col.sortable && 'cursor-pointer select-none hover:text-white'
                   )}
                 >
-                  {col.header}
+                  {typeof col.header === 'function' ? col.header() : col.header}
                 </th>
               ))}
             </tr>

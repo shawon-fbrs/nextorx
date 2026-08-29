@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/admin/ui/card';
 import { Select } from '@/components/admin/ui/select';
 import { DataTable } from '@/components/admin/ui/data-table';
 import { StatsCard } from '@/components/admin/ui/stats-card';
+import { Button } from '@/components/admin/ui/button';
 import { Skeleton } from '@/components/admin/ui/skeleton';
 
 export default function AuditPage() {
@@ -20,6 +21,29 @@ export default function AuditPage() {
     const timer = setTimeout(() => setIsLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
+
+  const filteredLogs = useMemo(() => {
+    let result = [...mockAuditLogs];
+    if (search) {
+      const s = search.toLowerCase();
+      result = result.filter(
+        (l) =>
+          l.adminName.toLowerCase().includes(s) ||
+          l.action.toLowerCase().includes(s) ||
+          l.target.toLowerCase().includes(s) ||
+          l.details.toLowerCase().includes(s)
+      );
+    }
+    if (targetTypeFilter !== 'all') result = result.filter((l) => l.targetType === targetTypeFilter);
+    return result;
+  }, [search, targetTypeFilter]);
+
+  const paginatedLogs = useMemo(() => {
+    const start = pagination.pageIndex * pagination.pageSize;
+    return filteredLogs.slice(start, start + pagination.pageSize);
+  }, [filteredLogs, pagination]);
+
+  const totalPages = Math.ceil(filteredLogs.length / pagination.pageSize);
 
   if (isLoading) {
     return (
@@ -52,29 +76,6 @@ export default function AuditPage() {
       </div>
     );
   }
-
-  const filteredLogs = useMemo(() => {
-    let result = [...mockAuditLogs];
-    if (search) {
-      const s = search.toLowerCase();
-      result = result.filter(
-        (l) =>
-          l.adminName.toLowerCase().includes(s) ||
-          l.action.toLowerCase().includes(s) ||
-          l.target.toLowerCase().includes(s) ||
-          l.details.toLowerCase().includes(s)
-      );
-    }
-    if (targetTypeFilter !== 'all') result = result.filter((l) => l.targetType === targetTypeFilter);
-    return result;
-  }, [search, targetTypeFilter]);
-
-  const paginatedLogs = useMemo(() => {
-    const start = pagination.pageIndex * pagination.pageSize;
-    return filteredLogs.slice(start, start + pagination.pageSize);
-  }, [filteredLogs, pagination]);
-
-  const totalPages = Math.ceil(filteredLogs.length / pagination.pageSize);
 
   const getActionBadge = (action: string) => {
     if (action.includes('approve')) return <Badge variant="success">{action}</Badge>;
@@ -166,19 +167,42 @@ export default function AuditPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="w-40">
-              <Select
-                value={targetTypeFilter}
-                onChange={(e) => setTargetTypeFilter(e.target.value)}
-                options={[
-                  { value: 'all', label: 'All Types' },
-                  { value: 'user', label: 'User' },
-                  { value: 'trade', label: 'Trade' },
-                  { value: 'asset', label: 'Asset' },
-                  { value: 'finance', label: 'Finance' },
-                  { value: 'system', label: 'System' },
-                ]}
-              />
+            <div className="flex gap-2">
+              <div className="w-40">
+                <Select
+                  value={targetTypeFilter}
+                  onChange={(e) => setTargetTypeFilter(e.target.value)}
+                  options={[
+                    { value: 'all', label: 'All Types' },
+                    { value: 'user', label: 'User' },
+                    { value: 'trade', label: 'Trade' },
+                    { value: 'asset', label: 'Asset' },
+                    { value: 'finance', label: 'Finance' },
+                    { value: 'system', label: 'System' },
+                  ]}
+                />
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const exportData = filteredLogs.map(l => ({
+                    timestamp: new Date(l.timestamp).toLocaleString(),
+                    admin: l.adminName,
+                    action: l.action,
+                    target: l.target,
+                    type: l.targetType,
+                    details: l.details,
+                    ip: l.ip,
+                  }));
+                  import('@/lib/export').then(m => m.exportToCSV(exportData, 'audit_logs'));
+                }}
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Export
+              </Button>
             </div>
           </div>
         </CardContent>

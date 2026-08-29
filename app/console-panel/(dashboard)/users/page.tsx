@@ -7,6 +7,7 @@ import { DataTable } from '@/components/admin/ui/data-table';
 import { SearchInput } from '@/components/admin/ui/search-input';
 import { Badge } from '@/components/admin/ui/badge';
 import { Card, CardContent } from '@/components/admin/ui/card';
+import { Button } from '@/components/admin/ui/button';
 import { Skeleton } from '@/components/admin/ui/skeleton';
 
 const columns = [
@@ -91,32 +92,6 @@ export default function UsersPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <Skeleton className="h-7 w-16 mb-2" />
-          <Skeleton className="h-4 w-40" />
-        </div>
-        <Card>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Skeleton className="h-10 flex-1" />
-              <div className="flex gap-2">
-                {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-16" />)}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Skeleton className="h-64 w-full" />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   const filteredUsers = useMemo(() => {
     let result = [...mockUsers];
 
@@ -142,6 +117,32 @@ export default function UsersPage() {
   }, [filteredUsers, pagination]);
 
   const totalPages = Math.ceil(filteredUsers.length / pagination.pageSize);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-7 w-16 mb-2" />
+          <Skeleton className="h-4 w-40" />
+        </div>
+        <Card>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Skeleton className="h-10 flex-1" />
+              <div className="flex gap-2">
+                {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-16" />)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -174,6 +175,27 @@ export default function UsersPage() {
                   {status.charAt(0).toUpperCase() + status.slice(1)}
                 </button>
               ))}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const exportData = filteredUsers.map(u => ({
+                    id: u.id,
+                    name: u.name,
+                    email: u.email,
+                    status: u.status,
+                    kyc: u.kyc,
+                    balance: u.balance,
+                    lastLogin: u.lastLogin,
+                  }));
+                  import('@/lib/export').then(m => m.exportToCSV(exportData, 'users'));
+                }}
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Export
+              </Button>
             </div>
           </div>
         </CardContent>

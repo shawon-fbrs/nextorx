@@ -10,22 +10,54 @@ import { Toggle } from '@/components/admin/ui/toggle';
 import { Button } from '@/components/admin/ui/button';
 import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/admin/ui/dialog';
 import { Input } from '@/components/admin/ui/input';
-import { Tabs } from '@/components/admin/ui/tabs';
 import { StatsCard } from '@/components/admin/ui/stats-card';
 import { Progress } from '@/components/admin/ui/progress';
 import { Alert } from '@/components/admin/ui/alert';
 import { Skeleton } from '@/components/admin/ui/skeleton';
 
+interface NewOtcPair {
+  symbol: string;
+  name: string;
+  description: string;
+  category: string;
+  basePayout: number;
+  minPayout: number;
+  maxPayout: number;
+  tradingHours: string;
+  spread: number;
+  minTrade: number;
+  maxTrade: number;
+}
+
+const categories = [
+  { value: 'forex', label: 'Forex' },
+  { value: 'crypto', label: 'Crypto' },
+  { value: 'commodities', label: 'Commodities' },
+  { value: 'stocks', label: 'Stocks' },
+];
+
 export default function OtcPage() {
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedAsset, setSelectedAsset] = useState<MockAsset | null>(null);
   const [editBasePayout, setEditBasePayout] = useState('');
   const [editMinPayout, setEditMinPayout] = useState('');
   const [editMaxPayout, setEditMaxPayout] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
   const [assets, setAssets] = useState(mockAssets);
   const [isLoading, setIsLoading] = useState(true);
+  const [addPairOpen, setAddPairOpen] = useState(false);
+  const [newPair, setNewPair] = useState<NewOtcPair>({
+    symbol: '',
+    name: '',
+    description: '',
+    category: 'forex',
+    basePayout: 85,
+    minPayout: 75,
+    maxPayout: 92,
+    tradingHours: '24/7',
+    spread: 0.0002,
+    minTrade: 1,
+    maxTrade: 5000,
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 800);
@@ -71,26 +103,67 @@ export default function OtcPage() {
   }
 
   const filteredAssets = useMemo(() => {
-    let result = [...assets];
+    let result = assets.filter((a) => a.isOtc);
     if (search) {
       const s = search.toLowerCase();
       result = result.filter((a) => a.name.toLowerCase().includes(s) || a.symbol.toLowerCase().includes(s));
     }
-    if (categoryFilter !== 'all') result = result.filter((a) => a.category === categoryFilter);
-    if (activeTab === 'otc') result = result.filter((a) => a.isOtc);
-    if (activeTab === 'regular') result = result.filter((a) => !a.isOtc);
     return result;
-  }, [search, categoryFilter, activeTab, assets]);
+  }, [search, assets]);
 
-  const stats = useMemo(() => ({
-    total: assets.length,
-    enabled: assets.filter((a) => a.enabled).length,
-    disabled: assets.filter((a) => !a.enabled).length,
-    otc: assets.filter((a) => a.isOtc).length,
-    avgPayout: Math.round(assets.filter((a) => a.enabled).reduce((s, a) => s + a.currentPayout, 0) / assets.filter((a) => a.enabled).length),
-    totalVolume: assets.reduce((s, a) => s + a.dailyVolume, 0),
-    totalTrades: assets.reduce((s, a) => s + a.dailyTrades, 0),
-  }), [assets]);
+  const stats = useMemo(() => {
+    const otcAssets = assets.filter((a) => a.isOtc);
+    return {
+      total: otcAssets.length,
+      enabled: otcAssets.filter((a) => a.enabled).length,
+      avgPayout: Math.round(otcAssets.filter((a) => a.enabled).reduce((s, a) => s + a.currentPayout, 0) / otcAssets.filter((a) => a.enabled).length) || 0,
+      totalVolume: otcAssets.reduce((s, a) => s + a.dailyVolume, 0),
+      totalTrades: otcAssets.reduce((s, a) => s + a.dailyTrades, 0),
+    };
+  }, [assets]);
+
+  const handleAddPair = () => {
+    if (!newPair.symbol || !newPair.name) {
+      alert('Symbol and Name are required');
+      return;
+    }
+    const id = `OTC_${newPair.symbol.toUpperCase()}_${Date.now()}`;
+    const pair: MockAsset = {
+      id,
+      symbol: newPair.symbol.toUpperCase(),
+      name: newPair.name,
+      description: newPair.description || `${newPair.name} OTC pair`,
+      category: newPair.category as any,
+      currentPayout: newPair.basePayout,
+      basePayout: newPair.basePayout,
+      minPayout: newPair.minPayout,
+      maxPayout: newPair.maxPayout,
+      enabled: true,
+      isOtc: true,
+      dailyVolume: 0,
+      dailyTrades: 0,
+      winRate: 0,
+      tradingHours: newPair.tradingHours,
+      spread: newPair.spread,
+      minTrade: newPair.minTrade,
+      maxTrade: newPair.maxTrade,
+    };
+    setAssets([...assets, pair]);
+    setAddPairOpen(false);
+    setNewPair({
+      symbol: '',
+      name: '',
+      description: '',
+      category: 'forex',
+      basePayout: 85,
+      minPayout: 75,
+      maxPayout: 92,
+      tradingHours: '24/7',
+      spread: 0.0002,
+      minTrade: 1,
+      maxTrade: 5000,
+    });
+  };
 
   const handleSavePayout = () => {
     if (selectedAsset) {
@@ -119,28 +192,24 @@ export default function OtcPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">Asset Management</h1>
-          <p className="text-sm text-textDark">Manage trading assets, per-pair payouts, and OTC configuration</p>
+          <h1 className="text-xl font-bold text-white">OTC Pairs Management</h1>
+          <p className="text-sm text-textDark">Add and manage Over-The-Counter trading pairs</p>
         </div>
+        <Button onClick={() => setAddPairOpen(true)}>
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Add New Pair
+        </Button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Total Assets" value={stats.total} />
+        <StatsCard title="Total OTC Pairs" value={stats.total} />
         <StatsCard title="Active Pairs" value={stats.enabled} />
         <StatsCard title="Avg Payout" value={`${stats.avgPayout}%`} />
         <StatsCard title="Daily Volume" value={`$${stats.totalVolume.toLocaleString()}`} />
       </div>
-
-      {/* Tabs */}
-      <Tabs
-        tabs={[
-          { id: 'all', label: 'All', count: assets.length },
-          { id: 'regular', label: 'Regular', count: assets.filter((a) => !a.isOtc).length },
-          { id: 'otc', label: 'OTC', count: assets.filter((a) => a.isOtc).length },
-        ]}
-        onChange={(id) => setActiveTab(id)}
-      />
 
       {/* Filters */}
       <Card>
@@ -148,21 +217,9 @@ export default function OtcPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <SearchInput
-                placeholder="Search assets..."
+                placeholder="Search OTC pairs..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <div className="w-40">
-              <Select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                options={[
-                  { value: 'all', label: 'All Categories' },
-                  { value: 'forex', label: 'Forex' },
-                  { value: 'crypto', label: 'Crypto' },
-                  { value: 'commodities', label: 'Commodities' },
-                ]}
               />
             </div>
           </div>
@@ -248,6 +305,110 @@ export default function OtcPage() {
           </Card>
         ))}
       </div>
+
+      {/* Add New Pair Modal */}
+      <Dialog open={addPairOpen} onClose={() => setAddPairOpen(false)}>
+        <DialogHeader onClose={() => setAddPairOpen(false)}>
+          <h2 className="text-lg font-bold text-white">Add New OTC Pair</h2>
+        </DialogHeader>
+        <DialogContent className="space-y-4">
+          <Alert variant="info" title="New OTC Pair">
+            Create a new Over-The-Counter trading pair. These pairs are managed manually and use fixed pricing.
+          </Alert>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Symbol (e.g., USD/BRL)"
+              placeholder="USD/BRL"
+              value={newPair.symbol}
+              onChange={(e) => setNewPair({ ...newPair, symbol: e.target.value })}
+            />
+            <Input
+              label="Display Name (e.g., USD/BRL OTC)"
+              placeholder="USD/BRL (OTC)"
+              value={newPair.name}
+              onChange={(e) => setNewPair({ ...newPair, name: e.target.value })}
+            />
+          </div>
+
+          <Input
+            label="Description"
+            placeholder="Short description of the pair"
+            value={newPair.description}
+            onChange={(e) => setNewPair({ ...newPair, description: e.target.value })}
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Category"
+              value={newPair.category}
+              onChange={(e) => setNewPair({ ...newPair, category: e.target.value })}
+              options={categories}
+            />
+            <Input
+              label="Trading Hours"
+              placeholder="24/7"
+              value={newPair.tradingHours}
+              onChange={(e) => setNewPair({ ...newPair, tradingHours: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <Input
+              label="Spread"
+              type="number"
+              placeholder="0.0002"
+              value={newPair.spread.toString()}
+              onChange={(e) => setNewPair({ ...newPair, spread: Number(e.target.value) })}
+            />
+            <Input
+              label="Min Trade ($)"
+              type="number"
+              placeholder="1"
+              value={newPair.minTrade.toString()}
+              onChange={(e) => setNewPair({ ...newPair, minTrade: Number(e.target.value) })}
+            />
+            <Input
+              label="Max Trade ($)"
+              type="number"
+              placeholder="5000"
+              value={newPair.maxTrade.toString()}
+              onChange={(e) => setNewPair({ ...newPair, maxTrade: Number(e.target.value) })}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <Input
+              label="Base Payout (%)"
+              type="number"
+              value={newPair.basePayout.toString()}
+              onChange={(e) => setNewPair({ ...newPair, basePayout: Number(e.target.value) })}
+              min={50}
+              max={95}
+            />
+            <Input
+              label="Min Payout (%)"
+              type="number"
+              value={newPair.minPayout.toString()}
+              onChange={(e) => setNewPair({ ...newPair, minPayout: Number(e.target.value) })}
+              min={50}
+              max={95}
+            />
+            <Input
+              label="Max Payout (%)"
+              type="number"
+              value={newPair.maxPayout.toString()}
+              onChange={(e) => setNewPair({ ...newPair, maxPayout: Number(e.target.value) })}
+              min={50}
+              max={95}
+            />
+          </div>
+        </DialogContent>
+        <DialogFooter>
+          <Button variant="secondary" onClick={() => setAddPairOpen(false)}>Cancel</Button>
+          <Button onClick={handleAddPair}>Add Pair</Button>
+        </DialogFooter>
+      </Dialog>
 
       {/* Edit Payout Modal */}
       <Dialog open={!!selectedAsset} onClose={() => setSelectedAsset(null)}>

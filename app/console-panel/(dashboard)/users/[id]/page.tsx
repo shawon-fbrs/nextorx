@@ -8,12 +8,19 @@ import { Badge } from '@/components/admin/ui/badge';
 import { Button } from '@/components/admin/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/admin/ui/card';
 import { StatsCard } from '@/components/admin/ui/stats-card';
+import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/admin/ui/dialog';
+import { Textarea } from '@/components/admin/ui/textarea';
+import { Input } from '@/components/admin/ui/input';
 
 type Tab = 'overview' | 'trades' | 'deposits' | 'withdrawals';
 
 export default function UserDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [adjustBalanceOpen, setAdjustBalanceOpen] = useState(false);
+  const [adjustmentAmount, setAdjustmentAmount] = useState('');
+  const [adjustmentNote, setAdjustmentNote] = useState('');
+  const [adjustmentType, setAdjustmentType] = useState<'add' | 'subtract'>('add');
 
   const user = mockUsers.find((u) => u.id === params.id);
   const userTrades = mockTrades.filter((t) => t.userId === params.id);
@@ -28,6 +35,22 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
       </div>
     );
   }
+
+  const handleAdjustBalance = () => {
+    const amount = parseFloat(adjustmentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    if (!adjustmentNote.trim()) {
+      alert('Please provide a reason for this adjustment');
+      return;
+    }
+    alert(`Balance ${adjustmentType === 'add' ? 'added' : 'subtracted'}: $${amount}\nReason: ${adjustmentNote}`);
+    setAdjustBalanceOpen(false);
+    setAdjustmentAmount('');
+    setAdjustmentNote('');
+  };
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
@@ -68,6 +91,12 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setAdjustBalanceOpen(true)}>
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Adjust Balance
+          </Button>
           <Button variant="outline" size="sm">Edit</Button>
           <Button variant="danger" size="sm">Ban User</Button>
         </div>
@@ -289,6 +318,70 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Balance Adjustment Dialog */}
+      <Dialog open={adjustBalanceOpen} onClose={() => setAdjustBalanceOpen(false)}>
+        <DialogHeader onClose={() => setAdjustBalanceOpen(false)}>
+          <h2 className="text-lg font-bold text-white">Adjust User Balance</h2>
+        </DialogHeader>
+        <DialogContent className="space-y-4">
+          <div className="p-3 bg-orange/10 border border-orange/20 rounded-lg">
+            <p className="text-sm text-orange font-medium">Current Balance: ${user.balance.toLocaleString()}</p>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setAdjustmentType('add')}
+              className={`flex-1 py-2.5 rounded-lg font-medium text-sm transition-colors ${
+                adjustmentType === 'add'
+                  ? 'bg-green text-white'
+                  : 'bg-background text-textDark hover:text-white'
+              }`}
+            >
+              + Add Funds
+            </button>
+            <button
+              onClick={() => setAdjustmentType('subtract')}
+              className={`flex-1 py-2.5 rounded-lg font-medium text-sm transition-colors ${
+                adjustmentType === 'subtract'
+                  ? 'bg-red text-white'
+                  : 'bg-background text-textDark hover:text-white'
+              }`}
+            >
+              - Subtract Funds
+            </button>
+          </div>
+
+          <Input
+            label="Amount ($)"
+            type="number"
+            placeholder="Enter amount"
+            value={adjustmentAmount}
+            onChange={(e) => setAdjustmentAmount(e.target.value)}
+            min={1}
+          />
+
+          <Textarea
+            label="Reason / Note (required)"
+            placeholder="Enter reason for this adjustment (e.g., 'Customer support credit', 'Correction for duplicate charge')"
+            value={adjustmentNote}
+            onChange={(e) => setAdjustmentNote(e.target.value)}
+            rows={3}
+          />
+
+          <div className="p-3 bg-background rounded-lg border border-border">
+            <p className="text-[11px] text-textDark">
+              <span className="font-semibold text-orange">Warning:</span> This action will be logged in the audit trail with timestamp and admin ID.
+            </p>
+          </div>
+        </DialogContent>
+        <DialogFooter>
+          <Button variant="secondary" onClick={() => setAdjustBalanceOpen(false)}>Cancel</Button>
+          <Button onClick={handleAdjustBalance}>
+            {adjustmentType === 'add' ? 'Add Funds' : 'Subtract Funds'}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

@@ -20,6 +20,7 @@ export default function FinancePage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedTxn, setSelectedTxn] = useState<MockTransaction | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rejectReason, setRejectReason] = useState('');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [activeTab, setActiveTab] = useState('all');
@@ -102,7 +103,54 @@ export default function FinancePage() {
     setSelectedTxn(null);
   };
 
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedTxns.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedTxns.map(t => t.reference)));
+    }
+  };
+
+  const handleBulkApprove = () => {
+    alert(`Approved ${selectedIds.size} transactions`);
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkReject = () => {
+    alert(`Rejected ${selectedIds.size} transactions`);
+    setSelectedIds(new Set());
+  };
+
   const columns = [
+    {
+      key: 'select',
+      header: () => (
+        <input
+          type="checkbox"
+          checked={selectedIds.size === paginatedTxns.length && paginatedTxns.length > 0}
+          onChange={toggleSelectAll}
+          className="w-4 h-4 rounded border-border bg-background cursor-pointer accent-blue"
+        />
+      ),
+      render: (t: MockTransaction) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(t.reference)}
+          onChange={() => toggleSelect(t.reference)}
+          className="w-4 h-4 rounded border-border bg-background cursor-pointer accent-blue"
+        />
+      ),
+    },
     {
       key: 'type',
       header: 'Type',
@@ -201,20 +249,79 @@ export default function FinancePage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="w-40">
-              <Select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                options={[
-                  { value: 'all', label: 'All Types' },
-                  { value: 'deposit', label: 'Deposits' },
-                  { value: 'withdrawal', label: 'Withdrawals' },
-                ]}
-              />
+            <div className="flex gap-2">
+              <div className="w-40">
+                <Select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  options={[
+                    { value: 'all', label: 'All Types' },
+                    { value: 'deposit', label: 'Deposits' },
+                    { value: 'withdrawal', label: 'Withdrawals' },
+                  ]}
+                />
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const exportData = allTxns.map(t => ({
+                    reference: t.reference,
+                    type: t.type,
+                    user: t.userName,
+                    amount: t.amount,
+                    method: t.method,
+                    status: t.status,
+                    date: new Date(t.createdAt).toLocaleDateString(),
+                  }));
+                  import('@/lib/export').then(m => m.exportToCSV(exportData, 'transactions'));
+                }}
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Export
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <Card className="border-blue/50 bg-blue/5">
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue/20 flex items-center justify-center">
+                  <span className="text-blue font-bold">{selectedIds.size}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">{selectedIds.size} item(s) selected</p>
+                  <p className="text-[11px] text-textDark">Bulk actions will apply to all selected items</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setSelectedIds(new Set())}>
+                  Clear
+                </Button>
+                <Button variant="danger" size="sm" onClick={handleBulkReject}>
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Reject All
+                </Button>
+                <Button size="sm" onClick={handleBulkApprove}>
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Approve All
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Data Table */}
       <Card>

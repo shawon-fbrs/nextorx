@@ -32,7 +32,7 @@ export default function OperationsPage() {
           </div>
           <Skeleton className="h-6 w-28" />
         </div>
-        <Skeleton className="h-10 w-96" />
+        <Skeleton className="h-10 w-[500px]" />
         <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
@@ -74,6 +74,7 @@ export default function OperationsPage() {
           { id: 'workflow', label: 'Daily Workflow' },
           { id: 'risk', label: 'User Risk' },
           { id: 'pnl', label: 'P&L' },
+          { id: 'health', label: 'Health' },
         ]}
         onChange={setActiveTab}
       />
@@ -319,6 +320,182 @@ export default function OperationsPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'health' && (
+        <div className="space-y-6">
+          {/* Status Overview */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-green/10 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-textDark uppercase">API Status</p>
+                    <p className="text-lg font-bold text-green">Operational</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-green/10 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-textDark uppercase">Database</p>
+                    <p className="text-lg font-bold text-green">Connected</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-orange/10 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-textDark uppercase">API Latency</p>
+                    <p className="text-lg font-bold text-orange">124ms</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-green/10 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path d="M12 6v6l4 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-textDark uppercase">Uptime</p>
+                    <p className="text-lg font-bold text-green">99.97%</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Service Status */}
+          <Card>
+            <CardHeader><CardTitle>Service Status</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { name: 'Web Application', status: 'operational', latency: '45ms' },
+                  { name: 'Trading Engine', status: 'operational', latency: '12ms' },
+                  { name: 'Payment Processor', status: 'operational', latency: '89ms' },
+                  { name: 'User Authentication', status: 'operational', latency: '23ms' },
+                  { name: 'KYC Verification', status: 'degraded', latency: '342ms' },
+                  { name: 'Email Service', status: 'operational', latency: '156ms' },
+                  { name: 'Data Backup', status: 'operational', latency: '2.1s' },
+                  { name: 'CDN', status: 'operational', latency: '8ms' },
+                ].map((service) => (
+                  <div key={service.name} className="flex items-center justify-between p-3 bg-background rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2.5 h-2.5 rounded-full ${service.status === 'operational' ? 'bg-green' : service.status === 'degraded' ? 'bg-orange animate-pulse' : 'bg-red'}`} />
+                      <span className="text-sm font-medium text-white">{service.name}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-[11px] text-textDark">{service.latency}</span>
+                      <Badge variant={service.status === 'operational' ? 'success' : service.status === 'degraded' ? 'warning' : 'danger'}>
+                        {service.status === 'operational' ? 'Operational' : service.status === 'degraded' ? 'Degraded' : 'Outage'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Server Resources */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader><CardTitle>CPU Usage (24h)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {[
+                    { server: 'API Server 1', usage: 34 },
+                    { server: 'API Server 2', usage: 28 },
+                    { server: 'Trading Engine', usage: 67 },
+                    { server: 'Database Primary', usage: 45 },
+                    { server: 'Database Replica', usage: 32 },
+                  ].map((s) => (
+                    <div key={s.server} className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-textDark">{s.server}</span>
+                        <span className="text-white font-medium">{s.usage}%</span>
+                      </div>
+                      <Progress value={s.usage} size="sm" color={s.usage > 70 ? 'red' : s.usage > 50 ? 'orange' : 'green'} />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Memory Usage (24h)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {[
+                    { server: 'API Server 1', usage: 56 },
+                    { server: 'API Server 2', usage: 48 },
+                    { server: 'Trading Engine', usage: 72 },
+                    { server: 'Database Primary', usage: 61 },
+                    { server: 'Database Replica', usage: 44 },
+                  ].map((s) => (
+                    <div key={s.server} className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-textDark">{s.server}</span>
+                        <span className="text-white font-medium">{s.usage}%</span>
+                      </div>
+                      <Progress value={s.usage} size="sm" color={s.usage > 70 ? 'red' : s.usage > 50 ? 'orange' : 'green'} />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Incidents */}
+          <Card>
+            <CardHeader><CardTitle>Recent Incidents</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { date: 'Aug 26, 2026', title: 'KYC Service Degradation', duration: '12 min', status: 'resolved' },
+                  { date: 'Aug 22, 2026', title: 'API Latency Spike', duration: '4 min', status: 'resolved' },
+                  { date: 'Aug 15, 2026', title: 'Payment Processor Timeout', duration: '8 min', status: 'resolved' },
+                ].map((incident) => (
+                  <div key={incident.date} className="flex items-center gap-4 p-3 bg-background rounded-lg">
+                    <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-white">{incident.title}</p>
+                      <p className="text-[11px] text-textDark">{incident.date} • Duration: {incident.duration}</p>
+                    </div>
+                    <Badge variant="success">Resolved</Badge>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

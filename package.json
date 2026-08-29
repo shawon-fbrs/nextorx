@@ -9,8 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@klinecharts/extension": "^0.1.0",
     "@tanstack/react-table": "^9.2.3",
     "clsx": "^2.1.1",
+    "klinecharts": "^10.0.2",
+    "lightweight-charts": "^5.2.1",
     "lucide-react": "^1.34.0",
     "next": "16.3.3",
     "react": "19.2.8",
