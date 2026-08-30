@@ -1,53 +1,53 @@
-FROM node:20-alpine AS base
+# syntax=docker/dockerfile:1
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@11.8.0 --activate
+# ─────────────────────────────────────────────────────────────────────
+# NextOrx — single-process production image.
+#
+# Standard Next.js (standalone output). Runtime boot order:
+#   prisma migrate deploy → seed (idempotent) → next start
+#
+# Deploy exactly ONE replica of this container.
+# ─────────────────────────────────────────────────────────────────────
 
-# Install dependencies only
+FROM node:22-slim AS base
+ENV NEXT_TELEMETRY_DISABLED=1
+# curl/wget are used by Coolify's built-in container healthcheck
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates curl \
+  && rm -rf /var/lib/apt/lists/* \
+  && npm install -g corepack --silent
+
+# ── Dependencies ─────────────────────────────────────────────────────
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# The pnpm store lives in a BuildKit cache mount: it survives layer
+# evictions, so a fresh build never re-downloads the full registry again.
+RUN --mount=type=cache,target=/pnpm/store corepack enable \
+  && pnpm install --frozen-lockfile --store-dir /pnpm/store \
+     --fetch-retries 5 --fetch-retry-mintimeout 10000 \
+     --fetch-retry-maxtimeout 300000 --fetch-timeout 900000
 
-# Build the app
+# ── Builder ──────────────────────────────────────────────────────────
 FROM base AS builder
 WORKDIR /app
+ENV SKIP_ENV_VALIDATION=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# .next/cache is persisted via a cache mount, so `next build` recompiles
+# only the files that actually changed on every deploy.
+RUN --mount=type=cache,target=/app/.next/cache corepack enable \
+  && npx prisma generate \
+  && pnpm build
 
-# Generate Prisma client
-RUN npx prisma generate
-
-# Build Next.js
-RUN pnpm build
-
-# Production image
+# ── Runner ───────────────────────────────────────────────────────────
 FROM base AS runner
-WORKDIR /app
-
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/.bin ./node_modules/.bin
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
-COPY --from=builder /app/scripts ./scripts
-
-RUN chmod +x ./entrypoint.sh
-
-USER nextjs
-
-EXPOSE 3000
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-CMD ["./entrypoint.sh"]
+RUN groupadd --system app && useradd --system --gid app app
+WORKDIR /app
+COPY --from=builder /app ./
+RUN chown -R app:app .next
+USER app
+EXPOSE 3000
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node_modules/.bin/next start"]

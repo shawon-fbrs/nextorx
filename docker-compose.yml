@@ -1,45 +1,35 @@
+# Coolify Compose stack — the app service only.
+# Postgres + Redis are separate Coolify resources (or self-hosted): pass
+# their connection strings via DATABASE_URL / REDIS_URL.
+# Traffic enters through a Cloudflare Tunnel (cloudflared) → app:3000, so
+# the port mapping is optional; it's kept for direct IP:3000 testing.
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: nextorx-postgres
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     environment:
-      POSTGRES_USER: nextorx
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: nextorx
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nextorx"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: nextorx-redis
-    restart: unless-stopped
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://localhost:6379}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      TELEGRAM_CLIENT_ID: ${TELEGRAM_CLIENT_ID:-}
+      TELEGRAM_CLIENT_SECRET: ${TELEGRAM_CLIENT_SECRET:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@nextorx.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe!123456}
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+      - "3000:3000"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
       timeout: 5s
-      retries: 5
-
-  adminer:
-    image: adminer:latest
-    container_name: nextorx-adminer
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-
-volumes:
-  postgres_data:
-  redis_data:
+      retries: 12
+      start_period: 90s

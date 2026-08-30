@@ -1,8 +1,82 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { authClient } from '@/lib/auth-client';
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [currency, setCurrency] = useState('USD');
+  const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!agreed) {
+      setError('You must agree to the Terms of Service');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data, error: authError } = await authClient.signUp.email({
+        email,
+        password,
+        name: `${firstName} ${lastName}`.trim() || email.split('@')[0],
+      });
+
+      if (authError) {
+        setError(authError.message || 'Registration failed');
+        return;
+      }
+
+      if (data) {
+        router.push('/trade/binance');
+        router.refresh();
+      }
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRegister = async () => {
+    try {
+      await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: '/trade/binance',
+      });
+    } catch {
+      setError('Google registration failed');
+    }
+  };
+
+  const handleTelegramRegister = async () => {
+    try {
+      await authClient.signIn.social({
+        provider: 'telegram',
+        callbackURL: '/trade/binance',
+      });
+    } catch {
+      setError('Telegram registration failed');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-text flex items-center justify-center px-6">
       <div className="w-full max-w-md">
@@ -21,12 +95,20 @@ export default function RegisterPage() {
         </div>
 
         <div className="bg-surface border border-border rounded-2xl p-6">
-          <div className="space-y-4">
+          {error && (
+            <div className="mb-4 p-3 bg-red/10 border border-red/20 rounded-xl text-red text-xs font-semibold">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleRegister} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">First Name</label>
                 <input
                   type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
                   placeholder="John"
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
                 />
@@ -35,6 +117,8 @@ export default function RegisterPage() {
                 <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Last Name</label>
                 <input
                   type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
                   placeholder="Doe"
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
                 />
@@ -44,7 +128,10 @@ export default function RegisterPage() {
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Email</label>
               <input
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@email.com"
+                required
                 className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
               />
             </div>
@@ -52,13 +139,20 @@ export default function RegisterPage() {
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Password</label>
               <input
                 type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Min. 8 characters"
+                required
                 className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
               />
             </div>
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Currency</label>
-              <select className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue transition-colors appearance-none cursor-pointer">
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue transition-colors appearance-none cursor-pointer"
+              >
                 <option value="USD">USD — US Dollar</option>
                 <option value="EUR">EUR — Euro</option>
                 <option value="GBP">GBP — British Pound</option>
@@ -67,16 +161,25 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 mt-0.5 rounded border-border bg-background accent-green" />
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded border-border bg-background accent-green"
+                />
                 <span className="text-[11px] text-text-dark leading-relaxed">
                   I agree to the <a href="#" className="text-blue hover:text-blue-hover">Terms of Service</a> and <a href="#" className="text-blue hover:text-blue-hover">Privacy Policy</a>. I confirm I am at least 18 years old.
                 </span>
               </label>
             </div>
-            <button className="w-full bg-green hover:bg-green-hover text-white font-bold text-sm py-3 rounded-xl transition-colors shadow-lg shadow-green/20 active:scale-[0.98]">
-              Create Account
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-green hover:bg-green-hover text-white font-bold text-sm py-3 rounded-xl transition-colors shadow-lg shadow-green/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Creating account...' : 'Create Account'}
             </button>
-          </div>
+          </form>
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
@@ -84,13 +187,19 @@ export default function RegisterPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <button className="bg-background border border-border hover:bg-surface-hover text-white text-xs font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+            <button
+              onClick={handleGoogleRegister}
+              className="bg-background border border-border hover:bg-surface-hover text-white text-xs font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
               Google
             </button>
-            <button className="bg-background border border-border hover:bg-surface-hover text-white text-xs font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+            <button
+              onClick={handleTelegramRegister}
+              className="bg-background border border-border hover:bg-surface-hover text-white text-xs font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z" /></svg>
-              Facebook
+              Telegram
             </button>
           </div>
         </div>

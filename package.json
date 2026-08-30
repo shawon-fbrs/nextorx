@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "npx prisma generate",
+    "db:migrate": "npx prisma migrate deploy",
+    "db:push": "npx prisma db push",
+    "db:seed": "npx tsx scripts/seed.ts",
+    "db:studio": "npx prisma studio"
   },
   "dependencies": {
     "@klinecharts/extension": "^0.1.0",
