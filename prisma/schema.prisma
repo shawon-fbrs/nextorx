@@ -385,13 +385,17 @@ model PaymentMethod {
   label           String
   active          Boolean  @default(true)
   sortOrder       Int      @default(0)
-  network         String   @default("")
+  logoUrl         String?
+  networkName     String   @default("")
+  networkLogoUrl  String?
+  region          String   @default("International")
   minDeposit      Int      @default(1000)
   maxDeposit      Int      @default(10000000)
   minWithdraw     Int      @default(500)
   maxWithdraw     Int      @default(10000000)
-  walletAddress   String?
+  accountAddress  String?
+  accountQrUrl    String?
   createdAt       DateTime @default(now())
 
-  @@unique([name, network])
+  @@unique([name, networkName])
 }

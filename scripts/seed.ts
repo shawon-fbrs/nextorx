@@ -56,14 +56,14 @@ async function main() {
   }
   console.log(`Created ${OTC_PAIRS.length} OTC pairs`);
 
-  // Create payment method
+  // Create payment methods
   await prisma.paymentMethod.upsert({
-    where: { name_network: { name: "USDT", network: "TRC20" } },
+    where: { name_networkName: { name: "USDT", networkName: "TRC20" } },
     update: {},
     create: {
       name: "USDT",
       label: "USDT (Tether)",
-      network: "TRC20",
+      networkName: "TRC20",
       minDeposit: 1000,
       maxDeposit: 10000000,
       minWithdraw: 500,
@@ -72,12 +72,12 @@ async function main() {
   });
 
   await prisma.paymentMethod.upsert({
-    where: { name_network: { name: "USDT", network: "ERC20" } },
+    where: { name_networkName: { name: "USDT", networkName: "ERC20" } },
     update: {},
     create: {
       name: "USDT",
       label: "USDT (Ethereum)",
-      network: "ERC20",
+      networkName: "ERC20",
       minDeposit: 2000,
       maxDeposit: 10000000,
       minWithdraw: 1000,

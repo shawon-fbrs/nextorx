@@ -9,6 +9,7 @@ export const statements = {
   ledger: ["read", "adjust"],
   settings: ["read", "manage"],
   promo: ["read", "manage"],
+  payment: ["list", "manage"],
   pair: ["read", "manage"],
   trade: ["read", "cancel"],
   audit: ["read"],
@@ -27,6 +28,7 @@ export const roles = {
     withdrawal: ["list", "approve", "reject", "mark_paid"],
     ledger: ["read"],
     settings: ["read"],
+    payment: ["list"],
   }),
   support: ac.newRole({
     user: ["list", "read"],
@@ -45,6 +47,7 @@ export const roles = {
     ledger: ["read", "adjust"],
     settings: ["read", "manage"],
     promo: ["read", "manage"],
+    payment: ["list", "manage"],
     pair: ["read", "manage"],
     trade: ["read", "cancel"],
     audit: ["read"],
