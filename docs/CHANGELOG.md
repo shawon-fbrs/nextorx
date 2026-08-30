@@ -27,6 +27,13 @@
 | 2026-08-30 | opencode | frontend | ✅ COMPLETED | Trading page — TopBar, SideToolbar, IndSidebar, Chart, TradingPanel |
 | 2026-08-30 | opencode | frontend | ✅ COMPLETED | Candle data feed — backward scroll support for infinite history |
 | 2026-08-30 | opencode | frontend | ✅ COMPLETED | Removed sliding sidebars — replaced by permanent SideToolbar + IndSidebar |
+| 2026-08-30 | opencode | frontend | ✅ COMPLETED | Drawing tools — 10 tools with edit panel (color/width/style), copy, delete |
+| 2026-08-30 | opencode | frontend | ✅ COMPLETED | Custom overlays registered — rect, arrowMarker via registerOverlay API |
+| 2026-08-30 | opencode | frontend | ✅ COMPLETED | Lucide React icons — replaced all inline SVGs in SideToolbar |
+| 2026-08-30 | opencode | frontend | ✅ COMPLETED | Right-click delete prevention on overlays via onRightClick callback |
+| 2026-08-30 | opencode | frontend | ✅ COMPLETED | Draggable overlay edit panel with handle bar |
+| 2026-08-30 | opencode | frontend | ✅ COMPLETED | Overlay copy — duplicates with offset, preserves styles and event handlers |
+| 2026-08-30 | opencode | frontend | ✅ COMPLETED | Tool cleanup — removed Position/forex/text tools, kept 10 binary-options-essential tools |
 | 2026-08-30 | opencode | console | ✅ COMPLETED | Loading skeletons on all 11 console pages |
 | 2026-08-30 | opencode | console | ✅ COMPLETED | Global search command palette (Cmd+K / Ctrl+K) |
 | 2026-08-30 | opencode | console | ✅ COMPLETED | Admin role system — Superadmin/Admin/Viewer |
@@ -110,6 +117,10 @@
 | Admin roles | ✅ | 2026-08-30 |
 | KLineChart integration | ✅ | 2026-08-30 |
 | OTC pairs management | ✅ | 2026-08-30 |
+| Drawing tools (10 tools) | ✅ | 2026-08-30 |
+| Overlay edit panel | ✅ | 2026-08-30 |
+| Overlay copy/delete | ✅ | 2026-08-30 |
+| Lucide React icons | ✅ | 2026-08-30 |
 
 ---
 

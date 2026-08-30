@@ -101,7 +101,7 @@ export function Header({ balance }: HeaderProps) {
   const active = accountData[accountType];
 
   return (
-    <header className="h-16 min-w-full bg-background border-b border-border flex items-center z-50 flex-shrink-0 px-4 gap-4">
+    <header className="h-16 min-w-full bg-background border-b border-border flex items-center z-[100] flex-shrink-0 px-4 gap-4">
       <div className="flex items-center gap-4">
         <Link href={`/trade/${accountType}`} className="flex items-center gap-4">
           <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24">
@@ -129,7 +129,7 @@ export function Header({ balance }: HeaderProps) {
             </span>
           </button>
 
-          <div className={`absolute top-full right-0 mt-2 w-96 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-50 ${notifOpen ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
+          <div className={`absolute top-full right-0 mt-2 w-96 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-[200] ${notifOpen ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-white font-bold">Notifications</span>
@@ -257,7 +257,7 @@ export function Header({ balance }: HeaderProps) {
             </svg>
           </button>
 
-          <div className={`absolute top-full right-0 mt-2 w-96 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-50 ${expanded ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
+          <div className={`absolute top-full right-0 mt-2 w-96 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-[200] ${expanded ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
             <div className="p-5 border-b border-border">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs text-text font-bold uppercase tracking-wider">Account Levels</span>
@@ -419,7 +419,7 @@ export function Header({ balance }: HeaderProps) {
       </div>
 
       {selectedLevel && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedLevel(null)}>
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedLevel(null)}>
           <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[420px] overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className={`px-6 pt-6 pb-4 ${
               selectedLevel.name === 'Standard' ? 'bg-gradient-to-br from-blue/10 to-transparent' :

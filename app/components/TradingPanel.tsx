@@ -25,7 +25,7 @@ export function TradingPanel({
   const [expandedTrade, setExpandedTrade] = useState<number | null>(null);
 
   return (
-    <aside className="w-[300px] bg-surface border-l border-border flex flex-col z-30 flex-shrink-0">
+    <aside className="w-[260px] bg-surface border-l border-border flex flex-col z-30 flex-shrink-0">
       {/* Symbol header */}
       <div className="h-14 border-b border-border flex items-center justify-between px-5 bg-background flex-shrink-0">
         <div className="flex items-center gap-2">
