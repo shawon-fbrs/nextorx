@@ -1,0 +1,397 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── better-auth core ───────────────────────────
+
+model User {
+  id            String    @id @default(uuid())
+  uid           String?   @unique
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  banned        Boolean?  @default(false)
+  banReason     String?
+  banExpires    DateTime?
+
+  // Platform fields
+  role                String              @default("player")
+  phone               String?
+  nickname            String?
+  firstName           String?
+  lastName            String?
+  country             String?
+  currencyPref        String              @default("USD")
+  balance             Int                 @default(0)
+  bonusBalance        Int                 @default(0)
+  bonusTurnoverRequired Int              @default(0)
+  bonusTurnoverDone   Int                 @default(0)
+  bonusExpiresAt      DateTime?
+  referralCode  String?         @unique
+  referredBy    String?
+  kycStatus     String          @default("NOT_SUBMITTED")
+
+  sessions      Session[]
+  accounts      Account[]
+  ledgerEntries LedgerEntry[]
+  deposits      DepositRequest[]
+  withdrawals   WithdrawalRequest[]
+  holds         WalletHold[]
+  trades        Trade[]
+  riskProfile   UserRiskProfile?
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  promoUses     PromoCodeUse[]
+  reviewedDeposits    DepositRequest[]    @relation("DepositReviewer")
+  reviewedWithdrawals WithdrawalRequest[] @relation("WithdrawalReviewer")
+
+  @@index([role])
+  @@index([referredBy])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier, expiresAt])
+}
+
+// ─────────────────────────── wallet & ledger ───────────────────────────
+
+model PlatformSetting {
+  key       String   @id
+  value     Int
+  label     String?
+  updatedAt DateTime @updatedAt
+}
+
+enum LedgerType {
+  DEPOSIT_CREDIT
+  WITHDRAWAL_HOLD
+  WITHDRAWAL_RELEASE
+  WITHDRAWAL_DEBIT
+  TRADE_HOLD
+  TRADE_RELEASE
+  TRADE_WIN
+  TRADE_LOSS
+  PROMO_CREDIT
+  PROMO_CONVERT
+  ADMIN_ADJUSTMENT
+  WITHDRAWAL_REJECT_RESTORE
+  DEPOSIT_REJECT_REVERSE
+  BONUS_CREDIT
+  BONUS_CONVERT
+  BONUS_EXPIRE
+}
+
+model LedgerEntry {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  type              LedgerType
+  amount            Int
+  balanceAfter      Int
+  bonusBalanceAfter Int?
+  referenceId       String?
+  description       String?
+  createdAt         DateTime  @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+  @@unique([userId, type, referenceId])
+}
+
+// ─────────────────────────── deposits & withdrawals ───────────────────────────
+
+enum DepositStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model DepositRequest {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  amount       Int
+  method       String
+  network      String?
+  txHash       String?
+  walletAddress String?
+  status       DepositStatus @default(PENDING)
+  reviewedById String?
+  reviewedBy   User?         @relation("DepositReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  note         String?
+  promoCode        String?
+  promoPercent     Int?
+  promoMaxBonusInt Int?
+  createdAt        DateTime      @default(now())
+
+  @@index([status, createdAt(sort: Desc)])
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model WithdrawalRequest {
+  id           String           @id @default(uuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  amount       Int
+  method       String
+  network      String?
+  walletAddress String
+  status       WithdrawalStatus @default(PENDING)
+  reviewedById String?
+  reviewedBy   User?            @relation("WithdrawalReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  note         String?
+  tier         Int              @default(1)
+  createdAt    DateTime         @default(now())
+  hold         WalletHold?
+
+  @@index([status, createdAt(sort: Desc)])
+}
+
+enum HoldStatus {
+  HELD
+  RELEASED
+  SETTLED
+}
+
+model WalletHold {
+  id             String     @id @default(uuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  withdrawalId   String     @unique
+  withdrawal     WithdrawalRequest @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+  amount         Int
+  status         HoldStatus @default(HELD)
+  createdAt      DateTime   @default(now())
+  releasedAt     DateTime?
+
+  @@index([userId])
+}
+
+// ─────────────────────────── promo codes ───────────────────────────
+
+model PromoCode {
+  id              String         @id @default(uuid())
+  code            String         @unique
+  label           String?
+  percent         Int
+  maxBonus        Int
+  minDeposit      Int
+  maxUses         Int
+  usesPerUser     Int
+  validUntil      DateTime?
+  active          Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  uses            PromoCodeUse[]
+
+  @@index([active])
+}
+
+model PromoCodeUse {
+  id         String    @id @default(uuid())
+  promoId    String
+  promo      PromoCode @relation(fields: [promoId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  depositId  String    @unique
+  bonusAmount Int
+  createdAt  DateTime  @default(now())
+
+  @@index([promoId])
+  @@index([userId])
+}
+
+// ─────────────────────────── OTC trading ───────────────────────────
+
+model Pair {
+  id              String   @id
+  name            String
+  category        String
+  basePrice       Decimal  @db.Decimal(16, 8)
+  volatility      Decimal  @db.Decimal(8, 6)
+  payoutPercent   Decimal  @db.Decimal(5, 2) @default(80)
+  spread          Decimal  @db.Decimal(8, 6) @default(0.0002)
+  isActive        Boolean  @default(true)
+  minTrade        Decimal  @db.Decimal(10, 2) @default(1)
+  maxTrade        Decimal  @db.Decimal(10, 2) @default(5000)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  candles         Candle[]
+  trades          Trade[]
+
+  @@index([isActive, sortOrder])
+}
+
+model Candle {
+  id        String   @id @default(uuid())
+  pairId    String
+  pair      Pair     @relation(fields: [pairId], references: [id], onDelete: Cascade)
+  timestamp BigInt
+  open      Decimal  @db.Decimal(16, 8)
+  high      Decimal  @db.Decimal(16, 8)
+  low       Decimal  @db.Decimal(16, 8)
+  close     Decimal  @db.Decimal(16, 8)
+  volume    BigInt   @default(0)
+
+  @@unique([pairId, timestamp])
+  @@index([pairId, timestamp(sort: Desc)])
+}
+
+enum TradeDirection {
+  UP
+  DOWN
+}
+
+enum TradeStatus {
+  PENDING
+  ACTIVE
+  WON
+  LOST
+  CANCELLED
+}
+
+model Trade {
+  id             String        @id @default(uuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  pairId         String
+  pair           Pair          @relation(fields: [pairId], references: [id], onDelete: Restrict)
+  direction      TradeDirection
+  amount         Int
+  payoutPercent  Decimal       @db.Decimal(5, 2)
+  durationSeconds Int
+  openPrice      Decimal       @db.Decimal(16, 8)
+  closePrice     Decimal?      @db.Decimal(16, 8)
+  status         TradeStatus   @default(PENDING)
+  profit         Int?
+  settledAt      DateTime?
+  createdAt      DateTime      @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([pairId, createdAt(sort: Desc)])
+}
+
+// ─────────────────────────── user risk ───────────────────────────
+
+model UserRiskProfile {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  effectiveWinRate  Decimal   @db.Decimal(5, 4) @default(0.48)
+  balanceMultiplier Decimal   @db.Decimal(5, 2) @default(1.5)
+  betLimitDaily     Int       @default(50000)
+  riskScore         Int       @default(0)
+  currentLossStreak Int       @default(0)
+  maxLossStreak     Int       @default(0)
+  totalTrades       Int       @default(0)
+  totalWins         Int       @default(0)
+  flags             Json      @default("[]")
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// ─────────────────────────── platform ───────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String
+  meta      Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entity, entityId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model PaymentMethod {
+  id              String   @id @default(uuid())
+  name            String
+  label           String
+  active          Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  network         String   @default("")
+  minDeposit      Int      @default(1000)
+  maxDeposit      Int      @default(10000000)
+  minWithdraw     Int      @default(500)
+  maxWithdraw     Int      @default(10000000)
+  walletAddress   String?
+  createdAt       DateTime @default(now())
+
+  @@unique([name, network])
+}

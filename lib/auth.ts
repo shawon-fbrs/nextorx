@@ -1,0 +1,255 @@
+import { betterAuth } from "better-auth";
+import type { BetterAuthPlugin, User } from "better-auth";
+import { APIError, createAuthEndpoint } from "better-auth/api";
+import { setSessionCookie } from "better-auth/cookies";
+import { handleOAuthUserInfo } from "better-auth/oauth2";
+import { prismaAdapter } from "better-auth/adapters/prisma";
+import { admin, bearer, genericOAuth } from "better-auth/plugins";
+import type { GenericOAuthConfig } from "better-auth/plugins";
+import type { OAuth2Tokens } from "better-auth/oauth2";
+import * as z from "zod";
+import { prisma } from "@/lib/db";
+import { env } from "@/env";
+import { roles } from "@/lib/rbac";
+
+const REFERRAL_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function generateReferralCode(length = 8): string {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(
+    bytes,
+    (b) => REFERRAL_ALPHABET[b % REFERRAL_ALPHABET.length],
+  ).join("");
+}
+
+async function generateUniqueUid(): Promise<string> {
+  for (let i = 0; i < 20; i++) {
+    const uid = String(10000000 + Math.floor(Math.random() * 90000000));
+    const exists = await prisma.user.findUnique({ where: { uid } });
+    if (!exists) return uid;
+  }
+  return String(Date.now()).slice(-8);
+}
+
+const TELEGRAM_SYNTHETIC_EMAIL = (tgId: string | number) =>
+  `tg-${tgId}@nextorx.app`;
+
+const telegramMiniAppLogin = createAuthEndpoint(
+  "/telegram/mini-app-login",
+  {
+    method: "POST",
+    operationId: "telegramMiniAppLogin",
+    body: z.object({
+      initData: z.string(),
+      callbackURL: z.string().optional(),
+      newUserCallbackURL: z.string().optional(),
+    }),
+  },
+  async (c) => {
+    if (!env.TELEGRAM_LOGIN_BOT_TOKEN) {
+      throw new APIError("BAD_REQUEST", {
+        message: "Telegram mini app login is not configured",
+      });
+    }
+    const { verifyTelegramInitData } = await import(
+      "@/lib/auth/telegram-init-data"
+    );
+    const verified = verifyTelegramInitData(
+      c.body.initData,
+      env.TELEGRAM_LOGIN_BOT_TOKEN,
+    );
+    if (!verified) {
+      throw new APIError("UNAUTHORIZED", { message: "Invalid initData" });
+    }
+    const tgId = String(verified.user?.id ?? "");
+    const name =
+      [verified.user?.first_name, verified.user?.last_name]
+        .filter(Boolean)
+        .join(" ") || "Telegram User";
+    const userInfo = {
+      id: tgId,
+      name,
+      image: verified.user?.photo_url,
+      email: TELEGRAM_SYNTHETIC_EMAIL(tgId),
+      emailVerified: true,
+      nickname: verified.user?.username?.toLowerCase() ?? null,
+    } as unknown as Omit<User, "createdAt" | "updatedAt">;
+    const result = await handleOAuthUserInfo(c, {
+      userInfo,
+      account: { providerId: "telegram", accountId: tgId, issuer: "telegram" },
+      callbackURL: c.body.callbackURL,
+      isTrustedProvider: true,
+      overrideUserInfo: true,
+    });
+    if (result.error || !result.data) {
+      throw new APIError("UNAUTHORIZED", {
+        message: result.error ?? "Failed to sign in",
+      });
+    }
+    const url = result.isRegister
+      ? c.body.newUserCallbackURL
+      : c.body.callbackURL;
+    await setSessionCookie(c, {
+      session: result.data.session,
+      user: result.data.user,
+    });
+    return c.json({
+      token: result.data.session.token,
+      redirect: false,
+      url,
+      user: result.data.user,
+    });
+  },
+);
+
+const telegramMiniApp = (): BetterAuthPlugin => ({
+  id: "telegram-mini-app",
+  endpoints: { telegramMiniAppLogin },
+});
+
+const telegramOAuthConfig = (() => {
+  if (!env.TELEGRAM_CLIENT_ID || !env.TELEGRAM_CLIENT_SECRET) return null;
+  return {
+    config: [
+      {
+        providerId: "telegram",
+        clientId: env.TELEGRAM_CLIENT_ID,
+        clientSecret: env.TELEGRAM_CLIENT_SECRET,
+        discoveryUrl:
+          "https://oauth.telegram.org/.well-known/openid-configuration",
+        scopes: ["openid", "profile", "phone"],
+        pkce: true,
+        overrideUserInfo: true,
+        getUserInfo: async (tokens: OAuth2Tokens) => {
+          if (!tokens.idToken) throw new Error("Telegram id_token missing");
+          const claims = JSON.parse(
+            Buffer.from(
+              tokens.idToken.split(".")[1],
+              "base64",
+            ).toString(),
+          );
+          const tgId = String(claims.id ?? claims.sub ?? "");
+          if (!tgId) throw new Error("Telegram id_token has no user id");
+          return {
+            id: tgId,
+            name:
+              claims.name ??
+              claims.preferred_username ??
+              "Telegram User",
+            image: claims.picture,
+            email: TELEGRAM_SYNTHETIC_EMAIL(tgId),
+            emailVerified: true,
+            username: claims.preferred_username ?? null,
+          } as unknown as {
+            id: string | number;
+            name?: string;
+            email?: string | null;
+            image?: string;
+            emailVerified: boolean;
+            username?: string | null;
+          };
+        },
+      } satisfies GenericOAuthConfig,
+    ],
+  };
+})();
+
+const googleOAuthConfig = (() => {
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null;
+  return {
+    config: [
+      {
+        providerId: "google",
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+        scopes: ["openid", "email", "profile"],
+      } satisfies GenericOAuthConfig,
+    ],
+  };
+})();
+
+export const auth = betterAuth({
+  database: prismaAdapter(prisma, { provider: "postgresql" }),
+  secret: env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
+  trustedOrigins: (req) => {
+    const baseURL = env.BETTER_AUTH_URL.replace(/\/+$/, "");
+    const origins = [baseURL];
+    if (env.NODE_ENV !== "production") {
+      origins.push("http://localhost:3000", "http://0.0.0.0:3000");
+    }
+    let baseHost = "";
+    let wwwHost = "";
+    try {
+      const base = new URL(baseURL);
+      baseHost = base.host;
+      if (!base.hostname.startsWith("www.")) {
+        const www = new URL(baseURL);
+        www.hostname = `www.${base.hostname}`;
+        wwwHost = www.host;
+        origins.push(www.origin);
+      }
+      const originHeader = req?.headers.get("origin");
+      if (originHeader) {
+        const origin = new URL(originHeader);
+        if (origin.host === baseHost || origin.host === wwwHost) {
+          origins.push(origin.origin);
+        }
+      }
+    } catch {}
+    return origins;
+  },
+  emailAndPassword: {
+    enabled: true,
+    minPasswordLength: 8,
+    requireEmailVerification: false,
+  },
+  plugins: [
+    admin({
+      defaultRole: "player",
+      adminRoles: ["super_admin"],
+      roles,
+    }),
+    bearer(),
+    ...(googleOAuthConfig ? [genericOAuth(googleOAuthConfig)] : []),
+    ...(telegramOAuthConfig ? [genericOAuth(telegramOAuthConfig)] : []),
+    ...(env.TELEGRAM_LOGIN_BOT_TOKEN ? [telegramMiniApp()] : []),
+  ],
+  user: {
+    additionalFields: {
+      uid: { type: "string", required: false },
+      phone: { type: "string", required: false },
+      kycStatus: { type: "string", required: false },
+      referralCode: { type: "string", required: false },
+      referredBy: { type: "string", required: false },
+      nickname: { type: "string", required: false },
+      firstName: { type: "string", required: false },
+      lastName: { type: "string", required: false },
+      country: { type: "string", required: false },
+      balance: { type: "number", required: false },
+      bonusBalance: { type: "number", required: false },
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          return {
+            data: {
+              ...user,
+              referralCode: generateReferralCode(),
+              uid: await generateUniqueUid(),
+            },
+          };
+        },
+      },
+    },
+  },
+  advanced: {
+    defaultCookieAttributes: {
+      sameSite: "lax",
+      secure: env.NODE_ENV === "production",
+    },
+  },
+});
