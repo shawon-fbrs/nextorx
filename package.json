@@ -13,6 +13,7 @@
     "db:migrate": "npx prisma migrate deploy",
     "db:push": "npx prisma db push",
     "db:seed": "npx tsx scripts/seed.ts",
+    "db:reset": "npx tsx scripts/reset-db.ts",
     "db:studio": "npx prisma studio"
   },
   "dependencies": {
