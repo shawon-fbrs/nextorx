@@ -2,8 +2,11 @@
 
 import { useAuth } from '@/lib/auth-context';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { authClient } from '@/lib/auth-client';
 
 export default function AccountPage() {
+  const router = useRouter();
   const { user, loading: authLoading, refresh } = useAuth();
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -248,6 +251,26 @@ export default function AccountPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="bg-surface border border-border rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-red/15 flex items-center justify-center">
+              <svg className="w-5 h-5 text-red" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white">Session</h2>
+              <p className="text-[11px] text-text-dark">Manage your session</p>
+            </div>
+          </div>
+          <button
+            onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => router.push('/login') } })}
+            className="w-full bg-red/10 hover:bg-red/20 border border-red/20 text-red text-xs font-bold py-2.5 rounded-lg transition-colors"
+          >
+            Log Out
+          </button>
         </div>
       </div>
     </div>
