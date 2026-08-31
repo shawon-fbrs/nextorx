@@ -31,7 +31,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetch("/api/admin/stats")
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((data) => setStats(data))
       .catch(() => {})
       .finally(() => setIsLoading(false));

@@ -27,7 +27,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     fetch('/api/admin/stats')
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((d) => setStats(d))
       .catch(() => {})
       .finally(() => setIsLoading(false));

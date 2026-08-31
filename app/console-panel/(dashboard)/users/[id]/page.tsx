@@ -50,8 +50,8 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/admin/users?limit=200`).then(r => r.json()),
-      fetch(`/api/admin/trades?limit=200`).then(r => r.json()),
+      fetch(`/api/admin/users?limit=200`).then(r => { if (!r.ok) throw new Error(); return r.json(); }),
+      fetch(`/api/admin/trades?limit=200`).then(r => { if (!r.ok) throw new Error(); return r.json(); }),
     ]).then(([userData, tradeData]) => {
       const found = userData.users?.find((u: UserData) => u.id === params.id);
       setUser(found || null);

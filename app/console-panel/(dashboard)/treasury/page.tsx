@@ -28,7 +28,7 @@ export default function TreasuryPage() {
 
   useEffect(() => {
     fetch('/api/admin/treasury')
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((d) => setData(d))
       .catch(() => {})
       .finally(() => setIsLoading(false));
