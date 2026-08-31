@@ -23,13 +23,8 @@ function generateReferralCode(length = 8): string {
   ).join("");
 }
 
-async function generateUniqueUid(): Promise<string> {
-  for (let i = 0; i < 20; i++) {
-    const uid = String(10000000 + Math.floor(Math.random() * 90000000));
-    const exists = await prisma.user.findUnique({ where: { uid } });
-    if (!exists) return uid;
-  }
-  return String(Date.now()).slice(-8);
+function generateUid(): string {
+  return String(10000000 + Math.floor(Math.random() * 90000000));
 }
 
 const TELEGRAM_SYNTHETIC_EMAIL = (tgId: string | number) =>
@@ -243,7 +238,7 @@ export const auth = betterAuth({
             data: {
               ...user,
               referralCode: generateReferralCode(),
-              uid: await generateUniqueUid(),
+              uid: generateUid(),
             },
           };
         },
