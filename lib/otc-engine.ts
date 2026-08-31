@@ -47,9 +47,16 @@ export class OTCEngine {
   private broadcast: ((msg: TickMessage | CandleCloseMessage) => void) | null = null;
 
   async init() {
-    const dbPairs = await prisma.pair.findMany({ where: { isActive: true } });
-
-    for (const p of dbPairs) {
+    let retries = 10;
+    while (retries > 0) {
+      try {
+        const dbPairs = await prisma.pair.findMany({ where: { isActive: true } });
+        if (dbPairs.length === 0) {
+          console.log('[OTC] No active pairs found. Running seed...');
+          await this.runSeed();
+        }
+        const pairs = await prisma.pair.findMany({ where: { isActive: true } });
+        for (const p of pairs) {
       const basePrice = Number(p.basePrice);
       const volatility = Number(p.volatility);
       const now = Date.now();
@@ -78,6 +85,26 @@ export class OTCEngine {
     }
 
     await this.seedHistoricalCandles();
+        return;
+      } catch (e) {
+        retries--;
+        if (retries <= 0) {
+          console.error('[OTC] Failed to init after retries:', e);
+          return;
+        }
+        console.log(`[OTC] DB not ready, retrying in 3s... (${retries} left)`);
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
+  }
+
+  private async runSeed() {
+    try {
+      const { execSync } = await import('child_process');
+      execSync('npx tsx scripts/seed.ts', { stdio: 'inherit', timeout: 30000 });
+    } catch {
+      console.log('[OTC] Seed script failed or not found, continuing...');
+    }
   }
 
   private async seedHistoricalCandles() {
