@@ -9,6 +9,10 @@ export async function GET(req: NextRequest) {
       NODE_ENV: process.env.NODE_ENV,
       hasSecret: !!process.env.BETTER_AUTH_SECRET,
       secretLength: process.env.BETTER_AUTH_SECRET?.length,
+      hasGoogleId: !!process.env.GOOGLE_CLIENT_ID,
+      googleIdLength: process.env.GOOGLE_CLIENT_ID?.length,
+      hasGoogleSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+      googleSecretLength: process.env.GOOGLE_CLIENT_SECRET?.length,
     },
     usage: {
       "GET /api/debug/auth-test": "This info",
