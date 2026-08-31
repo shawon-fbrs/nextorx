@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { hashPassword } from "better-auth/crypto";
+import { auth } from "@/lib/auth";
 
 const RESET_SECRET = "nextorx-reset-2026";
 
@@ -40,24 +40,29 @@ export async function POST(req: NextRequest) {
     const adminEmail = process.env.ADMIN_EMAIL || "admin@nextorx.app";
     const adminPassword = process.env.ADMIN_PASSWORD || "ChangeMe!123456";
 
-    const admin = await prisma.user.create({
-      data: {
+    const signUpResult = await auth.api.signUpEmail({
+      body: {
         email: adminEmail,
+        password: adminPassword,
         name: "Admin",
-        emailVerified: true,
-        role: "super_admin",
-        referralCode: generateReferralCode(),
-        uid: generateUid(),
       },
     });
 
-    const hashedPassword = await hashPassword(adminPassword);
-    await prisma.account.create({
+    if (!signUpResult?.user) {
+      throw new Error("Failed to create admin user");
+    }
+
+    const userId = signUpResult.user.id;
+    const referralCode = generateReferralCode();
+    const uid = generateUid();
+
+    await prisma.user.update({
+      where: { id: userId },
       data: {
-        accountId: adminEmail,
-        providerId: "credential",
-        userId: admin.id,
-        password: hashedPassword,
+        role: "super_admin",
+        emailVerified: true,
+        referralCode,
+        uid,
       },
     });
 
@@ -73,7 +78,7 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     return NextResponse.json(
       { error: e.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
