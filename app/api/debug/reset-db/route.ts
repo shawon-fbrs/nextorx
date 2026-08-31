@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "better-auth/crypto";
 
 const RESET_SECRET = "nextorx-reset-2026";
 
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const hashedPassword = await bcrypt.hash(adminPassword, 12);
+    const hashedPassword = await hashPassword(adminPassword);
     await prisma.account.create({
       data: {
         accountId: adminEmail,
