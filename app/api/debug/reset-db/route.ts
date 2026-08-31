@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
         password: adminPassword,
         name: "Admin",
       },
+      headers: req.headers,
     });
 
     if (!signUpResult?.user) {
@@ -53,16 +54,14 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = signUpResult.user.id;
-    const referralCode = generateReferralCode();
-    const uid = generateUid();
 
     await prisma.user.update({
       where: { id: userId },
       data: {
         role: "super_admin",
         emailVerified: true,
-        referralCode,
-        uid,
+        referralCode: generateReferralCode(),
+        uid: generateUid(),
       },
     });
 

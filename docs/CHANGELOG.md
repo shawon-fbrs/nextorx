@@ -17,6 +17,21 @@
 
 ## Log
 
+### 2026-08-31
+
+| Date | Author | Module | Status | Description |
+|---|---|---|---|---|
+| 2026-08-31 | opencode | auth | ✅ COMPLETED | Email sign-up/sign-in fixed on production |
+| 2026-08-31 | opencode | auth | ✅ COMPLETED | Google OAuth working (socialProviders config) |
+| 2026-08-31 | opencode | auth | ✅ COMPLETED | Telegram OIDC configured with explicit endpoints |
+| 2026-08-31 | opencode | proxy | ✅ COMPLETED | proxy.ts rewritten — role-based protection via compact session_data cookie decode (Web Crypto HMAC-SHA256) |
+| 2026-08-31 | opencode | dal | ✅ COMPLETED | lib/dal.ts — centralized session verification and permission checks |
+| 2026-08-31 | opencode | admin | ✅ COMPLETED | console-panel layout.tsx server component role guard |
+| 2026-08-31 | opencode | auth | ✅ COMPLETED | session.cookieCache enabled (compact strategy, 5min TTL) |
+| 2026-08-31 | opencode | api | ✅ COMPLETED | lib/api.ts cleaned up with proper RoleName typing |
+| 2026-08-31 | opencode | debug | ✅ COMPLETED | reset-db re-seeds admin user after DB wipe |
+| 2026-08-31 | opencode | debug | 🚧 PARTIAL | Admin password sign-in after reset-db — user created but login returns 401 |
+
 ### 2026-08-30
 
 | Date | Author | Module | Status | Description |

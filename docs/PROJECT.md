@@ -1,8 +1,8 @@
 # NextOrx — Binary Options Trading Platform
 
 > **Version:** 1.0.0  
-> **Last Updated:** 2026-08-30  
-> **Status:** Frontend Complete, Backend Planning Phase
+> **Last Updated:** 2026-08-31  
+> **Status:** Frontend Complete, Backend API Operational, Auth Working, RBAC Implemented
 
 ---
 
@@ -686,7 +686,7 @@ Client → Server:
 | Module | Status | Notes |
 |---|---|---|
 | Landing page | ✅ Done | |
-| Login/Register | ✅ Done | |
+| Login/Register | ✅ Done | Email + Google OAuth + Telegram OIDC |
 | Trader interface | ✅ Done | KLineChart integrated |
 | Trading panel | ✅ Done | Investment, time, payout, UP/DOWN |
 | Asset tabs | ✅ Done | TopBar with dropdown + inline tabs |
@@ -705,64 +705,75 @@ Client → Server:
 | Global search | ✅ Done | Cmd+K / Ctrl+K |
 | Admin roles | ✅ Done | Superadmin/Admin/Viewer |
 | Candle data feed | ✅ Done | KLineChart with backward scrolling |
+| Auth (Email) | ✅ Done | Sign-up/sign-in via better-auth |
+| Auth (Google) | ✅ Done | socialProviders.google config |
+| Auth (Telegram) | ✅ Done | genericOAuth with explicit OIDC endpoints |
+| RBAC (Proxy) | ✅ Done | Edge proxy role-based route protection |
+| RBAC (Server) | ✅ Done | DAL layer + console-panel layout guard |
+| Backend API | ✅ Done | 30+ endpoints (auth, trades, admin, finance) |
+| OTC Price Engine | ✅ Done | Per-user outcome control |
+| Database | ✅ Done | PostgreSQL via Prisma, 16 models |
+| Docker | ✅ Done | Dockerfile + .dockerignore |
+| Deployment | ✅ Done | Coolify v4, production at nextorx.247play.win |
+
+### Partially Done 🚧
+
+| Module | Status | Notes |
+|---|---|---|
+| Admin login after DB reset | 🚧 | User created but password sign-in returns 401 |
+| Trade execution integration | 🚧 | Frontend panels use mock data, need API wiring |
 
 ### Not Started ❌
 
 | Module | Priority | Notes |
 |---|---|---|
-| Backend API | P0 | Node.js + PostgreSQL + Redis |
-| OTC Price Engine | P0 | Core algorithm |
-| Trade Settlement | P0 | Per-user win rate control |
-| User Risk Profiler | P0 | Dynamic win rate, balance caps |
-| Treasury Manager | P0 | Real-time reserve monitoring |
-| WebSocket Server | P1 | Real-time candle feed |
-| Auth Service | P1 | JWT, KYC integration |
-| Deposit Integration | P1 | Crypto wallet generation (USDT) |
-| Withdrawal System | P1 | Tiered processing |
-| Martingale Detector | P2 | Pattern detection |
-| Multi-Account Detector | P2 | Device fingerprinting |
-| Admin Real-time Dashboard | P3 | Live monitoring |
-| Mobile App | P4 | Future |
+| Trade execution API wiring | P0 | Frontend trade panel needs to call real /api/trades |
+| WebSocket live candle feed | P1 | Currently using mock candle generation in client |
+| Deposit crypto integration | P1 | USDT wallet generation (TRC20/ERC20) |
+| Withdrawal tiered processing | P1 | Tiered approval flow |
+| Martingale detector | P2 | Pattern detection |
+| Multi-account detector | P2 | Device fingerprinting |
+| Admin real-time dashboard | P3 | Live monitoring |
+| Mobile app | P4 | Future |
 
 ---
 
 ## 11. Deployment
 
-### Infrastructure (Recommended)
+### Infrastructure (Production)
 
 | Service | Provider | Purpose |
 |---|---|---|
-| VPS | Hetzner / DigitalOcean | Backend + database |
+| VPS | Coolify-managed | Backend + database |
 | CDN | Cloudflare | Frontend + DDoS protection |
-| Database | PostgreSQL on VPS | Primary data |
-| Cache | Redis on VPS | Sessions + cache |
-| DNS | Cloudflare | Domain management |
+| Database | PostgreSQL 17 on VPS | Primary data |
+| Cache | Redis 7.2 on VPS | Sessions + cache |
+| DNS | Cloudflare | Domain: nextorx.247play.win |
+| CI/CD | Coolify v4 | Auto-deploy from main branch |
 
-### Environment Variables
+### Environment Variables (Coolify)
 
 ```env
 # Database
 DATABASE_URL=postgresql://user:pass@localhost:5432/nextorx
 
+# Auth
+BETTER_AUTH_SECRET=your-secret-min-32-chars
+BETTER_AUTH_URL=https://nextorx.247play.win
+
+# OAuth
+GOOGLE_CLIENT_ID=from-google-cloud
+GOOGLE_CLIENT_SECRET=from-google-cloud
+TELEGRAM_CLIENT_ID=from-botfather
+TELEGRAM_CLIENT_SECRET=from-botfather
+TELEGRAM_LOGIN_BOT_TOKEN=from-botfather
+
+# Admin
+ADMIN_EMAIL=admin@nextorx.app
+ADMIN_PASSWORD=ChangeMe!123456
+
 # Redis
 REDIS_URL=redis://localhost:6379
-
-# JWT
-JWT_SECRET=your-secret-key
-JWT_EXPIRY=7d
-
-# Crypto
-TRC20_WALLET_ADDRESS=your-trc20-wallet
-ERC20_WALLET_ADDRESS=your-erc20-wallet
-
-# Price Feed APIs
-EXCHANGE_RATE_API_KEY=your-api-key
-COINGECKO_API_KEY=your-api-key
-
-# OTC Engine
-OTC_BASE_WIN_RATE=0.48
-OTC_MAX_WIN_RATE=0.55
-OTC_MIN_WIN_RATE=0.35
 ```
 
 ---
