@@ -49,16 +49,22 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
   } catch (e: any) {
+    const statusCode = typeof e.status === "number" && e.status >= 200 && e.status <= 599
+      ? e.status
+      : typeof e.statusCode === "number" && e.statusCode >= 200 && e.statusCode <= 599
+        ? e.statusCode
+        : 500;
     return NextResponse.json(
       {
         error: e.message,
         name: e.name,
         code: e.code,
         status: e.status,
+        statusCode: e.statusCode,
         body: e.body,
         stack: process.env.NODE_ENV !== "production" ? e.stack : undefined,
       },
-      { status: e.status || 500 }
+      { status: statusCode }
     );
   }
 }

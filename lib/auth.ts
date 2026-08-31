@@ -226,8 +226,6 @@ export const auth = betterAuth({
       firstName: { type: "string", required: false },
       lastName: { type: "string", required: false },
       country: { type: "string", required: false },
-      balance: { type: "number", required: false },
-      bonusBalance: { type: "number", required: false },
     },
   },
   databaseHooks: {
