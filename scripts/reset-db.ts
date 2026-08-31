@@ -23,7 +23,7 @@ async function main() {
   console.log("All user data cleared. Pairs, settings, and payment methods preserved.");
 
   const userCount = await prisma.user.count();
-  const pairCount = await prisma.otcPair.count();
+  const pairCount = await prisma.pair.count();
   console.log(`Users: ${userCount}, Pairs: ${pairCount}`);
 }
 
