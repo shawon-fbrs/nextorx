@@ -244,4 +244,10 @@ export const auth = betterAuth({
       secure: env.NODE_ENV === "production",
     },
   },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
 });

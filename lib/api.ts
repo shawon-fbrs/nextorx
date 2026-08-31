@@ -1,6 +1,6 @@
-import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { can } from "@/lib/rbac";
+import { auth } from "@/lib/auth";
+import { can, type RoleName } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 
 export type ApiSessionUser = {
@@ -11,12 +11,16 @@ export type ApiSessionUser = {
 };
 
 export async function getSessionUser(): Promise<ApiSessionUser | null> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (!session?.user) return null;
-  const user = session.user as unknown as ApiSessionUser;
-  return user;
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+    if (!session?.user) return null;
+    const user = session.user as unknown as ApiSessionUser;
+    return user;
+  } catch {
+    return null;
+  }
 }
 
 export async function requireUser(): Promise<ApiSessionUser> {
@@ -32,7 +36,7 @@ export async function requirePermission(
   action: Parameters<typeof can>[2],
 ): Promise<ApiSessionUser> {
   const user = await requireUser();
-  if (!can(user.role, resource, action)) {
+  if (!can(user.role as RoleName, resource, action)) {
     throw new ApiError(403, "Forbidden");
   }
   return user;
