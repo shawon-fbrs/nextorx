@@ -179,21 +179,25 @@ export const auth = betterAuth({
     if (env.NODE_ENV !== "production") {
       origins.push("http://localhost:3000", "http://0.0.0.0:3000");
     }
-    let baseHost = "";
-    let wwwHost = "";
     try {
       const base = new URL(baseURL);
-      baseHost = base.host;
-      if (!base.hostname.startsWith("www.")) {
-        const www = new URL(baseURL);
-        www.hostname = `www.${base.hostname}`;
-        wwwHost = www.host;
-        origins.push(www.origin);
+      const hostname = base.hostname;
+      // Add www variant
+      if (!hostname.startsWith("www.")) {
+        origins.push(`https://www.${hostname}`, `http://www.${hostname}`);
+      } else {
+        const bare = hostname.replace(/^www\./, "");
+        origins.push(`https://${bare}`, `http://${bare}`);
       }
+      // Add both http and https of the base
+      origins.push(`https://${hostname}`, `http://${hostname}`);
+      // Dynamically add the request origin
       const originHeader = req?.headers.get("origin");
       if (originHeader) {
         const origin = new URL(originHeader);
-        if (origin.host === baseHost || origin.host === wwwHost) {
+        const baseHostname = base.hostname.replace(/^www\./, "");
+        const reqHostname = origin.hostname.replace(/^www\./, "");
+        if (reqHostname === baseHostname) {
           origins.push(origin.origin);
         }
       }

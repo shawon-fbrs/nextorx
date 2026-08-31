@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -31,17 +32,20 @@ const OTC_PAIRS = [
 async function main() {
   console.log("Seeding database...");
 
-  // Fix column width if needed ( Decimal(8,6) -> Decimal(12,6) for volatility )
+  // Fix column width if needed
   await prisma.$executeRawUnsafe(
     `ALTER TABLE "Pair" ALTER COLUMN "volatility" TYPE DECIMAL(12,6)`
   ).catch(() => {});
 
   // Create admin user
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@nextorx.app";
+  const adminPassword = process.env.ADMIN_PASSWORD || "ChangeMe!123456";
+
   const admin = await prisma.user.upsert({
-    where: { email: process.env.ADMIN_EMAIL || "admin@nextorx.app" },
+    where: { email: adminEmail },
     update: {},
     create: {
-      email: process.env.ADMIN_EMAIL || "admin@nextorx.app",
+      email: adminEmail,
       name: "Admin",
       emailVerified: true,
       role: "super_admin",
@@ -50,6 +54,50 @@ async function main() {
     },
   });
   console.log("Admin user:", admin.email);
+
+  // Create admin Account with hashed password (so email/password login works)
+  const existingAccount = await prisma.account.findFirst({
+    where: { userId: admin.id, providerId: "credential" },
+  });
+
+  if (!existingAccount) {
+    const hashedPassword = await bcrypt.hash(adminPassword, 12);
+    await prisma.account.create({
+      data: {
+        accountId: adminEmail,
+        providerId: "credential",
+        userId: admin.id,
+        password: hashedPassword,
+      },
+    });
+    console.log("Admin account with password created");
+  } else {
+    console.log("Admin account already exists");
+  }
+
+  // Ensure all existing users without accounts get one
+  const usersWithoutAccounts = await prisma.user.findMany({
+    where: {
+      accounts: { none: {} },
+    },
+  });
+  for (const u of usersWithoutAccounts) {
+    const acct = await prisma.account.findFirst({
+      where: { userId: u.id, providerId: "credential" },
+    });
+    if (!acct && u.email) {
+      const hashedPassword = await bcrypt.hash(adminPassword, 12);
+      await prisma.account.create({
+        data: {
+          accountId: u.email,
+          providerId: "credential",
+          userId: u.id,
+          password: hashedPassword,
+        },
+      });
+      console.log(`Created account for existing user: ${u.email}`);
+    }
+  }
 
   // Create OTC pairs
   for (const pair of OTC_PAIRS) {
