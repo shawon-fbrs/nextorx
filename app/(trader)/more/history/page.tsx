@@ -142,7 +142,7 @@ export default function HistoryPage() {
           <div className="text-center py-12">
             <p className="text-sm font-medium text-white">No trades yet</p>
             <p className="text-xs text-text-dark mt-1">Start trading to see your history here</p>
-            <Link href="/trade/binance" className="mt-4 inline-block bg-green hover:bg-green-hover text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+            <Link href="/trade/demo" className="mt-4 inline-block bg-green hover:bg-green-hover text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
               Start Trading
             </Link>
           </div>

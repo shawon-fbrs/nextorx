@@ -45,7 +45,7 @@ export default function RegisterPage() {
       }
 
       if (data) {
-        router.push('/trade/binance');
+        router.push('/trade/demo');
         router.refresh();
       }
     } catch {
@@ -59,7 +59,7 @@ export default function RegisterPage() {
     try {
       await authClient.signIn.social({
         provider: 'google',
-        callbackURL: '/trade/binance',
+        callbackURL: '/trade/demo',
       });
     } catch {
       setError('Google registration failed');
@@ -70,7 +70,7 @@ export default function RegisterPage() {
     try {
       await authClient.signIn.social({
         provider: 'telegram',
-        callbackURL: '/trade/binance',
+        callbackURL: '/trade/demo',
       });
     } catch {
       setError('Telegram registration failed');

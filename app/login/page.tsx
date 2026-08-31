@@ -29,7 +29,7 @@ export default function LoginPage() {
       }
 
       if (data) {
-        router.push('/trade/binance');
+        router.push('/trade/demo');
         router.refresh();
       }
     } catch {
@@ -43,7 +43,7 @@ export default function LoginPage() {
     try {
       await authClient.signIn.social({
         provider: 'google',
-        callbackURL: '/trade/binance',
+        callbackURL: '/trade/demo',
       });
     } catch {
       setError('Google login failed');
@@ -54,7 +54,7 @@ export default function LoginPage() {
     try {
       await authClient.signIn.social({
         provider: 'telegram',
-        callbackURL: '/trade/binance',
+        callbackURL: '/trade/demo',
       });
     } catch {
       setError('Telegram login failed');

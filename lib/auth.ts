@@ -150,24 +150,18 @@ const telegramOAuthConfig = (() => {
   };
 })();
 
-const googleOAuthConfig = (() => {
-  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null;
-  return {
-    config: [
-      {
-        providerId: "google",
-        clientId: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
-        scopes: ["openid", "email", "profile"],
-      } satisfies GenericOAuthConfig,
-    ],
-  };
-})();
-
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
+  ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET ? {
+    socialProviders: {
+      google: {
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+      },
+    },
+  } : {}),
   trustedOrigins: (req) => {
     const baseURL = env.BETTER_AUTH_URL.replace(/\/+$/, "");
     const origins = [baseURL];
@@ -211,7 +205,6 @@ export const auth = betterAuth({
       roles,
     }),
     bearer(),
-    ...(googleOAuthConfig ? [genericOAuth(googleOAuthConfig)] : []),
     ...(telegramOAuthConfig ? [genericOAuth(telegramOAuthConfig)] : []),
     ...(env.TELEGRAM_LOGIN_BOT_TOKEN ? [telegramMiniApp()] : []),
   ],

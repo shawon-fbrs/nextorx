@@ -324,9 +324,16 @@ export default function TradingPage() {
   useEffect(() => {
     fetch('/api/pairs')
       .then(r => r.json())
-      .then((data: PairDef[]) => {
-        setPairs(data);
-        if (data.length > 0) setActivePair(data[0]);
+      .then((data: { pairs: Array<Record<string, unknown>> }) => {
+        const normalized = (data.pairs || []).map(p => ({
+          ...p,
+          payoutPercent: Number(p.payoutPercent),
+          basePrice: Number(p.basePrice),
+          minTrade: Number(p.minTrade),
+          maxTrade: Number(p.maxTrade),
+        })) as PairDef[];
+        setPairs(normalized);
+        if (normalized.length > 0) setActivePair(normalized[0]);
       })
       .catch(() => {});
     setMounted(true);

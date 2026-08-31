@@ -1,11 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 
 export default function TraderLayout({ children }: { children: React.ReactNode }) {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [balance, setBalance] = useState(10000);
+
+  useEffect(() => {
+    fetch('/api/balance')
+      .then(r => r.json())
+      .then(data => {
+        if (data.wallet?.balance != null) {
+          setBalance(data.wallet.balance / 100);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="h-screen w-screen overflow-hidden flex bg-background text-text text-sm">
@@ -14,7 +26,7 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
         onToggle={() => setSidebarExpanded(!sidebarExpanded)}
       />
       <div className="flex-1 flex flex-col min-w-0">
-        <Header balance={1000} />
+        <Header balance={balance} />
         <div className="flex-1 min-h-0 overflow-hidden">
           {children}
         </div>
