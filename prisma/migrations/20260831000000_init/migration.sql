@@ -205,7 +205,7 @@ CREATE TABLE "Pair" (
     "name" TEXT NOT NULL,
     "category" TEXT NOT NULL,
     "basePrice" DECIMAL(16,8) NOT NULL,
-    "volatility" DECIMAL(8,6) NOT NULL,
+    "volatility" DECIMAL(12,6) NOT NULL,
     "payoutPercent" DECIMAL(5,2) NOT NULL DEFAULT 80,
     "spread" DECIMAL(8,6) NOT NULL DEFAULT 0.0002,
     "isActive" BOOLEAN NOT NULL DEFAULT true,

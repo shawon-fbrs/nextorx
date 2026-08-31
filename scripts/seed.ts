@@ -31,6 +31,11 @@ const OTC_PAIRS = [
 async function main() {
   console.log("Seeding database...");
 
+  // Fix column width if needed ( Decimal(8,6) -> Decimal(12,6) for volatility )
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "Pair" ALTER COLUMN "volatility" TYPE DECIMAL(12,6)`
+  ).catch(() => {});
+
   // Create admin user
   const admin = await prisma.user.upsert({
     where: { email: process.env.ADMIN_EMAIL || "admin@nextorx.app" },

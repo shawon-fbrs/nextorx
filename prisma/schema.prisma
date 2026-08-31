@@ -263,7 +263,7 @@ model Pair {
   name            String
   category        String
   basePrice       Decimal  @db.Decimal(16, 8)
-  volatility      Decimal  @db.Decimal(8, 6)
+  volatility      Decimal  @db.Decimal(12, 6)
   payoutPercent   Decimal  @db.Decimal(5, 2) @default(80)
   spread          Decimal  @db.Decimal(8, 6) @default(0.0002)
   isActive        Boolean  @default(true)
