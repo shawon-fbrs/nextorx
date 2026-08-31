@@ -1,15 +1,35 @@
 import { useState } from 'react';
-import { SymbolDef, Trade } from '../lib/types';
+
+interface SymbolLike {
+  name: string;
+  payoutPercent?: number;
+  payout?: number;
+}
+
+interface TradeLike {
+  id: string | number;
+  symbol: string;
+  type: string;
+  amount: number;
+  payout: number;
+  profit: number;
+  time: string;
+  timestamp: number;
+  status: string;
+  openPrice?: number;
+  closePrice?: number;
+  payoutPercent?: number;
+}
 
 interface TradingPanelProps {
-  symbol: SymbolDef;
+  symbol: SymbolLike;
   investment: number;
   setInvestment: (v: number) => void;
   timeStr: string;
   onTimeChange: (delta: number) => void;
   onTrade: (type: 'up' | 'down') => void;
   payoutAmount: string;
-  trades: Trade[];
+  trades: TradeLike[];
 }
 
 export function TradingPanel({
@@ -38,7 +58,7 @@ export function TradingPanel({
           </div>
         </div>
         <div className="text-right">
-          <span className="text-green font-bold text-sm block leading-tight">{symbol.payout}%</span>
+          <span className="text-green font-bold text-sm block leading-tight">{symbol.payoutPercent ?? symbol.payout}%</span>
           <span className="text-[10px] text-textDark">payout</span>
         </div>
       </div>
@@ -236,7 +256,7 @@ export function TradingPanel({
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-textDark">Payout</span>
-                            <span className="text-[11px] text-green font-semibold">{t.payoutPercent ?? symbol.payout}%</span>
+                            <span className="text-[11px] text-green font-semibold">{t.payoutPercent ?? symbol.payoutPercent ?? symbol.payout}%</span>
                           </div>
                           <div className="h-px bg-border/40"></div>
                           <div className="flex items-center justify-between pt-0.5">

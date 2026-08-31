@@ -1,19 +1,21 @@
 'use client';
 
 import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { init, dispose, registerOverlay, Chart as KLineChart } from 'klinecharts';
+import { init, dispose, registerOverlay, Chart as KLineChart, KLineData } from 'klinecharts';
 
-interface Candle {
-  time: number;
+export interface CandleData {
+  timestamp: number;
   open: number;
   high: number;
   low: number;
   close: number;
+  volume: number;
 }
 
 interface ChartProps {
-  candles: Candle[];
-  currentPrice: number;
+  pairId: string | null;
+  currentPrice: number | null;
+  currentCandle: CandleData | null;
   onOverlaySelected?: (overlay: { id: string; name: string } | null) => void;
 }
 
@@ -25,43 +27,6 @@ export interface ChartHandle {
   copyOverlay: (id: string) => void;
   getOverlays: () => Array<{ id: string; name: string }>;
   getChart: () => KLineChart | null;
-}
-
-function seededRand(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-function generateBackwardCandles(fromTimestamp: number, count: number, basePrice: number): Candle[] {
-  const rand = seededRand(fromTimestamp);
-  const candles: Candle[] = [];
-  let price = basePrice + (rand() - 0.5) * 0.02;
-  const interval = 60;
-  let trend = 0;
-  for (let i = 0; i < count; i++) {
-    trend += (rand() - 0.5) * 0.008;
-    trend = Math.max(-0.01, Math.min(0.01, trend));
-    const volatility = (rand() * 0.008 + 0.003) * basePrice;
-    const open = price;
-    const drift = trend + (rand() - 0.5) * volatility;
-    const close = open + drift;
-    const wickUp = rand() * volatility * 0.8;
-    const wickDown = rand() * volatility * 0.8;
-    const high = Math.max(open, close) + wickUp;
-    const low = Math.min(open, close) - wickDown;
-    candles.unshift({
-      time: fromTimestamp - (count - i) * interval,
-      open,
-      high,
-      low,
-      close,
-    });
-    price = open;
-  }
-  return candles;
 }
 
 const CUSTOM_OVERLAYS: Array<{
@@ -125,14 +90,14 @@ const CUSTOM_OVERLAYS: Array<{
 
 CUSTOM_OVERLAYS.forEach(o => registerOverlay(o));
 
-export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ candles, currentPrice, onOverlaySelected }, ref) {
+export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, currentPrice, currentCandle, onOverlaySelected }, ref) {
   const chartIdRef = useRef(`kline-${Math.random().toString(36).slice(2)}`);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<KLineChart | null>(null);
-  const candlesRef = useRef(candles);
-  candlesRef.current = candles;
+  const pairIdRef = useRef(pairId);
   const onOverlaySelectedRef = useRef(onOverlaySelected);
   onOverlaySelectedRef.current = onOverlaySelected;
+  const subscribeBarCallbackRef = useRef<((data: KLineData) => void) | null>(null);
 
   useImperativeHandle(ref, () => ({
     createOverlay: (name: string, onSelected?: (id: string) => void, onDeselected?: () => void) => {
@@ -155,28 +120,16 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ candle
         onRightClick: (event) => { (event as { preventDefault?: () => void }).preventDefault?.(); return true; },
       });
     },
-    removeOverlay: (id?: string) => {
-      if (id) {
-        chartRef.current?.removeOverlay({ id });
-      }
-    },
+    removeOverlay: (id?: string) => { if (id) chartRef.current?.removeOverlay({ id }); },
     removeAllOverlays: () => {
       const chart = chartRef.current;
-      if (chart) {
-        const overlays = chart.getOverlays({});
-        overlays.forEach(o => {
-          if (o.id) chart.removeOverlay({ id: o.id });
-        });
-      }
+      if (chart) { chart.getOverlays({}).forEach(o => { if (o.id) chart.removeOverlay({ id: o.id }); }); }
     },
-    overrideOverlay: (id: string, overlay: Record<string, unknown>) => {
-      chartRef.current?.overrideOverlay({ id, ...overlay });
-    },
+    overrideOverlay: (id: string, overlay: Record<string, unknown>) => { chartRef.current?.overrideOverlay({ id, ...overlay }); },
     copyOverlay: (id: string) => {
       const chart = chartRef.current;
       if (!chart) return;
-      const all = chart.getOverlays({});
-      const src = all.find(o => o.id === id);
+      const src = chart.getOverlays({}).find(o => o.id === id);
       if (!src) return;
       const offset = 30;
       const newPoints = (src.points ?? []).map((p: { timestamp?: number; dataIndex?: number; value?: number }) => ({
@@ -185,9 +138,8 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ candle
         dataIndex: p.dataIndex !== undefined ? p.dataIndex + offset : undefined,
         value: p.value !== undefined ? p.value * 1.02 : undefined,
       }));
-      const overlayName = src.name ?? '';
       chart.createOverlay({
-        name: overlayName,
+        name: src.name ?? '',
         points: newPoints,
         styles: src.styles ? { ...src.styles } : undefined,
         needDefaultPointFigure: true,
@@ -195,61 +147,74 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ candle
         needDefaultYAxisFigure: true,
         onSelected: (event) => {
           const newId = (event as { overlay?: { id?: string } }).overlay?.id ?? '';
-          onOverlaySelectedRef.current?.({ id: newId, name: overlayName });
+          onOverlaySelectedRef.current?.({ id: newId, name: src.name ?? '' });
           return true;
         },
-        onDeselected: () => {
-          onOverlaySelectedRef.current?.(null);
-          return true;
-        },
+        onDeselected: () => { onOverlaySelectedRef.current?.(null); return true; },
         onRightClick: (event) => { (event as { preventDefault?: () => void }).preventDefault?.(); return true; },
       });
     },
     getOverlays: () => {
       const chart = chartRef.current;
-      if (!chart) return [];
-      return chart.getOverlays({}).map(o => ({ id: o.id ?? '', name: o.name ?? '' }));
+      return chart ? chart.getOverlays({}).map(o => ({ id: o.id ?? '', name: o.name ?? '' })) : [];
     },
     getChart: () => chartRef.current,
   }));
 
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    if (!chartContainerRef.current || chartRef.current) return;
 
     const chart = init(chartIdRef.current, { styles: 'dark' });
     chartRef.current = chart;
 
     if (chart) {
-      chart.setSymbol({ name: 'EUR/USD' });
+      chart.setSymbol({ name: pairIdRef.current || 'OTC' });
       chart.setPeriod({ span: 1, type: 'minute' });
 
       chart.setDataLoader({
-        getBars: ({ type, timestamp, callback }) => {
+        getBars: async ({ type, timestamp, callback }) => {
+          const pid = pairIdRef.current;
+          if (!pid) { callback([], false); return; }
+
           if (type === 'init') {
-            const data = candlesRef.current.map(c => ({
-              timestamp: c.time * 1000,
-              open: c.open,
-              high: c.high,
-              low: c.low,
-              close: c.close,
-              volume: Math.floor(Math.random() * 10000),
-            }));
-            callback(data, false);
+            try {
+              const res = await fetch(`/api/pairs/${pid}/candles?limit=300`);
+              const data = await res.json();
+              const bars: KLineData[] = (data.candles || []).map((c: any) => ({
+                timestamp: c.timestamp,
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+                volume: Number(c.volume) || 0,
+              })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
+              callback(bars, false);
+            } catch {
+              callback([], false);
+            }
           } else if (type === 'backward' && timestamp) {
-            const basePrice = candlesRef.current.length > 0
-              ? candlesRef.current[0].open
-              : 1.0;
-            const older = generateBackwardCandles(Math.floor(timestamp / 1000), 50, basePrice);
-            const data = older.map(c => ({
-              timestamp: c.time * 1000,
-              open: c.open,
-              high: c.high,
-              low: c.low,
-              close: c.close,
-              volume: Math.floor(Math.random() * 10000),
-            }));
-            callback(data, true);
+            try {
+              const res = await fetch(`/api/pairs/${pid}/candles?limit=100&before=${timestamp}`);
+              const data = await res.json();
+              const bars: KLineData[] = (data.candles || []).map((c: any) => ({
+                timestamp: c.timestamp,
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+                volume: Number(c.volume) || 0,
+              })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
+              callback(bars, bars.length < 100);
+            } catch {
+              callback([], true);
+            }
           }
+        },
+        subscribeBar: ({ callback }) => {
+          subscribeBarCallbackRef.current = callback;
+        },
+        unsubscribeBar: () => {
+          subscribeBarCallbackRef.current = null;
         },
       });
 
@@ -265,8 +230,90 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ candle
       ro.disconnect();
       dispose(chartIdRef.current);
       chartRef.current = null;
+      subscribeBarCallbackRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (pairId) {
+      pairIdRef.current = pairId;
+      if (chartRef.current) {
+        dispose(chartIdRef.current);
+        chartRef.current = null;
+        subscribeBarCallbackRef.current = null;
+      }
+      if (chartContainerRef.current) {
+        const chart = init(chartIdRef.current, { styles: 'dark' });
+        chartRef.current = chart;
+
+        if (chart) {
+          chart.setSymbol({ name: pairId });
+          chart.setPeriod({ span: 1, type: 'minute' });
+          chart.setDataLoader({
+            getBars: async ({ type, timestamp, callback }) => {
+              if (type === 'init') {
+                try {
+                  const res = await fetch(`/api/pairs/${pairId}/candles?limit=300`);
+                  const data = await res.json();
+                  const bars: KLineData[] = (data.candles || []).map((c: any) => ({
+                    timestamp: c.timestamp,
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close,
+                    volume: Number(c.volume) || 0,
+                  })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
+                  callback(bars, false);
+                } catch {
+                  callback([], false);
+                }
+              } else if (type === 'backward' && timestamp) {
+                try {
+                  const res = await fetch(`/api/pairs/${pairId}/candles?limit=100&before=${timestamp}`);
+                  const data = await res.json();
+                  const bars: KLineData[] = (data.candles || []).map((c: any) => ({
+                    timestamp: c.timestamp,
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close,
+                    volume: Number(c.volume) || 0,
+                  })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
+                  callback(bars, bars.length < 100);
+                } catch {
+                  callback([], true);
+                }
+              }
+            },
+            subscribeBar: ({ callback }) => {
+              subscribeBarCallbackRef.current = callback;
+            },
+            unsubscribeBar: () => {
+              subscribeBarCallbackRef.current = null;
+            },
+          });
+          chart.resetData();
+          chart.setBarSpace(8);
+          chart.scrollToRealTime(0);
+        }
+      }
+    }
+  }, [pairId]);
+
+  useEffect(() => {
+    if (!currentCandle) return;
+    const cb = subscribeBarCallbackRef.current;
+    if (cb) {
+      cb({
+        timestamp: currentCandle.timestamp,
+        open: currentCandle.open,
+        high: currentCandle.high,
+        low: currentCandle.low,
+        close: currentCandle.close,
+        volume: currentCandle.volume,
+      });
+    }
+  }, [currentCandle]);
 
   return (
     <div className="absolute inset-0 bg-[#161a22] overflow-hidden">

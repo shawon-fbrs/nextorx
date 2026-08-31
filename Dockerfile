@@ -50,4 +50,4 @@ COPY --from=builder /app ./
 RUN chown -R app:app .next
 USER app
 EXPOSE 3000
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node_modules/.bin/next start"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node_modules/.bin/tsx server.ts"]

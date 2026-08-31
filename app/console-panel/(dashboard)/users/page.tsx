@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect, ReactNode } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { mockUsers, MockUser } from '@/lib/mock-data/users';
 import { DataTable } from '@/components/admin/ui/data-table';
 import { SearchInput } from '@/components/admin/ui/search-input';
 import { Badge } from '@/components/admin/ui/badge';
@@ -10,14 +9,29 @@ import { Card, CardContent } from '@/components/admin/ui/card';
 import { Button } from '@/components/admin/ui/button';
 import { Skeleton } from '@/components/admin/ui/skeleton';
 
+type User = {
+  id: string;
+  uid: string | null;
+  name: string;
+  email: string;
+  role: string;
+  balance: number;
+  bonusBalance: number;
+  kycStatus: string;
+  banned: boolean | null;
+  referralCode: string | null;
+  createdAt: string;
+  _count: { ledgerEntries: number; deposits: number; withdrawals: number; trades: number };
+};
+
 const columns = [
   {
     key: 'name',
     header: 'User',
-    render: (user: MockUser): ReactNode => (
+    render: (user: User): ReactNode => (
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-blue/20 flex items-center justify-center">
-          <span className="text-xs font-bold text-blue">{user.name.charAt(0)}</span>
+          <span className="text-xs font-bold text-blue">{user.name.charAt(0).toUpperCase()}</span>
         </div>
         <div>
           <p className="text-sm font-medium text-white">{user.name}</p>
@@ -27,94 +41,97 @@ const columns = [
     ),
   },
   {
-    key: 'country',
-    header: 'Country',
+    key: 'uid',
+    header: 'UID',
+    render: (user: User): ReactNode => (
+      <span className="text-xs font-mono text-textDark">{user.uid ?? '—'}</span>
+    ),
   },
   {
     key: 'balance',
     header: 'Balance',
-    render: (user: MockUser): ReactNode => (
+    render: (user: User): ReactNode => (
       <span className="text-sm font-medium text-white">
-        ${user.balance.toLocaleString()}
+        ${(user.balance / 100).toFixed(2)}
       </span>
     ),
   },
   {
     key: 'status',
     header: 'Status',
-    render: (user: MockUser): ReactNode => (
-      <Badge
-        variant={
-          user.status === 'active' ? 'success' : user.status === 'blocked' ? 'danger' : 'neutral'
-        }
-      >
-        {user.status}
+    render: (user: User): ReactNode => (
+      <Badge variant={user.banned ? 'danger' : 'success'}>
+        {user.banned ? 'blocked' : 'active'}
       </Badge>
     ),
   },
   {
-    key: 'kyc',
+    key: 'kycStatus',
     header: 'KYC',
-    render: (user: MockUser): ReactNode => (
+    render: (user: User): ReactNode => (
       <Badge
         variant={
-          user.kyc === 'approved' ? 'success' : user.kyc === 'pending' ? 'warning' : 'danger'
+          user.kycStatus === 'APPROVED' ? 'success' : user.kycStatus === 'PENDING' ? 'warning' : 'neutral'
         }
       >
-        {user.kyc}
+        {user.kycStatus === 'NOT_SUBMITTED' ? 'none' : user.kycStatus.toLowerCase()}
       </Badge>
     ),
   },
   {
-    key: 'verified',
-    header: 'Verified',
-    render: (user: MockUser): ReactNode => (
-      <Badge variant={user.verified ? 'success' : 'warning'}>
-        {user.verified ? 'Yes' : 'No'}
-      </Badge>
+    key: 'role',
+    header: 'Role',
+    render: (user: User): ReactNode => (
+      <span className="text-xs text-textDark capitalize">{user.role}</span>
     ),
   },
   {
-    key: 'lastLogin',
-    header: 'Last Login',
+    key: 'trades',
+    header: 'Trades',
+    render: (user: User): ReactNode => (
+      <span className="text-xs text-textDark">{user._count.trades}</span>
+    ),
   },
 ];
 
 export default function UsersPage() {
   const router = useRouter();
+  const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
+    fetchUsers();
   }, []);
 
-  const filteredUsers = useMemo(() => {
-    let result = [...mockUsers];
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/admin/users?limit=200');
+      const data = await res.json();
+      if (data.users) setUsers(data.users);
+    } catch {
+      // ignore
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  const filteredUsers = users.filter((u) => {
     if (search) {
-      const lowerSearch = search.toLowerCase();
-      result = result.filter(
-        (u) =>
-          u.name.toLowerCase().includes(lowerSearch) ||
-          u.email.toLowerCase().includes(lowerSearch)
-      );
+      const q = search.toLowerCase();
+      if (!u.name.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
     }
+    if (statusFilter === 'active') return !u.banned;
+    if (statusFilter === 'blocked') return !!u.banned;
+    return true;
+  });
 
-    if (statusFilter !== 'all') {
-      result = result.filter((u) => u.status === statusFilter);
-    }
-
-    return result;
-  }, [search, statusFilter]);
-
-  const paginatedUsers = useMemo(() => {
-    const start = pagination.pageIndex * pagination.pageSize;
-    return filteredUsers.slice(start, start + pagination.pageSize);
-  }, [filteredUsers, pagination]);
+  const paginatedUsers = filteredUsers.slice(
+    pagination.pageIndex * pagination.pageSize,
+    (pagination.pageIndex + 1) * pagination.pageSize
+  );
 
   const totalPages = Math.ceil(filteredUsers.length / pagination.pageSize);
 
@@ -125,16 +142,6 @@ export default function UsersPage() {
           <Skeleton className="h-7 w-16 mb-2" />
           <Skeleton className="h-4 w-40" />
         </div>
-        <Card>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Skeleton className="h-10 flex-1" />
-              <div className="flex gap-2">
-                {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-16" />)}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
         <Card>
           <CardContent>
             <Skeleton className="h-64 w-full" />
@@ -162,7 +169,7 @@ export default function UsersPage() {
               />
             </div>
             <div className="flex gap-2">
-              {['all', 'active', 'blocked', 'pending'].map((status) => (
+              {['all', 'active', 'blocked'].map((status) => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
@@ -181,12 +188,14 @@ export default function UsersPage() {
                 onClick={() => {
                   const exportData = filteredUsers.map(u => ({
                     id: u.id,
+                    uid: u.uid,
                     name: u.name,
                     email: u.email,
-                    status: u.status,
-                    kyc: u.kyc,
-                    balance: u.balance,
-                    lastLogin: u.lastLogin,
+                    role: u.role,
+                    balance: u.balance / 100,
+                    kyc: u.kycStatus,
+                    banned: u.banned,
+                    trades: u._count.trades,
                   }));
                   import('@/lib/export').then(m => m.exportToCSV(exportData, 'users'));
                 }}

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/admin/ui/card';
 import { StatsCard } from '@/components/admin/ui/stats-card';
 import { Skeleton } from '@/components/admin/ui/skeleton';
-import { dashboardStats, revenueData, topAssets } from '@/lib/mock-data/stats';
 import {
   AreaChart,
   Area,
@@ -17,15 +16,28 @@ import {
   Bar,
 } from 'recharts';
 
+type Stats = {
+  totalUsers: number;
+  todayTrades: number;
+  totalRevenue: number;
+  winRate: number;
+  monthlyRevenue: { date: string; revenue: number; trades: number }[];
+  topAssets: { name: string; trades: number; volume: number; winRate: number }[];
+};
+
 export default function DashboardPage() {
+  const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
+    fetch("/api/admin/stats")
+      .then((r) => r.json())
+      .then((data) => setStats(data))
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, []);
 
-  if (isLoading) {
+  if (isLoading || !stats) {
     return (
       <div className="space-y-6">
         <div>
@@ -65,18 +77,15 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
       <div>
         <h1 className="text-xl font-bold text-white">Dashboard</h1>
         <p className="text-sm text-textDark">Overview of your platform</p>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           title="Total Users"
-          value={dashboardStats.totalUsers.toLocaleString()}
-          change={dashboardStats.userGrowth}
+          value={stats.totalUsers.toLocaleString()}
           icon={
             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
               <path d="M12 4.354a4 4 0 110 7.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" strokeLinecap="round" strokeLinejoin="round" />
@@ -85,8 +94,7 @@ export default function DashboardPage() {
         />
         <StatsCard
           title="Today's Trades"
-          value={dashboardStats.todayTrades.toLocaleString()}
-          change={dashboardStats.tradeGrowth}
+          value={stats.todayTrades.toLocaleString()}
           icon={
             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
               <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round" />
@@ -95,8 +103,7 @@ export default function DashboardPage() {
         />
         <StatsCard
           title="Total Revenue"
-          value={`$${dashboardStats.totalRevenue.toLocaleString()}`}
-          change={dashboardStats.revenueGrowth}
+          value={`$${(stats.totalRevenue / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           icon={
             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
               <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
@@ -105,7 +112,7 @@ export default function DashboardPage() {
         />
         <StatsCard
           title="Win Rate"
-          value={`${dashboardStats.winRate}%`}
+          value={`${stats.winRate}%`}
           icon={
             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
               <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" strokeLinecap="round" strokeLinejoin="round" />
@@ -114,9 +121,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Revenue Chart */}
         <Card>
           <CardHeader>
             <CardTitle>Revenue Trend</CardTitle>
@@ -124,7 +129,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
+                <AreaChart data={stats.monthlyRevenue}>
                   <defs>
                     <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#007aff" stopOpacity={0.3} />
@@ -133,7 +138,7 @@ export default function DashboardPage() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#31394c" />
                   <XAxis dataKey="date" stroke="#525a6b" fontSize={11} />
-                  <YAxis stroke="#525a6b" fontSize={11} />
+                  <YAxis stroke="#525a6b" fontSize={11} tickFormatter={(v) => `$${(v / 100).toFixed(0)}`} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#242a38',
@@ -141,6 +146,7 @@ export default function DashboardPage() {
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
+                    formatter={(value: any) => [`$${(Number(value) / 100).toFixed(2)}`, 'Revenue']}
                   />
                   <Area
                     type="monotone"
@@ -155,7 +161,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Trades Chart */}
         <Card>
           <CardHeader>
             <CardTitle>Trades Volume</CardTitle>
@@ -163,7 +168,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueData}>
+                <BarChart data={stats.monthlyRevenue}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#31394c" />
                   <XAxis dataKey="date" stroke="#525a6b" fontSize={11} />
                   <YAxis stroke="#525a6b" fontSize={11} />
@@ -183,7 +188,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Top Assets */}
       <Card>
         <CardHeader>
           <CardTitle>Top Assets</CardTitle>
@@ -200,18 +204,24 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {topAssets.map((asset) => (
-                  <tr key={asset.name} className="border-b border-border/50 hover:bg-surface-hover/50">
-                    <td className="px-4 py-3 text-sm font-medium text-white">{asset.name}</td>
-                    <td className="px-4 py-3 text-sm text-text">{asset.trades.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-text">${asset.volume.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <span className={asset.winRate >= 49 ? 'text-green' : 'text-orange'}>
-                        {asset.winRate}%
-                      </span>
-                    </td>
+                {stats.topAssets.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-textDark">No trade data yet</td>
                   </tr>
-                ))}
+                ) : (
+                  stats.topAssets.map((asset) => (
+                    <tr key={asset.name} className="border-b border-border/50 hover:bg-surface-hover/50">
+                      <td className="px-4 py-3 text-sm font-medium text-white">{asset.name}</td>
+                      <td className="px-4 py-3 text-sm text-text">{asset.trades.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-text">${(asset.volume / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={asset.winRate >= 49 ? 'text-green' : 'text-orange'}>
+                          {asset.winRate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

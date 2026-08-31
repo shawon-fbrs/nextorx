@@ -11,7 +11,19 @@ import { Tabs } from '@/components/admin/ui/tabs';
 import { Alert } from '@/components/admin/ui/alert';
 import { Badge } from '@/components/admin/ui/badge';
 import { Skeleton } from '@/components/admin/ui/skeleton';
-import { payoutRules, withdrawalRules } from '@/lib/mock-data/treasury';
+const payoutRules = [
+  { id: '1', condition: 'Reserve > 40%', action: 'increase' as const, payoutValue: 85, enabled: true },
+  { id: '2', condition: 'Reserve 30-40%', action: 'increase' as const, payoutValue: 82, enabled: true },
+  { id: '3', condition: 'Reserve 20-30%', action: 'decrease' as const, payoutValue: 75, enabled: true },
+  { id: '4', condition: 'Reserve < 20%', action: 'decrease' as const, payoutValue: 65, enabled: true },
+];
+
+const withdrawalRules = [
+  { id: '1', name: 'Auto Approve', condition: 'Amount < $200 AND reserve > 40%', action: 'auto_approve' as const, enabled: true },
+  { id: '2', name: 'Manual Review', condition: 'Amount $200-$500 OR reserve < 40%', action: 'manual_review' as const, enabled: true },
+  { id: '3', name: 'Senior Review', condition: 'Amount > $500 OR reserve < 20%', action: 'manual_review' as const, enabled: true },
+  { id: '4', name: 'Block High Risk', condition: 'User risk score > 80', action: 'reject' as const, enabled: true },
+];
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');

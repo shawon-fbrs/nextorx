@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:ws": "tsx server.ts",
     "build": "next build",
     "start": "next start",
+    "start:prod": "tsx server.ts",
     "lint": "eslint",
     "db:generate": "npx prisma generate",
     "db:migrate": "npx prisma migrate deploy",
@@ -33,6 +35,7 @@
     "recharts": "^3.10.1",
     "tailwind-merge": "^3.6.0",
     "uuid": "^14.0.2",
+    "ws": "^8.21.3",
     "zod": "^4.5.2"
   },
   "devDependencies": {
@@ -40,10 +43,12 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   },
   "packageManager": "pnpm@11.8.0"

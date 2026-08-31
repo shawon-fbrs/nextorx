@@ -2,19 +2,42 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { SYMBOLS, generateOtcCandles, Trade } from '../../../lib/types';
 import dynamic from 'next/dynamic';
 import type { ChartHandle } from '../../../components/Chart';
 const Chart = dynamic(() => import('../../../components/Chart').then(m => m.Chart), { ssr: false });
 import { TradingPanel } from '../../../components/TradingPanel';
+import { usePairWS, type CandleData } from '@/lib/use-ws';
 import {
-  TrendingUp, BarChart3, Square, ArrowUpRight, Type,
+  TrendingUp, BarChart3, Square, ArrowUpRight,
   Minus, MoveHorizontal, ChevronRight,
-  GitBranch, Pencil, Ruler, Activity, Trash2, Maximize2, CandlestickChart,
+  GitBranch, Pencil, Activity, Trash2, Maximize2, CandlestickChart,
   PenLine, ArrowRight,
 } from 'lucide-react';
 
-const OTC_SYMBOLS = SYMBOLS.filter(s => s.category === 'otc');
+interface PairDef {
+  id: string;
+  name: string;
+  category: string;
+  payoutPercent: number;
+  basePrice: number;
+  minTrade: number;
+  maxTrade: number;
+}
+
+interface Trade {
+  id: string;
+  symbol: string;
+  type: 'up' | 'down';
+  amount: number;
+  payout: number;
+  profit: number;
+  time: string;
+  timestamp: number;
+  status: 'won' | 'lost';
+  openPrice?: number;
+  closePrice?: number;
+  payoutPercent?: number;
+}
 
 const drawingGroups = [
   { name: 'Line', icon: 'line', items: ['Trend Line', 'Horizontal Line', 'Horizontal Ray', 'Horizontal Segment', 'Ray Line', 'Extended Line'] },
@@ -36,7 +59,7 @@ const toolOverlayMap: Record<string, string> = {
   'Arrow Marker': 'arrowMarker',
 };
 
-function TopBar({ symbols, activeSymbol, onSelect }: { symbols: typeof OTC_SYMBOLS; activeSymbol: typeof OTC_SYMBOLS[0]; onSelect: (s: typeof OTC_SYMBOLS[0]) => void }) {
+function TopBar({ pairs, activePair, onSelect }: { pairs: PairDef[]; activePair: PairDef; onSelect: (p: PairDef) => void }) {
   const [addOpen, setAddOpen] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -60,18 +83,18 @@ function TopBar({ symbols, activeSymbol, onSelect }: { symbols: typeof OTC_SYMBO
             </div>
           </div>
           <div className="max-h-[420px] overflow-y-auto px-2 pb-2">
-            {symbols.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).map(sym => {
-              const isActive = sym.id === activeSymbol.id;
+            {pairs.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(pair => {
+              const isActive = pair.id === activePair.id;
               return (
-                <button key={sym.id} onClick={() => { onSelect(sym); setAddOpen(false); }}
+                <button key={pair.id} onClick={() => { onSelect(pair); setAddOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all mb-0.5 ${isActive ? 'bg-blue/10 border border-blue/30' : 'hover:bg-surface-hover border border-transparent'}`}>
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-blue/20' : 'bg-background'}`}>
-                    <span className="text-xs font-bold text-white">{sym.name.replace('/', '').slice(0, 3)}</span>
+                    <span className="text-xs font-bold text-white">{pair.name.replace('/', '').slice(0, 3)}</span>
                   </div>
                   <div className="flex-1 text-left">
-                    <span className="text-sm font-bold text-white">{sym.name}</span>
+                    <span className="text-sm font-bold text-white">{pair.name}</span>
                   </div>
-                  <span className="text-sm font-bold text-green">{sym.payout}%</span>
+                  <span className="text-sm font-bold text-green">{pair.payoutPercent}%</span>
                 </button>
               );
             })}
@@ -79,10 +102,10 @@ function TopBar({ symbols, activeSymbol, onSelect }: { symbols: typeof OTC_SYMBO
         </div>
       </div>
 
-      {symbols.slice(0, 7).map((sym) => {
-        const isActive = sym.id === activeSymbol.id;
+      {pairs.slice(0, 7).map((pair) => {
+        const isActive = pair.id === activePair.id;
         return (
-          <button key={sym.id} onClick={() => onSelect(sym)}
+          <button key={pair.id} onClick={() => onSelect(pair)}
             className={`h-11 w-40 min-w-0 flex-shrink rounded-xl flex items-center pl-4 pr-7 gap-2.5 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
             <span onClick={(e) => e.stopPropagation()}
               className="absolute top-0 right-0 w-5 h-5 bg-red rounded-bl-xl flex items-center justify-center hover:bg-red-hover transition-colors">
@@ -92,8 +115,8 @@ function TopBar({ symbols, activeSymbol, onSelect }: { symbols: typeof OTC_SYMBO
             </span>
             {isActive && <div className="w-0.5 h-6 bg-blue rounded-full" />}
             <div className="flex flex-col">
-              <span className="text-xs font-bold text-white leading-tight">{sym.name}</span>
-              <span className="text-[10px] font-bold text-orange">{sym.payout}%</span>
+              <span className="text-xs font-bold text-white leading-tight">{pair.name}</span>
+              <span className="text-[10px] font-bold text-orange">{pair.payoutPercent}%</span>
             </div>
           </button>
         );
@@ -249,14 +272,8 @@ function IndDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <input
-              type="text"
-              placeholder="Search indicators..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full bg-background border border-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue/50 transition-colors"
-              autoFocus
-            />
+            <input type="text" placeholder="Search indicators..." value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue/50 transition-colors" autoFocus />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-5">
@@ -265,11 +282,8 @@ function IndDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
               <div className="text-[10px] font-bold text-text-dark uppercase tracking-wider mb-1.5">{group.cat}</div>
               <div className="space-y-0.5">
                 {group.items.map(tool => (
-                  <button
-                    key={tool}
-                    onClick={onClose}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-hover transition-colors group"
-                  >
+                  <button key={tool} onClick={onClose}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-hover transition-colors group">
                     <div className="w-7 h-7 rounded-lg bg-background flex items-center justify-center flex-shrink-0">
                       <svg className="w-3.5 h-3.5 text-text-dark group-hover:text-blue transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                         <path d="M7 12l3-3 3 3 4-4" strokeLinecap="round" strokeLinejoin="round" />
@@ -281,9 +295,7 @@ function IndDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
               </div>
             </div>
           ))}
-          {filtered.length === 0 && (
-            <div className="text-center py-8 text-text-dark text-sm">No indicators found</div>
-          )}
+          {filtered.length === 0 && <div className="text-center py-8 text-text-dark text-sm">No indicators found</div>}
         </div>
       </div>
     </div>
@@ -294,12 +306,12 @@ export default function TradingPage() {
   const params = useParams();
   const accountType = (params.accountType as string) || 'demo';
   const [indOpen, setIndOpen] = useState(false);
-  const [activeSymbol, setActiveSymbol] = useState(OTC_SYMBOLS[0]);
+  const [pairs, setPairs] = useState<PairDef[]>([]);
+  const [activePair, setActivePair] = useState<PairDef | null>(null);
   const [investment, setInvestment] = useState(1);
   const [timeMinutes, setTimeMinutes] = useState(1);
   const [timeSeconds, setTimeSeconds] = useState(0);
   const [trades, setTrades] = useState<Trade[]>([]);
-  const [candles, setCandles] = useState<{ time: number; open: number; high: number; low: number; close: number }[]>([]);
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [panelPos, setPanelPos] = useState({ x: 0, y: 0 });
@@ -310,10 +322,26 @@ export default function TradingPage() {
   const editDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
 
   useEffect(() => {
+    fetch('/api/pairs')
+      .then(r => r.json())
+      .then((data: PairDef[]) => {
+        setPairs(data);
+        if (data.length > 0) setActivePair(data[0]);
+      })
+      .catch(() => {});
     setMounted(true);
-    const basePrice = activeSymbol.name.includes('Gold') ? 1950 : activeSymbol.name.includes('BTC') ? 43000 : 1.0;
-    setCandles(generateOtcCandles(200, Date.now(), basePrice));
-  }, [activeSymbol]);
+  }, []);
+
+  const handleTick = useCallback(() => {}, []);
+  const handleCandleClose = useCallback(() => {}, []);
+  const handleSnapshot = useCallback(() => {}, []);
+
+  const { isConnected, currentPrice, candle } = usePairWS({
+    pairId: activePair?.id ?? null,
+    onTick: handleTick,
+    onCandleClose: handleCandleClose,
+    onSnapshot: handleSnapshot,
+  });
 
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -323,14 +351,10 @@ export default function TradingPage() {
 
   const handleDrawTool = useCallback((toolName: string) => {
     const overlayName = toolOverlayMap[toolName];
-    if (overlayName) {
-      chartRef.current?.createOverlay(overlayName);
-    }
+    if (overlayName) chartRef.current?.createOverlay(overlayName);
   }, []);
 
-  useEffect(() => {
-    setEditPanelPos({ x: 0, y: 0 });
-  }, [selectedOverlay?.id]);
+  useEffect(() => { setEditPanelPos({ x: 0, y: 0 }); }, [selectedOverlay?.id]);
 
   const handleRemoveDrawings = useCallback(() => {
     chartRef.current?.removeAllOverlays();
@@ -365,11 +389,7 @@ export default function TradingPage() {
         y: dragRef.current.startPosY + (ev.clientY - dragRef.current.startY),
       });
     };
-    const onUp = () => {
-      dragRef.current = null;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
+    const onUp = () => { dragRef.current = null; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   };
@@ -384,40 +404,52 @@ export default function TradingPage() {
         y: editDragRef.current.startPosY + (ev.clientY - editDragRef.current.startY),
       });
     };
-    const onUp = () => {
-      editDragRef.current = null;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
+    const onUp = () => { editDragRef.current = null; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   };
 
-  const currentPrice = 1.35947;
-  const payoutAmount = (investment * (1 + activeSymbol.payout / 100)).toFixed(2);
+  const price = currentPrice ?? activePair?.basePrice ?? 1.0;
+  const payout = activePair?.payoutPercent ?? 80;
+  const payoutAmount = (investment * (1 + payout / 100)).toFixed(2);
   const timeStr = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}:00`;
 
-  const handleTrade = useCallback((type: 'up' | 'down') => {
-    const won = Math.random() > 0.5;
-    const profit = won ? parseFloat(payoutAmount) - investment : -investment;
-    const newTrade: Trade = {
-      id: Date.now().toString(),
-      symbol: activeSymbol.name,
-      type,
-      amount: investment,
-      payout: activeSymbol.payout,
-      profit,
-      time: timeStr,
-      timestamp: Date.now(),
-      status: won ? 'won' : 'lost',
-      openPrice: currentPrice,
-      closePrice: won
-        ? type === 'up' ? currentPrice * 1.002 : currentPrice * 0.998
-        : type === 'up' ? currentPrice * 0.998 : currentPrice * 1.002,
-      payoutPercent: activeSymbol.payout,
-    };
-    setTrades(prev => [newTrade, ...prev]);
-  }, [activeSymbol, investment, payoutAmount, timeStr, currentPrice]);
+  const handleTrade = useCallback(async (type: 'up' | 'down') => {
+    if (!activePair) return;
+
+    try {
+      const res = await fetch('/api/trades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pairId: activePair.id,
+          direction: type.toUpperCase(),
+          amountDollars: investment,
+          durationSeconds: timeMinutes * 60 + timeSeconds,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.trade) {
+        const t = data.trade;
+        const newTrade: Trade = {
+          id: t.id,
+          symbol: activePair.name,
+          type: type,
+          amount: investment,
+          payout: payout,
+          profit: 0,
+          time: timeStr,
+          timestamp: Date.now(),
+          status: 'won',
+          openPrice: price,
+          payoutPercent: payout,
+        };
+        setTrades(prev => [newTrade, ...prev]);
+      }
+    } catch {}
+  }, [activePair, investment, timeMinutes, timeSeconds, timeStr, price, payout]);
 
   const handleTimeChange = (delta: number) => {
     setTimeSeconds(prev => {
@@ -428,7 +460,7 @@ export default function TradingPage() {
     });
   };
 
-  if (!mounted) return <div className="h-full w-full bg-background" />;
+  if (!mounted || !activePair) return <div className="h-full w-full bg-background" />;
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
@@ -436,18 +468,15 @@ export default function TradingPage() {
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <TopBar symbols={OTC_SYMBOLS} activeSymbol={activeSymbol} onSelect={setActiveSymbol} />
+            <TopBar pairs={pairs} activePair={activePair} onSelect={setActivePair} />
             <div className="flex-1 flex min-w-0 overflow-hidden">
               <SideToolbar onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
-                <Chart ref={chartRef} candles={candles} currentPrice={currentPrice} onOverlaySelected={setSelectedOverlay} />
+                <Chart ref={chartRef} pairId={activePair.id} currentPrice={price} currentCandle={candle} onOverlaySelected={setSelectedOverlay} />
 
-                {/* Overlay edit panel — draggable */}
                 {selectedOverlay && (
-                  <div
-                    className="absolute z-[60] bg-[#1a1e2a]/95 backdrop-blur-md border border-[#2e3548] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden"
-                    style={{ left: `calc(50% + ${editPanelPos.x}px)`, top: `calc(8px + ${editPanelPos.y}px)`, transform: 'translateX(-50%)' }}
-                  >
+                  <div className="absolute z-[60] bg-[#1a1e2a]/95 backdrop-blur-md border border-[#2e3548] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden"
+                    style={{ left: `calc(50% + ${editPanelPos.x}px)`, top: `calc(8px + ${editPanelPos.y}px)`, transform: 'translateX(-50%)' }}>
                     <div onMouseDown={onEditDragStart} className="h-7 bg-[#161a24] border-b border-[#2e3548] flex items-center justify-between px-2.5 cursor-move select-none">
                       <div className="flex items-center gap-1.5">
                         <svg className="w-3 h-3 text-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -457,18 +486,14 @@ export default function TradingPage() {
                       </div>
                       <div className="w-6 h-0.5 bg-[#3a4256] rounded-full" />
                     </div>
-
                     <div className="px-2.5 py-2 flex items-center gap-2">
                       <div className="flex items-center gap-1">
                         {['#00c365', '#ff4954', '#007aff', '#ff8c00', '#e4e8f0', '#ffff00', '#a855f7', '#ec4899'].map(c => (
                           <button key={c} onClick={() => handleOverlayStyle('color', c)}
-                            className="w-4 h-4 rounded-full border border-white/10 hover:scale-125 transition-all duration-150"
-                            style={{ backgroundColor: c }} />
+                            className="w-4 h-4 rounded-full border border-white/10 hover:scale-125 transition-all duration-150" style={{ backgroundColor: c }} />
                         ))}
                       </div>
-
                       <div className="w-px h-5 bg-[#2e3548]" />
-
                       <div className="flex items-center gap-0.5">
                         {[1, 2, 3, 4].map(w => (
                           <button key={w} onClick={() => handleOverlayStyle('size', w)}
@@ -477,9 +502,7 @@ export default function TradingPage() {
                           </button>
                         ))}
                       </div>
-
                       <div className="w-px h-5 bg-[#2e3548]" />
-
                       <div className="flex items-center gap-0.5">
                         {['solid', 'dashed'].map(s => (
                           <button key={s} onClick={() => handleOverlayStyle('style', s)}
@@ -488,9 +511,7 @@ export default function TradingPage() {
                           </button>
                         ))}
                       </div>
-
                       <div className="w-px h-5 bg-[#2e3548]" />
-
                       <div className="flex items-center gap-0.5">
                         <button onClick={handleCopyOverlay} title="Copy"
                           className="w-6 h-6 rounded-md hover:bg-white/5 flex items-center justify-center text-white/30 hover:text-blue transition-all duration-150">
@@ -515,10 +536,8 @@ export default function TradingPage() {
                   </div>
                 )}
                 {isFullscreen && (
-                  <div
-                    className="absolute z-50 w-[200px] bg-surface/95 backdrop-blur-sm border border-border rounded-xl shadow-2xl overflow-hidden"
-                    style={{ right: 16 + panelPos.x, top: `calc(50% + ${panelPos.y}px)`, transform: 'translateY(-50%)' }}
-                  >
+                  <div className="absolute z-50 w-[200px] bg-surface/95 backdrop-blur-sm border border-border rounded-xl shadow-2xl overflow-hidden"
+                    style={{ right: 16 + panelPos.x, top: `calc(50% + ${panelPos.y}px)`, transform: 'translateY(-50%)' }}>
                     <div onMouseDown={onDragStart} className="h-7 bg-background border-b border-border flex items-center justify-center cursor-move select-none">
                       <div className="w-8 h-1 bg-border rounded-full" />
                     </div>
@@ -577,9 +596,9 @@ export default function TradingPage() {
             </div>
           </div>
         </div>
-        {!isFullscreen && (
+        {!isFullscreen && activePair && (
           <TradingPanel
-            symbol={activeSymbol}
+            symbol={activePair}
             investment={investment}
             setInvestment={setInvestment}
             timeStr={timeStr}

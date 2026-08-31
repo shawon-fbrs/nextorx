@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { mockTrades, MockTrade } from '@/lib/mock-data/trades';
+import { useState, useEffect } from 'react';
 import { DataTable } from '@/components/admin/ui/data-table';
 import { SearchInput } from '@/components/admin/ui/search-input';
 import { Badge } from '@/components/admin/ui/badge';
@@ -10,22 +9,137 @@ import { Select } from '@/components/admin/ui/select';
 import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/admin/ui/dialog';
 import { Button } from '@/components/admin/ui/button';
 import { StatsCard } from '@/components/admin/ui/stats-card';
-import { Tabs } from '@/components/admin/ui/tabs';
 import { Skeleton } from '@/components/admin/ui/skeleton';
 
+type Trade = {
+  id: string;
+  direction: string;
+  amount: number;
+  payoutPercent: string;
+  durationSeconds: number;
+  openPrice: string;
+  closePrice: string | null;
+  status: string;
+  profit: number | null;
+  settledAt: string | null;
+  createdAt: string;
+  pair: { id: string; name: string; category: string };
+  user: { id: string; name: string; email: string; uid: string | null };
+};
+
 export default function TradesPage() {
+  const [trades, setTrades] = useState<Trade[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [selectedTrade, setSelectedTrade] = useState<MockTrade | null>(null);
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-  const [activeTab, setActiveTab] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
+    fetchTrades();
   }, []);
+
+  const fetchTrades = async () => {
+    try {
+      const res = await fetch('/api/admin/trades?limit=500');
+      const data = await res.json();
+      if (data.trades) setTrades(data.trades);
+    } catch {
+      // ignore
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filtered = trades.filter((t) => {
+    if (search) {
+      const s = search.toLowerCase();
+      if (
+        !t.user.name.toLowerCase().includes(s) &&
+        !t.user.email.toLowerCase().includes(s) &&
+        !t.pair.name.toLowerCase().includes(s) &&
+        !t.id.toLowerCase().includes(s)
+      ) return false;
+    }
+    if (statusFilter !== 'all' && t.status !== statusFilter.toUpperCase()) return false;
+    if (typeFilter !== 'all' && t.direction !== typeFilter.toUpperCase()) return false;
+    return true;
+  });
+
+  const stats = {
+    total: trades.length,
+    won: trades.filter((t) => t.status === 'WON').length,
+    lost: trades.filter((t) => t.status === 'LOST').length,
+    totalVolume: trades.reduce((sum, t) => sum + t.amount, 0),
+    totalPayout: trades.filter((t) => t.status === 'WON').reduce((sum, t) => sum + (t.profit ?? 0), 0),
+  };
+
+  const paginatedTrades = filtered.slice(
+    pagination.pageIndex * pagination.pageSize,
+    (pagination.pageIndex + 1) * pagination.pageSize
+  );
+
+  const totalPages = Math.ceil(filtered.length / pagination.pageSize);
+
+  const columns = [
+    {
+      key: 'user',
+      header: 'User',
+      render: (t: Trade) => (
+        <div>
+          <span className="font-medium text-white">{t.user.name}</span>
+          <span className="text-[10px] text-textDark ml-1.5">{t.user.email}</span>
+        </div>
+      ),
+    },
+    { key: 'pair', header: 'Asset', render: (t: Trade) => <span className="text-sm">{t.pair.name}</span> },
+    {
+      key: 'direction',
+      header: 'Dir',
+      render: (t: Trade) => (
+        <Badge variant={t.direction === 'UP' ? 'success' : 'danger'}>{t.direction}</Badge>
+      ),
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      render: (t: Trade) => <span className="font-medium text-white">${(t.amount / 100).toFixed(2)}</span>,
+    },
+    {
+      key: 'openPrice',
+      header: 'Open',
+      render: (t: Trade) => <span className="text-text">{Number(t.openPrice).toFixed(5)}</span>,
+    },
+    {
+      key: 'closePrice',
+      header: 'Close',
+      render: (t: Trade) => <span className="text-text">{t.closePrice ? Number(t.closePrice).toFixed(5) : '—'}</span>,
+    },
+    {
+      key: 'profit',
+      header: 'Profit',
+      render: (t: Trade) => t.profit !== null ? (
+        <span className={t.profit >= 0 ? 'text-green font-medium' : 'text-red font-medium'}>
+          {t.profit >= 0 ? '+' : ''}{(t.profit / 100).toFixed(2)}
+        </span>
+      ) : <span className="text-textDark">—</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (t: Trade) => (
+        <Badge variant={t.status === 'WON' ? 'success' : t.status === 'LOST' ? 'danger' : 'neutral'}>
+          {t.status.toLowerCase()}
+        </Badge>
+      ),
+    },
+    {
+      key: 'createdAt',
+      header: 'Date',
+      render: (t: Trade) => <span className="text-textDark text-[11px]">{new Date(t.createdAt).toLocaleString()}</span>,
+    },
+  ];
 
   if (isLoading) {
     return (
@@ -44,108 +158,12 @@ export default function TradesPage() {
         </div>
         <Card>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Skeleton className="h-10 flex-1" />
-              <Skeleton className="h-10 w-36" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
             <Skeleton className="h-64 w-full" />
           </CardContent>
         </Card>
       </div>
     );
   }
-
-  const allTrades = useMemo(() => {
-    let result = [...mockTrades];
-    if (search) {
-      const s = search.toLowerCase();
-      result = result.filter(
-        (t) =>
-          t.userName.toLowerCase().includes(s) ||
-          t.symbol.toLowerCase().includes(s) ||
-          t.id.toLowerCase().includes(s)
-      );
-    }
-    if (statusFilter !== 'all') result = result.filter((t) => t.status === statusFilter);
-    if (typeFilter !== 'all') result = result.filter((t) => t.type === typeFilter);
-    return result;
-  }, [search, statusFilter, typeFilter]);
-
-  const stats = useMemo(() => ({
-    total: mockTrades.length,
-    won: mockTrades.filter((t) => t.status === 'won').length,
-    lost: mockTrades.filter((t) => t.status === 'lost').length,
-    totalVolume: mockTrades.reduce((sum, t) => sum + t.amount, 0),
-    totalPayout: mockTrades.filter((t) => t.status === 'won').reduce((sum, t) => sum + t.payout, 0),
-  }), []);
-
-  const paginatedTrades = useMemo(() => {
-    const start = pagination.pageIndex * pagination.pageSize;
-    return allTrades.slice(start, start + pagination.pageSize);
-  }, [allTrades, pagination]);
-
-  const totalPages = Math.ceil(allTrades.length / pagination.pageSize);
-
-  const columns = [
-    { key: 'id', header: 'ID' },
-    {
-      key: 'userName',
-      header: 'User',
-      render: (t: MockTrade) => (
-        <span className="font-medium text-white">{t.userName}</span>
-      ),
-    },
-    { key: 'symbol', header: 'Asset' },
-    {
-      key: 'type',
-      header: 'Type',
-      render: (t: MockTrade) => (
-        <Badge variant={t.type === 'up' ? 'success' : 'danger'}>{t.type.toUpperCase()}</Badge>
-      ),
-    },
-    {
-      key: 'amount',
-      header: 'Amount',
-      render: (t: MockTrade) => <span className="font-medium text-white">${t.amount}</span>,
-    },
-    {
-      key: 'openPrice',
-      header: 'Open',
-      render: (t: MockTrade) => <span className="text-text">{t.openPrice}</span>,
-    },
-    {
-      key: 'closePrice',
-      header: 'Close',
-      render: (t: MockTrade) => <span className="text-text">{t.closePrice || '-'}</span>,
-    },
-    {
-      key: 'profit',
-      header: 'Profit',
-      render: (t: MockTrade) => (
-        <span className={t.profit && t.profit >= 0 ? 'text-green font-medium' : 'text-red font-medium'}>
-          {t.profit ? `$${t.profit}` : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (t: MockTrade) => (
-        <Badge variant={t.status === 'won' ? 'success' : t.status === 'lost' ? 'danger' : 'neutral'}>
-          {t.status}
-        </Badge>
-      ),
-    },
-    {
-      key: 'createdAt',
-      header: 'Date',
-      render: (t: MockTrade) => <span className="text-textDark text-[11px]">{new Date(t.createdAt).toLocaleString()}</span>,
-    },
-  ];
 
   return (
     <div className="space-y-6">
@@ -154,30 +172,36 @@ export default function TradesPage() {
         <p className="text-sm text-textDark">Monitor all platform trades in real-time</p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatsCard title="Total Trades" value={stats.total} />
-        <StatsCard title="Won" value={stats.won} />
-        <StatsCard title="Lost" value={stats.lost} />
-        <StatsCard title="Total Volume" value={`$${stats.totalVolume.toLocaleString()}`} />
-        <StatsCard title="Total Payout" value={`$${stats.totalPayout.toLocaleString()}`} />
+        <StatsCard title="Total Trades" value={stats.total.toLocaleString()} />
+        <StatsCard title="Won" value={stats.won.toLocaleString()} />
+        <StatsCard title="Lost" value={stats.lost.toLocaleString()} />
+        <StatsCard title="Total Volume" value={`$${(stats.totalVolume / 100).toLocaleString()}`} />
+        <StatsCard title="Total Profit" value={`$${(stats.totalPayout / 100).toLocaleString()}`} />
       </div>
 
-      {/* Tabs */}
-      <Tabs
-        tabs={[
-          { id: 'all', label: 'All Trades', count: mockTrades.length },
-          { id: 'won', label: 'Won', count: mockTrades.filter((t) => t.status === 'won').length },
-          { id: 'lost', label: 'Lost', count: mockTrades.filter((t) => t.status === 'lost').length },
-          { id: 'pending', label: 'Pending', count: mockTrades.filter((t) => t.status === 'pending').length },
-        ]}
-        onChange={(id) => {
-          setStatusFilter(id === 'all' ? 'all' : id);
-          setPagination({ ...pagination, pageIndex: 0 });
-        }}
-      />
+      <div className="flex gap-2 mb-2">
+        {['all', 'ACTIVE', 'WON', 'LOST', 'PENDING'].map((s) => (
+          <button
+            key={s}
+            onClick={() => {
+              setStatusFilter(s === 'all' ? 'all' : s.toLowerCase());
+              setPagination({ ...pagination, pageIndex: 0 });
+            }}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              (s === 'all' && statusFilter === 'all') || statusFilter === s.toLowerCase()
+                ? 'bg-blue text-white'
+                : 'bg-surface text-textDark hover:bg-surface-hover'
+            }`}
+          >
+            {s === 'all' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
+            <span className="ml-1 text-[10px] opacity-70">
+              {s === 'all' ? trades.length : trades.filter((t) => t.status === s).length}
+            </span>
+          </button>
+        ))}
+      </div>
 
-      {/* Filters */}
       <Card>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4">
@@ -203,7 +227,6 @@ export default function TradesPage() {
         </CardContent>
       </Card>
 
-      {/* Data Table */}
       <Card>
         <CardContent>
           <DataTable
@@ -217,7 +240,6 @@ export default function TradesPage() {
         </CardContent>
       </Card>
 
-      {/* Trade Detail Modal */}
       <Dialog open={!!selectedTrade} onClose={() => setSelectedTrade(null)}>
         <DialogHeader onClose={() => setSelectedTrade(null)}>
           <h2 className="text-lg font-bold text-white">Trade Details</h2>
@@ -226,11 +248,11 @@ export default function TradesPage() {
           {selectedTrade && (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <Badge variant={selectedTrade.type === 'up' ? 'success' : 'danger'}>
-                  {selectedTrade.type.toUpperCase()}
+                <Badge variant={selectedTrade.direction === 'UP' ? 'success' : 'danger'}>
+                  {selectedTrade.direction}
                 </Badge>
-                <Badge variant={selectedTrade.status === 'won' ? 'success' : selectedTrade.status === 'lost' ? 'danger' : 'neutral'}>
-                  {selectedTrade.status}
+                <Badge variant={selectedTrade.status === 'WON' ? 'success' : selectedTrade.status === 'LOST' ? 'danger' : 'neutral'}>
+                  {selectedTrade.status.toLowerCase()}
                 </Badge>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -240,42 +262,44 @@ export default function TradesPage() {
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">Asset</p>
-                  <p className="text-sm text-white font-medium">{selectedTrade.symbol}</p>
+                  <p className="text-sm text-white font-medium">{selectedTrade.pair.name}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">User</p>
-                  <p className="text-sm text-white">{selectedTrade.userName}</p>
+                  <p className="text-sm text-white">{selectedTrade.user.name}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">Amount</p>
-                  <p className="text-sm text-white font-medium">${selectedTrade.amount}</p>
+                  <p className="text-sm text-white font-medium">${(selectedTrade.amount / 100).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">Open Price</p>
-                  <p className="text-sm text-text">{selectedTrade.openPrice}</p>
+                  <p className="text-sm text-text">{Number(selectedTrade.openPrice).toFixed(5)}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">Close Price</p>
-                  <p className="text-sm text-text">{selectedTrade.closePrice || 'Pending'}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-textDark uppercase">Payout</p>
-                  <p className="text-sm text-green">${selectedTrade.payout}</p>
+                  <p className="text-sm text-text">{selectedTrade.closePrice ? Number(selectedTrade.closePrice).toFixed(5) : 'Pending'}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">Profit</p>
-                  <p className={`text-sm font-medium ${selectedTrade.profit && selectedTrade.profit >= 0 ? 'text-green' : 'text-red'}`}>
-                    {selectedTrade.profit ? `$${selectedTrade.profit}` : '-'}
+                  <p className={`text-sm font-medium ${selectedTrade.profit !== null && selectedTrade.profit >= 0 ? 'text-green' : 'text-red'}`}>
+                    {selectedTrade.profit !== null ? `$${(selectedTrade.profit / 100).toFixed(2)}` : '—'}
                   </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-textDark uppercase">Duration</p>
+                  <p className="text-sm text-text">{selectedTrade.durationSeconds}s</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">Opened At</p>
                   <p className="text-sm text-text">{new Date(selectedTrade.createdAt).toLocaleString()}</p>
                 </div>
-                <div>
-                  <p className="text-[11px] text-textDark uppercase">Expires At</p>
-                  <p className="text-sm text-text">{new Date(selectedTrade.expiresAt).toLocaleString()}</p>
-                </div>
+                {selectedTrade.settledAt && (
+                  <div>
+                    <p className="text-[11px] text-textDark uppercase">Settled At</p>
+                    <p className="text-sm text-text">{new Date(selectedTrade.settledAt).toLocaleString()}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

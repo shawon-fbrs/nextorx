@@ -72,12 +72,7 @@ const faqData: FAQCategory[] = [
   },
 ];
 
-const mockTickets: Ticket[] = [
-  { id: 'TK-2847', subject: 'Withdrawal not received', category: 'Payment', date: '2026-08-25', status: 'pending', lastMessage: 'We\'re processing your withdrawal request. It should arrive within 24 hours.' },
-  { id: 'TK-2832', subject: 'Cannot verify identity', category: 'Account', date: '2026-08-22', status: 'resolved', lastMessage: 'Your account has been successfully verified. Thank you for your patience.' },
-  { id: 'TK-2819', subject: 'Chart not loading', category: 'Technical', date: '2026-08-20', status: 'closed', lastMessage: 'The issue has been fixed. Please clear your browser cache and try again.' },
-  { id: 'TK-2801', subject: 'Bonus not credited', category: 'Trading', date: '2026-08-18', status: 'resolved', lastMessage: 'The bonus has been credited to your account. Please check your balance.' },
-];
+const mockTickets: Ticket[] = [];
 
 const contactCategories = ['Technical Issue', 'Account Problem', 'Payment Issue', 'Trading Question', 'Partnership', 'Other'];
 
