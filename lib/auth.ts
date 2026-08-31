@@ -111,6 +111,8 @@ const telegramOAuthConfig = (() => {
         providerId: "telegram",
         clientId: env.TELEGRAM_CLIENT_ID,
         clientSecret: env.TELEGRAM_CLIENT_SECRET,
+        authorizationUrl: "https://oauth.telegram.org/auth",
+        tokenUrl: "https://oauth.telegram.org/token",
         discoveryUrl:
           "https://oauth.telegram.org/.well-known/openid-configuration",
         scopes: ["openid", "profile", "phone"],
