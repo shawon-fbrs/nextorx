@@ -3,8 +3,8 @@
 # ─────────────────────────────────────────────────────────────────────
 # NextOrx — single-process production image.
 #
-# Standard Next.js (standalone output). Runtime boot order:
-#   prisma migrate deploy → seed (idempotent) → next start
+# Custom server (server.ts) handles both HTTP + WebSocket.
+# Runtime boot order: prisma db push → seed → tsx server.ts
 #
 # Deploy exactly ONE replica of this container.
 # ─────────────────────────────────────────────────────────────────────

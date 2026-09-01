@@ -59,13 +59,19 @@ async function main() {
   });
   console.log("Admin user:", admin.email);
 
-  // Create admin Account with hashed password (so email/password login works)
+  // Always update admin password to match current ADMIN_PASSWORD
+  const hashedPassword = await bcrypt.hash(adminPassword, 12);
   const existingAccount = await prisma.account.findFirst({
     where: { userId: admin.id, providerId: "credential" },
   });
 
-  if (!existingAccount) {
-    const hashedPassword = await bcrypt.hash(adminPassword, 12);
+  if (existingAccount) {
+    await prisma.account.update({
+      where: { id: existingAccount.id },
+      data: { password: hashedPassword },
+    });
+    console.log("Admin password updated");
+  } else {
     await prisma.account.create({
       data: {
         accountId: adminEmail,
@@ -74,9 +80,7 @@ async function main() {
         password: hashedPassword,
       },
     });
-    console.log("Admin account with password created");
-  } else {
-    console.log("Admin account already exists");
+    console.log("Admin account created");
   }
 
   // Ensure all existing users without accounts get one

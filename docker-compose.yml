@@ -17,10 +17,10 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://nextorx.247play.win}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      TELEGRAM_CLIENT_ID: ${TELEGRAM_CLIENT_ID:-}
-      TELEGRAM_CLIENT_SECRET: ${TELEGRAM_CLIENT_SECRET:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@nextorx.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@nextorx.app}
     ports:
       - "3000:3000"
     healthcheck:
