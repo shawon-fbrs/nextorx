@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     await prisma.$transaction([
+      prisma.candle.deleteMany(),
       prisma.auditLog.deleteMany(),
       prisma.notification.deleteMany(),
       prisma.promoCodeUse.deleteMany(),

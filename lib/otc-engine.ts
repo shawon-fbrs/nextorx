@@ -38,7 +38,7 @@ export interface CandleCloseMessage {
 
 const TICK_INTERVAL_MS = 200;
 const CANDLE_INTERVAL_MS = 60_000;
-const VOLATILITY_SCALE = 0.0001;
+const VOLATILITY_SCALE = 1;
 
 export class OTCEngine {
   private pairs = new Map<string, PairState>();
@@ -134,14 +134,14 @@ export class OTCEngine {
         const ts = candleStart - i * CANDLE_INTERVAL_MS;
         const open = price;
 
-        trend += (Math.random() - 0.5) * 0.008;
-        trend = Math.max(-0.01, Math.min(0.01, trend));
+        trend += (Math.random() - 0.5) * 0.003;
+        trend = Math.max(-0.004, Math.min(0.004, trend));
 
-        const vol = (Math.random() * 0.008 + 0.003) * state.basePrice;
+        const vol = (Math.random() * 0.005 + 0.002) * state.basePrice;
         const drift = trend + (Math.random() - 0.5) * vol;
         const close = open + drift;
-        const wickUp = Math.random() * vol * 0.8;
-        const wickDown = Math.random() * vol * 0.8;
+        const wickUp = Math.random() * vol * 1.2;
+        const wickDown = Math.random() * vol * 1.2;
         const high = Math.max(open, close) + wickUp;
         const low = Math.min(open, close) - wickDown;
         const volume = Math.floor(Math.random() * 10000) + 100;
