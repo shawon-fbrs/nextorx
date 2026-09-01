@@ -95,7 +95,7 @@ export async function sendPasswordResetEmail(
   resetToken: string,
   name?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const resetUrl = `${env.BETTER_AUTH_URL}/reset-password?token=${resetToken}`;
+  const resetUrl = `${env.BETTER_AUTH_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
   const html = `
     <!DOCTYPE html>
