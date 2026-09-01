@@ -22,12 +22,14 @@ export async function GET(
 
     return Response.json({
       candles: candles.map((c: any) => ({
-        ...c,
+        id: c.id,
+        pairId: c.pairId,
         timestamp: Number(c.timestamp),
         open: Number(c.open),
         high: Number(c.high),
         low: Number(c.low),
         close: Number(c.close),
+        volume: Number(c.volume),
       })),
     });
   } catch (e) {
