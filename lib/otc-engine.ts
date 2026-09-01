@@ -134,14 +134,16 @@ export class OTCEngine {
         const ts = candleStart - i * CANDLE_INTERVAL_MS;
         const open = price;
 
-        trend += (Math.random() - 0.5) * 0.003;
-        trend = Math.max(-0.004, Math.min(0.004, trend));
+        const volScale = state.volatility * state.basePrice;
+        trend += (Math.random() - 0.5) * volScale * 0.5;
+        const maxTrend = volScale * 0.8;
+        trend = Math.max(-maxTrend, Math.min(maxTrend, trend));
 
-        const vol = (Math.random() * 0.005 + 0.002) * state.basePrice;
+        const vol = (Math.random() * volScale * 0.8 + volScale * 0.2);
         const drift = trend + (Math.random() - 0.5) * vol;
         const close = open + drift;
-        const wickUp = Math.random() * vol * 1.2;
-        const wickDown = Math.random() * vol * 1.2;
+        const wickUp = Math.random() * vol * 0.5;
+        const wickDown = Math.random() * vol * 0.5;
         const high = Math.max(open, close) + wickUp;
         const low = Math.min(open, close) - wickDown;
         const volume = Math.floor(Math.random() * 10000) + 100;
