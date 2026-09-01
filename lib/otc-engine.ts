@@ -306,6 +306,10 @@ export class OTCEngine {
   getSubscribers(pairId: string): Set<WebSocket> | undefined {
     return this.pairs.get(pairId)?.subscribers;
   }
+
+  async ensureHistoricalCandles() {
+    await this.seedHistoricalCandles();
+  }
 }
 
 let engine: OTCEngine | null = null;

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { toJsonError } from "@/lib/api";
+import { getOTCEngine } from "@/lib/otc-engine";
 
 export async function GET(
   request: NextRequest,
@@ -11,7 +12,7 @@ export async function GET(
     const limit = Number(request.nextUrl.searchParams.get("limit") ?? 200);
     const before = request.nextUrl.searchParams.get("before");
 
-    const candles = await prisma.candle.findMany({
+    let candles = await prisma.candle.findMany({
       where: {
         pairId: id,
         ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
@@ -19,6 +20,19 @@ export async function GET(
       orderBy: { timestamp: "desc" },
       take: Math.min(limit, 500),
     });
+
+    if (candles.length < 50) {
+      const engine = await getOTCEngine();
+      await engine.ensureHistoricalCandles();
+      candles = await prisma.candle.findMany({
+        where: {
+          pairId: id,
+          ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
+        },
+        orderBy: { timestamp: "desc" },
+        take: Math.min(limit, 500),
+      });
+    }
 
     return Response.json({
       candles: candles.map((c: any) => ({
