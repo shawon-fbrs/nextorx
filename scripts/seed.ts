@@ -39,7 +39,11 @@ async function main() {
 
   // Create admin user
   const adminEmail = process.env.ADMIN_EMAIL || "admin@nextorx.app";
-  const adminPassword = process.env.ADMIN_PASSWORD || "ChangeMe!123456";
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  
+  if (!adminPassword) {
+    throw new Error("ADMIN_PASSWORD environment variable is required");
+  }
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },

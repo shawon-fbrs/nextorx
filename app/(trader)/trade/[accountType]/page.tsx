@@ -431,7 +431,7 @@ export default function TradingPage() {
         body: JSON.stringify({
           pairId: activePair.id,
           direction: type.toUpperCase(),
-          amountDollars: investment,
+          amount: investment,
           durationSeconds: timeMinutes * 60 + timeSeconds,
         }),
       });

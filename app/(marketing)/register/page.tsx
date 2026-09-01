@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
+import { checkPasswordStrength, PASSWORD_REQUIREMENTS } from '@/lib/password';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,6 +17,8 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const passwordStrength = checkPasswordStrength(password);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -25,8 +28,8 @@ export default function RegisterPage() {
       return;
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    if (!passwordStrength.isValid) {
+      setError('Password does not meet requirements');
       return;
     }
 
@@ -130,10 +133,34 @@ export default function RegisterPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min. 8 characters"
+                placeholder="Min. 12 characters"
                 required
                 className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
               />
+              {password && (
+                <div className="mt-2">
+                  <div className="flex gap-1 mb-2">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className={`h-1 flex-1 rounded-full transition-colors ${
+                          i < passwordStrength.score ? passwordStrength.color : 'bg-border'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <div className="space-y-1">
+                    {PASSWORD_REQUIREMENTS.map((req) => (
+                      <div key={req.label} className="flex items-center gap-1.5">
+                        <div className={`w-1 h-1 rounded-full ${req.test(password) ? 'bg-green' : 'bg-border'}`} />
+                        <span className={`text-[10px] ${req.test(password) ? 'text-green' : 'text-text-dark'}`}>
+                          {req.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Currency</label>
@@ -163,7 +190,7 @@ export default function RegisterPage() {
             </div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !passwordStrength.isValid}
               className="w-full bg-green hover:bg-green-hover text-white font-bold text-sm py-3 rounded-xl transition-colors shadow-lg shadow-green/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating account...' : 'Create Account'}

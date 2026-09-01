@@ -43,6 +43,8 @@ model User {
   sessions      Session[]
   accounts      Account[]
   twoFactor     TwoFactor?
+  failedLogins  FailedLoginAttempt[]
+  bannedRecord  BannedUser?
   ledgerEntries LedgerEntry[]
   deposits      DepositRequest[]
   withdrawals   WithdrawalRequest[]
@@ -104,6 +106,25 @@ model TwoFactor {
   lockedUntil            DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
+}
+
+model FailedLoginAttempt {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ip          String?
+  attemptedAt DateTime @default(now())
+
+  @@index([userId, attemptedAt(sort: Desc)])
+}
+
+model BannedUser {
+  id        String    @id @default(uuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason    String?
+  bannedAt  DateTime  @default(now())
+  bannedBy  String?
 }
 
 model Verification {

@@ -20,7 +20,7 @@ services:
       TELEGRAM_CLIENT_ID: ${TELEGRAM_CLIENT_ID:-}
       TELEGRAM_CLIENT_SECRET: ${TELEGRAM_CLIENT_SECRET:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@nextorx.com}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe!123456}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     ports:
       - "3000:3000"
     healthcheck:

@@ -3,6 +3,7 @@ import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { getOTCEngine, type TickMessage, type CandleCloseMessage } from './lib/otc-engine';
+import { reconcileExpiredTrades } from './lib/trade-reconciliation';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = '0.0.0.0';
@@ -26,6 +27,9 @@ app.prepare().then(async () => {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
   const engine = await getOTCEngine();
+
+  // Reconcile any expired trades from previous session
+  await reconcileExpiredTrades();
 
   engine.setBroadcast((msg: TickMessage | CandleCloseMessage) => {
     const pairSubs = engine.getSubscribers(msg.pairId);

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser, toJsonError } from "@/lib/api";
-import { debit } from "@/lib/ledger";
+import { debit, credit } from "@/lib/ledger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -92,9 +92,8 @@ export async function POST(request: NextRequest) {
         const randomWin = Math.random() < effectiveWinRate;
         const finalWin = shouldWin === randomWin ? shouldWin : randomWin;
 
-        const profit = finalWin
-          ? Math.round(amountCents * (Number(pair.payoutPercent) / 100))
-          : -amountCents;
+        const payout = Math.round(amountCents * (Number(pair.payoutPercent) / 100));
+        const profit = finalWin ? payout : -amountCents;
 
         await prisma.trade.update({
           where: { id: trade.id },
@@ -105,6 +104,17 @@ export async function POST(request: NextRequest) {
             settledAt: new Date(),
           },
         });
+
+        // Credit user on win (return stake + payout)
+        if (finalWin) {
+          await credit({
+            userId: user.id,
+            type: "TRADE_WIN",
+            amount: amountCents + payout,
+            referenceId: trade.id,
+            description: `Trade won: ${pair.name} ${direction}`,
+          });
+        }
 
         if (profile) {
           await prisma.userRiskProfile.update({
