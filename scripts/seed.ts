@@ -1,4 +1,6 @@
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { auth } from "../lib/auth";
 import { hashPassword } from "better-auth/crypto";
 
 const prisma = new PrismaClient();
@@ -32,11 +34,7 @@ const OTC_PAIRS = [
 async function main() {
   console.log("Seeding database...");
 
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE "Pair" ALTER COLUMN "volatility" TYPE DECIMAL(12,6)`
-  ).catch(() => {});
-
-  // ── Admin user ──
+  // ── Admin user (PotShot pattern) ──
   const adminEmail = process.env.ADMIN_EMAIL || "admin@nextorx.app";
   const adminPassword = process.env.ADMIN_PASSWORD;
 
@@ -44,45 +42,40 @@ async function main() {
     throw new Error("ADMIN_PASSWORD environment variable is required");
   }
 
-  // Upsert admin user
-  const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: { role: "super_admin", emailVerified: true },
-    create: {
-      email: adminEmail,
-      name: "Admin",
-      emailVerified: true,
-      role: "super_admin",
-      referralCode: "ADMIN0001",
-      uid: "10000001",
-    },
-  });
-
-  // Hash password with better-auth's scrypt (not bcrypt!)
-  const hashedPassword = await hashPassword(adminPassword);
-
-  // Upsert credential account with correct scrypt hash
-  const existingAccount = await prisma.account.findFirst({
-    where: { userId: admin.id, providerId: "credential" },
-  });
-
-  if (existingAccount) {
-    await prisma.account.update({
-      where: { id: existingAccount.id },
-      data: { password: hashedPassword },
+  const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
+  if (existing) {
+    const hash = await hashPassword(adminPassword);
+    await prisma.account.updateMany({
+      where: { userId: existing.id, providerId: "credential" },
+      data: { password: hash },
     });
-    console.log("Admin password updated (scrypt)");
+    if (existing.role !== "super_admin") {
+      await prisma.user.update({
+        where: { email: adminEmail },
+        data: { role: "super_admin", emailVerified: true },
+      });
+      console.log(`Promoted ${adminEmail} to super_admin, password reset`);
+    } else {
+      console.log(`Admin ensured: ${adminEmail}, password reset`);
+    }
   } else {
-    await prisma.account.create({
-      data: {
-        accountId: adminEmail,
-        providerId: "credential",
-        userId: admin.id,
-        password: hashedPassword,
-      },
+    const signUp = await auth.api.signUpEmail({
+      body: { email: adminEmail, password: adminPassword, name: "Admin" },
     });
-    console.log("Admin account created (scrypt)");
+
+    await prisma.user.update({
+      where: { email: adminEmail },
+      data: { role: "super_admin", emailVerified: true },
+    });
+
+    console.log(`Created super_admin: ${adminEmail}`);
+    void signUp;
   }
+
+  // ── Volatility column type ──
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "Pair" ALTER COLUMN "volatility" TYPE DECIMAL(12,6)`
+  ).catch(() => {});
 
   // ── OTC pairs ──
   for (const pair of OTC_PAIRS) {

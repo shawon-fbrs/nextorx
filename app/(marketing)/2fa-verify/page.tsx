@@ -32,7 +32,14 @@ export default function TwoFactorVerifyPage() {
       }
 
       if (data) {
-        router.push('/trade/demo');
+        const session = await authClient.getSession();
+        const user = session?.data?.user as Record<string, unknown>;
+        const role = user?.role as string;
+        if (role === 'super_admin' || role === 'admin' || role === 'moderator') {
+          router.push('/console-panel');
+        } else {
+          router.push('/trade/demo');
+        }
         router.refresh();
       }
     } catch {

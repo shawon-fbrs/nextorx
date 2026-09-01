@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashToken, verifyResetToken } from '@/lib/verification';
-import bcrypt from 'bcryptjs';
+import { hashPassword } from 'better-auth/crypto';
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // Hash new password using better-auth's hashPassword (scrypt, matches login verification)
+    const hashedPassword = await hashPassword(password);
 
     // Update password in Account table
     await prisma.account.updateMany({

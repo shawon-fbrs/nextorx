@@ -35,9 +35,13 @@ export default function LoginPage() {
           return;
         }
         const session = await authClient.getSession();
-        const role = (session?.data?.user as Record<string, unknown>)?.role as string;
+        const user = session?.data?.user as Record<string, unknown>;
+        const role = user?.role as string;
+        const twoFactorEnabled = user?.twoFactorEnabled as boolean;
         if (role === 'super_admin' || role === 'admin' || role === 'moderator') {
           router.push('/console-panel');
+        } else if (!twoFactorEnabled) {
+          router.push('/setup-2fa');
         } else {
           router.push('/trade/demo');
         }
