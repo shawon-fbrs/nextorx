@@ -1,13 +1,6 @@
 import { betterAuth } from "better-auth";
-import type { BetterAuthPlugin, User } from "better-auth";
-import { APIError, createAuthEndpoint } from "better-auth/api";
-import { setSessionCookie } from "better-auth/cookies";
-import { handleOAuthUserInfo } from "better-auth/oauth2";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { admin, bearer, genericOAuth } from "better-auth/plugins";
-import type { GenericOAuthConfig } from "better-auth/plugins";
-import type { OAuth2Tokens } from "better-auth/oauth2";
-import * as z from "zod";
+import { admin, bearer, twoFactor } from "better-auth/plugins";
 import { prisma } from "@/lib/db";
 import { env } from "@/env";
 import { roles } from "@/lib/rbac";
@@ -26,131 +19,6 @@ function generateReferralCode(length = 8): string {
 function generateUid(): string {
   return String(10000000 + Math.floor(Math.random() * 90000000));
 }
-
-const TELEGRAM_SYNTHETIC_EMAIL = (tgId: string | number) =>
-  `tg-${tgId}@nextorx.app`;
-
-const telegramMiniAppLogin = createAuthEndpoint(
-  "/telegram/mini-app-login",
-  {
-    method: "POST",
-    operationId: "telegramMiniAppLogin",
-    body: z.object({
-      initData: z.string(),
-      callbackURL: z.string().optional(),
-      newUserCallbackURL: z.string().optional(),
-    }),
-  },
-  async (c) => {
-    if (!env.TELEGRAM_LOGIN_BOT_TOKEN) {
-      throw new APIError("BAD_REQUEST", {
-        message: "Telegram mini app login is not configured",
-      });
-    }
-    const { verifyTelegramInitData } = await import(
-      "@/lib/auth/telegram-init-data"
-    );
-    const verified = verifyTelegramInitData(
-      c.body.initData,
-      env.TELEGRAM_LOGIN_BOT_TOKEN,
-    );
-    if (!verified) {
-      throw new APIError("UNAUTHORIZED", { message: "Invalid initData" });
-    }
-    const tgId = String(verified.user?.id ?? "");
-    const name =
-      [verified.user?.first_name, verified.user?.last_name]
-        .filter(Boolean)
-        .join(" ") || "Telegram User";
-    const userInfo = {
-      id: tgId,
-      name,
-      image: verified.user?.photo_url,
-      email: TELEGRAM_SYNTHETIC_EMAIL(tgId),
-      emailVerified: true,
-      nickname: verified.user?.username?.toLowerCase() ?? null,
-    } as unknown as Omit<User, "createdAt" | "updatedAt">;
-    const result = await handleOAuthUserInfo(c, {
-      userInfo,
-      account: { providerId: "telegram", accountId: tgId, issuer: "telegram" },
-      callbackURL: c.body.callbackURL,
-      isTrustedProvider: true,
-      overrideUserInfo: true,
-    });
-    if (result.error || !result.data) {
-      throw new APIError("UNAUTHORIZED", {
-        message: result.error ?? "Failed to sign in",
-      });
-    }
-    const url = result.isRegister
-      ? c.body.newUserCallbackURL
-      : c.body.callbackURL;
-    await setSessionCookie(c, {
-      session: result.data.session,
-      user: result.data.user,
-    });
-    return c.json({
-      token: result.data.session.token,
-      redirect: false,
-      url,
-      user: result.data.user,
-    });
-  },
-);
-
-const telegramMiniApp = (): BetterAuthPlugin => ({
-  id: "telegram-mini-app",
-  endpoints: { telegramMiniAppLogin },
-});
-
-const telegramOAuthConfig = (() => {
-  if (!env.TELEGRAM_CLIENT_ID || !env.TELEGRAM_CLIENT_SECRET) return null;
-  return {
-    config: [
-      {
-        providerId: "telegram",
-        clientId: env.TELEGRAM_CLIENT_ID,
-        clientSecret: env.TELEGRAM_CLIENT_SECRET,
-        authorizationUrl: "https://oauth.telegram.org/auth",
-        tokenUrl: "https://oauth.telegram.org/token",
-        discoveryUrl:
-          "https://oauth.telegram.org/.well-known/openid-configuration",
-        scopes: ["openid", "profile", "phone"],
-        pkce: true,
-        overrideUserInfo: true,
-        getUserInfo: async (tokens: OAuth2Tokens) => {
-          if (!tokens.idToken) throw new Error("Telegram id_token missing");
-          const claims = JSON.parse(
-            Buffer.from(
-              tokens.idToken.split(".")[1],
-              "base64",
-            ).toString(),
-          );
-          const tgId = String(claims.id ?? claims.sub ?? "");
-          if (!tgId) throw new Error("Telegram id_token has no user id");
-          return {
-            id: tgId,
-            name:
-              claims.name ??
-              claims.preferred_username ??
-              "Telegram User",
-            image: claims.picture,
-            email: TELEGRAM_SYNTHETIC_EMAIL(tgId),
-            emailVerified: true,
-            username: claims.preferred_username ?? null,
-          } as unknown as {
-            id: string | number;
-            name?: string;
-            email?: string | null;
-            image?: string;
-            emailVerified: boolean;
-            username?: string | null;
-          };
-        },
-      } satisfies GenericOAuthConfig,
-    ],
-  };
-})();
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
@@ -173,16 +41,13 @@ export const auth = betterAuth({
     try {
       const base = new URL(baseURL);
       const hostname = base.hostname;
-      // Add www variant
       if (!hostname.startsWith("www.")) {
         origins.push(`https://www.${hostname}`, `http://www.${hostname}`);
       } else {
         const bare = hostname.replace(/^www\./, "");
         origins.push(`https://${bare}`, `http://${bare}`);
       }
-      // Add both http and https of the base
       origins.push(`https://${hostname}`, `http://${hostname}`);
-      // Dynamically add the request origin
       const originHeader = req?.headers.get("origin");
       if (originHeader) {
         const origin = new URL(originHeader);
@@ -207,8 +72,13 @@ export const auth = betterAuth({
       roles,
     }),
     bearer(),
-    ...(telegramOAuthConfig ? [genericOAuth(telegramOAuthConfig)] : []),
-    ...(env.TELEGRAM_LOGIN_BOT_TOKEN ? [telegramMiniApp()] : []),
+    twoFactor({
+      issuer: "NextOrx",
+      totpOptions: {
+        period: 30,
+        digits: 6,
+      },
+    }),
   ],
   user: {
     additionalFields: {
