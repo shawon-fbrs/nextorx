@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { auth } from "../lib/auth";
+import { hashPassword } from "better-auth/crypto";
 
 const prisma = new PrismaClient();
 
@@ -32,12 +32,11 @@ const OTC_PAIRS = [
 async function main() {
   console.log("Seeding database...");
 
-  // Fix column width if needed
   await prisma.$executeRawUnsafe(
     `ALTER TABLE "Pair" ALTER COLUMN "volatility" TYPE DECIMAL(12,6)`
   ).catch(() => {});
 
-  // Create admin user via better-auth (proper password hashing)
+  // ── Admin user ──
   const adminEmail = process.env.ADMIN_EMAIL || "admin@nextorx.app";
   const adminPassword = process.env.ADMIN_PASSWORD;
 
@@ -45,81 +44,66 @@ async function main() {
     throw new Error("ADMIN_PASSWORD environment variable is required");
   }
 
-  // Check if admin user already exists
-  const existingAdmin = await prisma.user.findUnique({
+  // Upsert admin user
+  const admin = await prisma.user.upsert({
     where: { email: adminEmail },
-  });
-
-  if (existingAdmin) {
-    // Delete old credential account so we can recreate with correct hash
-    await prisma.account.deleteMany({
-      where: { userId: existingAdmin.id, providerId: "credential" },
-    });
-  }
-
-  // Create admin via better-auth API (handles scrypt hashing)
-  const result = await auth.api.signUpEmail({
-    body: {
+    update: { role: "super_admin", emailVerified: true },
+    create: {
       email: adminEmail,
-      password: adminPassword,
       name: "Admin",
+      emailVerified: true,
+      role: "super_admin",
+      referralCode: "ADMIN0001",
+      uid: "10000001",
     },
   });
 
-  if (result.user) {
-    // Promote to super_admin
-    await prisma.user.update({
-      where: { id: result.user.id },
+  // Hash password with better-auth's scrypt (not bcrypt!)
+  const hashedPassword = await hashPassword(adminPassword);
+
+  // Upsert credential account with correct scrypt hash
+  const existingAccount = await prisma.account.findFirst({
+    where: { userId: admin.id, providerId: "credential" },
+  });
+
+  if (existingAccount) {
+    await prisma.account.update({
+      where: { id: existingAccount.id },
+      data: { password: hashedPassword },
+    });
+    console.log("Admin password updated (scrypt)");
+  } else {
+    await prisma.account.create({
       data: {
-        role: "super_admin",
-        emailVerified: true,
-        uid: "10000001",
+        accountId: adminEmail,
+        providerId: "credential",
+        userId: admin.id,
+        password: hashedPassword,
       },
     });
-    console.log("Admin user created/updated via better-auth:", adminEmail);
+    console.log("Admin account created (scrypt)");
   }
 
-  // Create OTC pairs
+  // ── OTC pairs ──
   for (const pair of OTC_PAIRS) {
-    await prisma.pair.upsert({
-      where: { id: pair.id },
-      update: {},
-      create: pair,
-    });
+    await prisma.pair.upsert({ where: { id: pair.id }, update: {}, create: pair });
   }
   console.log(`Created ${OTC_PAIRS.length} OTC pairs`);
 
-  // Create payment methods
+  // ── Payment methods ──
   await prisma.paymentMethod.upsert({
     where: { name_networkName: { name: "USDT", networkName: "TRC20" } },
     update: {},
-    create: {
-      name: "USDT",
-      label: "USDT (Tether)",
-      networkName: "TRC20",
-      minDeposit: 1000,
-      maxDeposit: 10000000,
-      minWithdraw: 500,
-      maxWithdraw: 10000000,
-    },
+    create: { name: "USDT", label: "USDT (Tether)", networkName: "TRC20", minDeposit: 1000, maxDeposit: 10000000, minWithdraw: 500, maxWithdraw: 10000000 },
   });
-
   await prisma.paymentMethod.upsert({
     where: { name_networkName: { name: "USDT", networkName: "ERC20" } },
     update: {},
-    create: {
-      name: "USDT",
-      label: "USDT (Ethereum)",
-      networkName: "ERC20",
-      minDeposit: 2000,
-      maxDeposit: 10000000,
-      minWithdraw: 1000,
-      maxWithdraw: 10000000,
-    },
+    create: { name: "USDT", label: "USDT (Ethereum)", networkName: "ERC20", minDeposit: 2000, maxDeposit: 10000000, minWithdraw: 1000, maxWithdraw: 10000000 },
   });
   console.log("Created payment methods");
 
-  // Create platform settings
+  // ── Platform settings ──
   const settings = [
     { key: "bonusTurnoverMultiplier", value: 30, label: "Bonus turnover multiplier" },
     { key: "bonusValidityDays", value: 30, label: "Bonus validity (days)" },
@@ -129,11 +113,7 @@ async function main() {
     { key: "maxTradeAmount", value: 500000, label: "Max trade amount (cents)" },
   ];
   for (const setting of settings) {
-    await prisma.platformSetting.upsert({
-      where: { key: setting.key },
-      update: {},
-      create: setting,
-    });
+    await prisma.platformSetting.upsert({ where: { key: setting.key }, update: {}, create: setting });
   }
   console.log("Created platform settings");
 
@@ -141,10 +121,5 @@ async function main() {
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });
