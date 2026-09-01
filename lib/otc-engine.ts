@@ -130,18 +130,19 @@ export class OTCEngine {
 
       for (let i = 499; i >= 0; i--) {
         const ts = candleStart - i * CANDLE_INTERVAL_MS;
-        const open = price;
+        const r = (v: number) => Math.round(v * 1e8) / 1e8;
+        const open = Math.max(0.00000001, r(price));
 
         const vol = state.volatility;
         const bodySize = (Math.random() * 0.6 + 0.1) * vol;
         const isBullish = Math.random() > 0.48;
         const bodyDir = isBullish ? 1 : -1;
-        const close = open + bodyDir * bodySize;
+        const close = Math.max(0.00000001, r(open + bodyDir * bodySize));
         const maxWick = vol * 0.8;
         const wickUp = Math.random() * maxWick * (isBullish ? 0.6 : 1.0);
         const wickDown = Math.random() * maxWick * (isBullish ? 1.0 : 0.6);
-        const high = Math.max(open, close) + wickUp;
-        const low = Math.min(open, close) - wickDown;
+        const high = r(Math.max(open, close) + wickUp);
+        const low = Math.max(0.00000001, r(Math.min(open, close) - wickDown));
         const volume = Math.floor(Math.random() * 10000) + 100;
 
         candles.push({
@@ -155,7 +156,7 @@ export class OTCEngine {
         });
 
         const drift = (Math.random() - 0.5) * vol * 0.15;
-        price = close + drift;
+        price = Math.max(state.basePrice * 0.5, Math.min(state.basePrice * 2, r(close + drift)));
       }
 
       await prisma.candle.createMany({ data: candles, skipDuplicates: true });
