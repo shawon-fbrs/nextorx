@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import { auth } from "../lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -37,74 +37,46 @@ async function main() {
     `ALTER TABLE "Pair" ALTER COLUMN "volatility" TYPE DECIMAL(12,6)`
   ).catch(() => {});
 
-  // Create admin user
+  // Create admin user via better-auth (proper password hashing)
   const adminEmail = process.env.ADMIN_EMAIL || "admin@nextorx.app";
   const adminPassword = process.env.ADMIN_PASSWORD;
-  
+
   if (!adminPassword) {
     throw new Error("ADMIN_PASSWORD environment variable is required");
   }
 
-  const admin = await prisma.user.upsert({
+  // Check if admin user already exists
+  const existingAdmin = await prisma.user.findUnique({
     where: { email: adminEmail },
-    update: {},
-    create: {
-      email: adminEmail,
-      name: "Admin",
-      emailVerified: true,
-      role: "super_admin",
-      referralCode: "ADMIN0001",
-      uid: "10000001",
-    },
-  });
-  console.log("Admin user:", admin.email);
-
-  // Always update admin password to match current ADMIN_PASSWORD
-  const hashedPassword = await bcrypt.hash(adminPassword, 12);
-  const existingAccount = await prisma.account.findFirst({
-    where: { userId: admin.id, providerId: "credential" },
   });
 
-  if (existingAccount) {
-    await prisma.account.update({
-      where: { id: existingAccount.id },
-      data: { password: hashedPassword },
+  if (existingAdmin) {
+    // Delete old credential account so we can recreate with correct hash
+    await prisma.account.deleteMany({
+      where: { userId: existingAdmin.id, providerId: "credential" },
     });
-    console.log("Admin password updated");
-  } else {
-    await prisma.account.create({
-      data: {
-        accountId: adminEmail,
-        providerId: "credential",
-        userId: admin.id,
-        password: hashedPassword,
-      },
-    });
-    console.log("Admin account created");
   }
 
-  // Ensure all existing users without accounts get one
-  const usersWithoutAccounts = await prisma.user.findMany({
-    where: {
-      accounts: { none: {} },
+  // Create admin via better-auth API (handles scrypt hashing)
+  const result = await auth.api.signUpEmail({
+    body: {
+      email: adminEmail,
+      password: adminPassword,
+      name: "Admin",
     },
   });
-  for (const u of usersWithoutAccounts) {
-    const acct = await prisma.account.findFirst({
-      where: { userId: u.id, providerId: "credential" },
+
+  if (result.user) {
+    // Promote to super_admin
+    await prisma.user.update({
+      where: { id: result.user.id },
+      data: {
+        role: "super_admin",
+        emailVerified: true,
+        uid: "10000001",
+      },
     });
-    if (!acct && u.email) {
-      const hashedPassword = await bcrypt.hash(adminPassword, 12);
-      await prisma.account.create({
-        data: {
-          accountId: u.email,
-          providerId: "credential",
-          userId: u.id,
-          password: hashedPassword,
-        },
-      });
-      console.log(`Created account for existing user: ${u.email}`);
-    }
+    console.log("Admin user created/updated via better-auth:", adminEmail);
   }
 
   // Create OTC pairs
