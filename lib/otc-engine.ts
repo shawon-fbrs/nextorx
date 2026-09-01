@@ -38,7 +38,6 @@ export interface CandleCloseMessage {
 
 const TICK_INTERVAL_MS = 200;
 const CANDLE_INTERVAL_MS = 60_000;
-const VOLATILITY_SCALE = 1;
 
 export class OTCEngine {
   private pairs = new Map<string, PairState>();
@@ -133,12 +132,12 @@ export class OTCEngine {
         const ts = candleStart - i * CANDLE_INTERVAL_MS;
         const open = price;
 
-        const volScale = state.volatility * state.basePrice;
-        const bodySize = (Math.random() * 0.6 + 0.1) * volScale;
+        const vol = state.volatility;
+        const bodySize = (Math.random() * 0.6 + 0.1) * vol;
         const isBullish = Math.random() > 0.48;
         const bodyDir = isBullish ? 1 : -1;
         const close = open + bodyDir * bodySize;
-        const maxWick = volScale * 0.8;
+        const maxWick = vol * 0.8;
         const wickUp = Math.random() * maxWick * (isBullish ? 0.6 : 1.0);
         const wickDown = Math.random() * maxWick * (isBullish ? 1.0 : 0.6);
         const high = Math.max(open, close) + wickUp;
@@ -155,7 +154,7 @@ export class OTCEngine {
           volume,
         });
 
-        const drift = (Math.random() - 0.5) * volScale * 0.15;
+        const drift = (Math.random() - 0.5) * vol * 0.15;
         price = close + drift;
       }
 
@@ -192,7 +191,7 @@ export class OTCEngine {
   }
 
   private generateTick(state: PairState, now: number): TickMessage | null {
-    const priceChange = (Math.random() - 0.5) * state.volatility * VOLATILITY_SCALE * state.basePrice;
+    const priceChange = (Math.random() - 0.5) * state.volatility * 0.06;
     const newPrice = Math.max(
       state.basePrice * 0.5,
       Math.min(state.basePrice * 2, state.currentPrice + priceChange)
