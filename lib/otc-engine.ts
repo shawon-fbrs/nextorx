@@ -135,11 +135,11 @@ export class OTCEngine {
         const open = price;
 
         const volScale = state.volatility * state.basePrice;
-        trend += (Math.random() - 0.5) * volScale * 0.5;
-        const maxTrend = volScale * 0.8;
+        trend += (Math.random() - 0.5) * volScale * 0.1;
+        const maxTrend = volScale * 0.3;
         trend = Math.max(-maxTrend, Math.min(maxTrend, trend));
 
-        const vol = (Math.random() * volScale * 0.8 + volScale * 0.2);
+        const vol = (Math.random() * volScale * 0.6 + volScale * 0.1);
         const drift = trend + (Math.random() - 0.5) * vol;
         const close = open + drift;
         const wickUp = Math.random() * vol * 0.5;
