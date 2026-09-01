@@ -97,15 +97,13 @@ model TwoFactor {
   id                     String    @id @default(uuid())
   secret                 String
   backupCodes            String
-  userId                 String
+  userId                 String    @unique
   user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   verified               Boolean   @default(true)
   failedVerificationCount Int      @default(0)
   lockedUntil            DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
-
-  @@index([userId])
 }
 
 model Verification {
