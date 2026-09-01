@@ -479,7 +479,7 @@ export default function TradingPage() {
             <div className="flex-1 flex min-w-0 overflow-hidden">
               <SideToolbar onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
-                <Chart ref={chartRef} pairId={activePair.id} currentPrice={price} currentCandle={candle} onOverlaySelected={setSelectedOverlay} />
+                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} onOverlaySelected={setSelectedOverlay} />
 
                 {selectedOverlay && (
                   <div className="absolute z-[60] bg-[#1a1e2a]/95 backdrop-blur-md border border-[#2e3548] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden"

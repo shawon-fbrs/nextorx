@@ -14,6 +14,7 @@ export interface CandleData {
 
 interface ChartProps {
   pairId: string | null;
+  pairName: string | null;
   currentPrice: number | null;
   currentCandle: CandleData | null;
   onOverlaySelected?: (overlay: { id: string; name: string } | null) => void;
@@ -90,7 +91,7 @@ const CUSTOM_OVERLAYS: Array<{
 
 CUSTOM_OVERLAYS.forEach(o => registerOverlay(o));
 
-export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, currentPrice, currentCandle, onOverlaySelected }, ref) {
+export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, onOverlaySelected }, ref) {
   const chartIdRef = useRef(`kline-${Math.random().toString(36).slice(2)}`);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<KLineChart | null>(null);
@@ -168,7 +169,8 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     chartRef.current = chart;
 
     if (chart) {
-      chart.setSymbol({ name: pairIdRef.current || 'OTC' });
+      const pricePrec = pairIdRef.current?.includes('JPY') ? 3 : 5;
+      chart.setSymbol({ ticker: pairIdRef.current || 'OTC', pricePrecision: pricePrec, volumePrecision: 0 });
       chart.setPeriod({ span: 1, type: 'minute' });
 
       chart.setDataLoader({
@@ -247,7 +249,8 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         chartRef.current = chart;
 
         if (chart) {
-          chart.setSymbol({ name: pairId });
+          const pricePrec = pairId?.includes('JPY') ? 3 : 5;
+          chart.setSymbol({ ticker: pairId || 'OTC', pricePrecision: pricePrec, volumePrecision: 0 });
           chart.setPeriod({ span: 1, type: 'minute' });
           chart.setDataLoader({
             getBars: async ({ type, timestamp, callback }) => {
