@@ -84,6 +84,27 @@ export class OTCEngine {
     }
 
     await this.seedHistoricalCandles();
+
+    const now2 = Date.now();
+    const candleStart2 = Math.floor(now2 / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
+    for (const state of Array.from(this.pairs.values())) {
+      const lastCandle = await prisma.candle.findFirst({
+        where: { pairId: state.pairId },
+        orderBy: { timestamp: 'desc' },
+      });
+      if (lastCandle) {
+        const closePrice = Number(lastCandle.close);
+        state.currentPrice = closePrice;
+        state.candle = {
+          timestamp: candleStart2,
+          open: closePrice,
+          high: closePrice,
+          low: closePrice,
+          close: closePrice,
+          volume: 0,
+        };
+      }
+    }
         return;
       } catch (e) {
         retries--;
