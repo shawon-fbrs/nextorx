@@ -85,8 +85,6 @@ export class OTCEngine {
 
     await this.seedHistoricalCandles();
 
-    const now2 = Date.now();
-    const candleStart2 = Math.floor(now2 / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
     for (const state of Array.from(this.pairs.values())) {
       const lastCandle = await prisma.candle.findFirst({
         where: { pairId: state.pairId },
@@ -96,7 +94,7 @@ export class OTCEngine {
         const closePrice = Number(lastCandle.close);
         state.currentPrice = closePrice;
         state.candle = {
-          timestamp: candleStart2,
+          timestamp: Number(lastCandle.timestamp),
           open: closePrice,
           high: closePrice,
           low: closePrice,
@@ -250,25 +248,14 @@ export class OTCEngine {
 
     for (const state of Array.from(this.pairs.values())) {
       const oldCandle = { ...state.candle };
-
-      await prisma.candle.create({
-        data: {
-          pairId: state.pairId,
-          timestamp: BigInt(oldCandle.timestamp),
-          open: oldCandle.open,
-          high: oldCandle.high,
-          low: oldCandle.low,
-          close: oldCandle.close,
-          volume: BigInt(oldCandle.volume),
-        },
-      }).catch(() => {});
+      const lastClose = state.currentPrice;
 
       state.candle = {
         timestamp: candleStart,
-        open: state.currentPrice,
-        high: state.currentPrice,
-        low: state.currentPrice,
-        close: state.currentPrice,
+        open: lastClose,
+        high: lastClose,
+        low: lastClose,
+        close: lastClose,
         volume: 0,
       };
 
@@ -281,6 +268,18 @@ export class OTCEngine {
       if (this.broadcast) {
         this.broadcast(closeMsg);
       }
+
+      await prisma.candle.create({
+        data: {
+          pairId: state.pairId,
+          timestamp: BigInt(oldCandle.timestamp),
+          open: oldCandle.open,
+          high: oldCandle.high,
+          low: oldCandle.low,
+          close: oldCandle.close,
+          volume: BigInt(oldCandle.volume),
+        },
+      }).catch(() => {});
     }
   }
 
