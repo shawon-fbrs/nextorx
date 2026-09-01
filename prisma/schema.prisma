@@ -38,9 +38,11 @@ model User {
   referralCode  String?         @unique
   referredBy    String?
   kycStatus     String          @default("NOT_SUBMITTED")
+  twoFactorEnabled Boolean     @default(false)
 
   sessions      Session[]
   accounts      Account[]
+  twoFactor     TwoFactor?
   ledgerEntries LedgerEntry[]
   deposits      DepositRequest[]
   withdrawals   WithdrawalRequest[]
@@ -87,6 +89,21 @@ model Account {
   issuer                String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model TwoFactor {
+  id                     String    @id @default(uuid())
+  secret                 String
+  backupCodes            String
+  userId                 String
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified               Boolean   @default(true)
+  failedVerificationCount Int      @default(0)
+  lockedUntil            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   @@index([userId])
 }
