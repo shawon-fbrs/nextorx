@@ -10,7 +10,7 @@ interface HeaderProps {
   balance: number;
 }
 
-const accountData: Record<AccountType, { icon: ReactNode; color: string; label: string; balance: number }> = {
+const accountData: Record<AccountType, { icon: ReactNode; color: string; label: string }> = {
   demo: {
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -19,7 +19,6 @@ const accountData: Record<AccountType, { icon: ReactNode; color: string; label: 
     ),
     color: 'text-blue',
     label: 'Demo Account',
-    balance: 10000.00,
   },
   real: {
     icon: (
@@ -29,7 +28,6 @@ const accountData: Record<AccountType, { icon: ReactNode; color: string; label: 
     ),
     color: 'text-green',
     label: 'Real Account',
-    balance: 0.00,
   },
   funded: {
     icon: (
@@ -39,7 +37,6 @@ const accountData: Record<AccountType, { icon: ReactNode; color: string; label: 
     ),
     color: 'text-orange',
     label: 'Funded Account',
-    balance: 0.00,
   },
   tournament: {
     icon: (
@@ -49,7 +46,6 @@ const accountData: Record<AccountType, { icon: ReactNode; color: string; label: 
     ),
     color: 'text-yellow',
     label: 'Tournament',
-    balance: 0.00,
   },
 };
 
@@ -382,7 +378,7 @@ export function Header({ balance }: HeaderProps) {
                       </span>
                       <div className="flex flex-col items-start flex-1">
                         <span className="text-sm font-bold text-white">{acc.label}</span>
-                        <span className="text-xs text-text">{hidden ? '••••••' : `$${acc.balance.toFixed(2)}`}</span>
+                        <span className="text-xs text-text">{hidden ? '••••••' : `$${balance.toFixed(2)}`}</span>
                       </div>
                       {isActive ? (
                         <div className="w-6 h-6 rounded-full bg-green/20 flex items-center justify-center">

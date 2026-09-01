@@ -322,7 +322,7 @@ export default function TradingPage() {
   const editDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
 
   useEffect(() => {
-    fetch('/api/pairs')
+    fetch('/api/market/pairs')
       .then(r => r.json())
       .then((data: { pairs: Array<Record<string, unknown>> }) => {
         const normalized = (data.pairs || []).map(p => ({
@@ -425,7 +425,7 @@ export default function TradingPage() {
     if (!activePair) return;
 
     try {
-      const res = await fetch('/api/trades', {
+      const res = await fetch('/api/trade/trades', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

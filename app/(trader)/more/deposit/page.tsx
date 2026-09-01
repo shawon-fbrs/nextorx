@@ -49,7 +49,7 @@ export default function DepositPage() {
     setMessage('');
 
     try {
-      const res = await fetch('/api/deposit', {
+      const res = await fetch('/api/trade/deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

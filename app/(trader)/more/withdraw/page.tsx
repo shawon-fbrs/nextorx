@@ -47,7 +47,7 @@ export default function WithdrawPage() {
     setMessage('');
 
     try {
-      const res = await fetch('/api/withdraw', {
+      const res = await fetch('/api/trade/withdraw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

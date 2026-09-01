@@ -34,7 +34,13 @@ export default function LoginPage() {
           router.push('/2fa-verify');
           return;
         }
-        router.push('/trade/demo');
+        const session = await authClient.getSession();
+        const role = (session?.data?.user as Record<string, unknown>)?.role as string;
+        if (role === 'super_admin' || role === 'admin' || role === 'moderator') {
+          router.push('/console-panel');
+        } else {
+          router.push('/trade/demo');
+        }
         router.refresh();
       }
     } catch {
@@ -107,7 +113,7 @@ export default function LoginPage() {
                 <input type="checkbox" className="w-4 h-4 rounded border-border bg-background accent-green" />
                 <span className="text-xs text-text-dark">Remember me</span>
               </label>
-              <a href="#" className="text-xs text-blue hover:text-blue-hover transition-colors font-semibold">Forgot password?</a>
+              <a href="/forgot-password" className="text-xs text-blue hover:text-blue-hover transition-colors font-semibold">Forgot password?</a>
             </div>
             <button
               type="submit"

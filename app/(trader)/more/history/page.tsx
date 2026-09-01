@@ -65,7 +65,7 @@ export default function HistoryPage() {
 
   const fetchTrades = async () => {
     try {
-      const res = await fetch('/api/trades?limit=200');
+      const res = await fetch('/api/trade/trades?limit=200');
       const data = await res.json();
       if (data.trades) setTrades(data.trades);
     } catch {

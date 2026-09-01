@@ -30,7 +30,7 @@ export default function OtcPage() {
 
   const fetchPairs = async () => {
     try {
-      const res = await fetch('/api/pairs');
+      const res = await fetch('/api/market/pairs');
       const data = await res.json();
       if (data.pairs) setPairs(data.pairs);
     } catch {} finally { setIsLoading(false); }
