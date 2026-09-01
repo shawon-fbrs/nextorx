@@ -1,8 +1,8 @@
 # NextOrx — Binary Options Trading Platform
 
-> **Version:** 1.0.0  
-> **Last Updated:** 2026-08-31  
-> **Status:** Frontend Complete, Backend API Operational, Auth Working, RBAC Implemented
+> **Version:** 1.1.0  
+> **Last Updated:** 2026-09-01  
+> **Status:** Frontend Complete, Backend API Operational, Auth + 2FA Working, RBAC Implemented, OTC Engine Running
 
 ---
 
@@ -35,11 +35,13 @@ NextOrx is a binary options trading platform where:
 
 | Component | Description |
 |---|---|
-| **Trader Interface** | Chart, trading panel, asset selection, real-time candles |
-| **Admin Console** | Finance, treasury, users, trades, OTC management, operations |
-| **OTC Price Engine** | Generates realistic candle data with per-user outcome control |
+| **Trader Interface** | Chart (klinecharts v10), trading panel, asset selection, real-time candles via WebSocket |
+| **Admin Console** | Finance, treasury, users, trades, OTC management, operations (11 pages) |
+| **OTC Price Engine** | Generates realistic candle data with shared history across all users |
 | **Financial System** | Deposits (crypto), withdrawals (tiered), trade settlement |
-| **Backend API** | Node.js + PostgreSQL + Redis + WebSocket |
+| **Backend API** | Next.js 16 custom server + PostgreSQL + WebSocket |
+| **Auth System** | better-auth with email/password, Google OAuth, TOTP 2FA |
+| **RBAC** | Edge proxy + DAL layer with role-based access control |
 
 ### Trade Mechanics
 
@@ -88,25 +90,44 @@ At 90% payout: winRate must stay below 52.6%
 
 ## 3. OTC Price Engine
 
-### Approach: Hybrid (Real Reference + OTC Bias)
+### Approach: Shared Candles with Per-User Outcome Control
 
-All pairs are OTC (platform-generated prices), but we use real market data as a reference to make prices look realistic.
+All pairs are OTC (platform-generated prices). The OTC engine runs in the custom server.ts process, generating ticks every 200ms and closing candles every 60 seconds. All users see the same candle history.
 
 ### Candle Generation (Shared Across All Users)
 
 ```
-1. Fetch real reference price from free API
-   - EUR/USD → exchangerate-api.com
-   - BTC/USD → coingecko.com API
-   - etc.
+1. On server startup, OTCEngine.init() loads pairs from DB
+   - Each pair has: basePrice, volatility, payoutPercent, spread
 
-2. Add platform-controlled offset per candle
-   - offset = seeded_random(timestamp + pair_id) × volatility
-   - This makes candles look natural
+2. Historical candles seeded (500 candles per pair)
+   - Uses volatility directly for body/wick sizing
+   - Random bullish/bearish (52%/48%)
+   - Mean-reverting drift keeps price near basePrice
+   - Values rounded to 8 decimals for Decimal(16,8) compatibility
 
-3. Store in candle_history table
-   - All users see the same candle history
-   - Consistent chart experience
+3. Live ticks generated every 200ms
+   - priceChange = (random - 0.5) * volatility * 0.06
+   - Over 300 ticks per minute, produces realistic candle range
+   - Clamped to basePrice * 0.5 .. basePrice * 2
+
+4. Candles closed every 60 seconds
+   - Saved to DB (Candle table)
+   - Broadcast to subscribed WebSocket clients
+   - New candle starts at exact close price (no gap)
+```
+
+### Tick Engine Formula
+
+```
+For each tick:
+  priceChange = (Math.random() - 0.5) × volatility × 0.06
+  newPrice = clamp(currentPrice + priceChange, basePrice × 0.5, basePrice × 2)
+
+Over 300 ticks (1 candle):
+  Expected range ≈ volatility ± small drift
+  EURUSD (vol=0.0008): ~0.0008 range (8 pips per candle)
+  BTC (vol=800): ~$800 range per candle
 ```
 
 ### Trade Settlement (Per-User)
@@ -133,10 +154,11 @@ All pairs are OTC (platform-generated prices), but we use real market data as a 
 
 ### Price Realism
 
-- Candles use real market reference prices (±small offset)
-- Volatility proportional to pair's real volatility
-- Candle patterns look natural (no obvious manipulation)
-- Different users see same candle history on same pair
+- Candles use calibrated volatility per asset class
+- Random bullish/bearish distribution (52%/48%)
+- Proportional wicks (bullish candles have longer lower wicks)
+- Mean-reverting drift prevents runaway prices
+- All users see same candle history on same pair
 
 ---
 
@@ -322,63 +344,75 @@ Auto-Rules:
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| Frontend | Next.js 16 + React | Trader UI + Admin Console |
-| Backend | Node.js + Express/Fastify | API server |
-| Database | PostgreSQL | Primary data store |
-| Cache | Redis | Sessions, rate limiting, live prices |
-| WebSocket | Socket.IO / WS | Real-time candle feed |
-| Price Feed | Free APIs + OTC engine | Candle generation |
+| Frontend | Next.js 16 + React 19 | Trader UI + Admin Console |
+| Styling | TailwindCSS v4 | Dark theme with CSS custom properties |
+| Chart | klinecharts v10 | Candlestick chart with drawing tools |
+| Auth | better-auth v1.7 | Email/password, Google OAuth, TOTP 2FA |
+| Database | PostgreSQL + Prisma | Primary data store |
+| WebSocket | ws (native) | Live candle feed |
+| Server | Custom server.ts | HTTP + WebSocket in single process |
+| Deployment | Coolify v4 + Docker | Auto-deploy from main branch |
 
 ### System Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     CLIENT LAYER                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │  Trader UI    │  │  Admin UI    │  │  Mobile App  │  │
-│  │  (Next.js)    │  │  (Next.js)   │  │  (Future)    │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
-└─────────┼──────────────────┼──────────────────┼──────────┘
-          │                  │                  │
-    ┌─────▼──────────────────▼──────────────────▼─────┐
-    │              API GATEWAY (Nginx)                  │
-    │         Rate Limiting, SSL, Load Balancing        │
-    └─────┬──────────────────┬──────────────────┬─────┘
-          │                  │                  │
-   ┌──────▼──────┐  ┌───────▼───────┐  ┌──────▼──────┐
-   │  AUTH SVC   │  │  TRADE SVC    │  │ FINANCE SVC │
-   │             │  │               │  │             │
-   │ - Register  │  │ - Place Trade │  │ - Deposit   │
-   │ - Login     │  │ - Settle      │  │ - Withdraw  │
-   │ - KYC       │  │ - Price Feed  │  │ - Treasury  │
-   │ - Sessions  │  │ - Candles     │  │ - P&L       │
-   └──────┬──────┘  └───────┬───────┘  └──────┬──────┘
-          │                  │                  │
-   ┌──────▼──────────────────▼──────────────────▼──────┐
-   │                  DATA LAYER                        │
-   │  ┌──────────────┐  ┌──────────────┐              │
-   │  │  PostgreSQL   │  │    Redis     │              │
-   │  │  (Primary)    │  │  (Cache)     │              │
-   │  └──────────────┘  └──────────────┘              │
-   └───────────────────────────────────────────────────┘
+│  ┌──────────────┐  ┌──────────────┐                     │
+│  │  Trader UI    │  │  Admin UI    │                     │
+│  │  (Next.js)    │  │  (Next.js)   │                     │
+│  └──────┬───────┘  └──────┬───────┘                     │
+└─────────┼──────────────────┼────────────────────────────┘
+          │                  │
+    ┌─────▼──────────────────▼─────┐
+    │     Next.js 16 (proxy.ts)    │
+    │   Edge: Role-based routing   │
+    └─────┬──────────────────┬─────┘
+          │                  │
+   ┌──────▼──────┐  ┌───────▼───────┐
+   │  AUTH SVC   │  │  TRADE SVC    │
+   │  (better-   │  │  (Next.js     │
+   │   auth)     │  │   API routes) │
+   │             │  │               │
+   │ - Register  │  │ - Pairs       │
+   │ - Login     │  │ - Candles     │
+   │ - 2FA       │  │ - Trades      │
+   │ - Google    │  │ - Balance     │
+   │ - Sessions  │  │ - Admin API   │
+   └──────┬──────┘  └───────┬───────┘
+          │                  │
+   ┌──────▼──────────────────▼──────┐
+   │         PostgreSQL (Prisma)     │
+   │   16 models, Decimal(16,8)     │
+   └──────┬─────────────────────────┘
           │
    ┌──────▼──────────────────────────────────────────┐
-   │              WEBSOCKET SERVER                     │
-   │  - Live candle stream per pair                    │
-   │  - Trade status updates                           │
-   │  - Price alerts                                   │
-   └──────────────────────────────────────────────────┘
+   │         Custom Server (server.ts)                │
+   │  ┌─────────────┐  ┌──────────────────────────┐  │
+   │  │  HTTP Server │  │  WebSocket Server (/ws)  │  │
+   │  │  (Next.js)   │  │  (ws library)            │  │
+   │  └─────────────┘  └──────────────────────────┘  │
+   │  ┌──────────────────────────────────────────┐   │
+   │  │         OTC Engine (lib/otc-engine.ts)    │   │
+   │  │  - Ticks every 200ms                      │   │
+   │  │  - Candles every 60s                      │   │
+   │  │  - 500 historical candles per pair        │   │
+   │  │  - 23 pairs (forex, crypto, commodities,  │   │
+   │  │    indices)                               │   │
+   │  └──────────────────────────────────────────┘   │
+   └─────────────────────────────────────────────────┘
 ```
 
 ### Service Responsibilities
 
 | Service | Responsibility | Key Endpoints |
 |---|---|---|
-| **Auth Service** | Registration, login, JWT, KYC | `/auth/register`, `/auth/login`, `/auth/kyc` |
-| **Trade Service** | Place trades, settlement, candles | `/trades`, `/pairs`, `/ws/pairs/:id` |
-| **Finance Service** | Deposits, withdrawals, treasury | `/balance`, `/deposit`, `/withdraw` |
-| **Admin Service** | User management, analytics | `/admin/*` |
-| **Price Service** | OTC candle generation, real-time feed | Internal only |
+| **Auth Service** | Registration, login, 2FA, Google OAuth, sessions | `/api/auth/*` |
+| **Trade Service** | Pairs, candles, trades, balance | `/api/pairs`, `/api/trades`, `/api/balance` |
+| **Finance Service** | Deposits, withdrawals, ledger | `/api/deposit`, `/api/withdraw` |
+| **Admin Service** | User management, analytics, treasury | `/api/admin/*` |
+| **OTC Engine** | Tick generation, candle creation, WebSocket broadcast | Internal (server.ts) |
+| **WebSocket** | Live candle feed per pair | `/ws` |
 
 ---
 
@@ -685,9 +719,10 @@ Client → Server:
 
 | Module | Status | Notes |
 |---|---|---|
-| Landing page | ✅ Done | |
-| Login/Register | ✅ Done | Email + Google OAuth + Telegram OIDC |
-| Trader interface | ✅ Done | KLineChart integrated |
+| Landing page | ✅ Done | Hero, stats, features, how-it-works, asset classes, CTA, footer |
+| Login/Register | ✅ Done | Email + Google OAuth |
+| TOTP 2FA | ✅ Done | better-auth twoFactor plugin, /2fa-verify page |
+| Trader interface | ✅ Done | KLineChart v10 integrated |
 | Trading panel | ✅ Done | Investment, time, payout, UP/DOWN |
 | Asset tabs | ✅ Done | TopBar with dropdown + inline tabs |
 | Side toolbar | ✅ Done | Drawing tools, chart type, timeframe, indicators, fullscreen |
@@ -703,15 +738,15 @@ Client → Server:
 | Console — KYC | ✅ Done | User verification |
 | Loading skeletons | ✅ Done | All 11 console pages |
 | Global search | ✅ Done | Cmd+K / Ctrl+K |
-| Admin roles | ✅ Done | Superadmin/Admin/Viewer |
+| Admin roles (RBAC) | ✅ Done | super_admin, finance, support, risk |
 | Candle data feed | ✅ Done | KLineChart with backward scrolling |
 | Auth (Email) | ✅ Done | Sign-up/sign-in via better-auth |
 | Auth (Google) | ✅ Done | socialProviders.google config |
-| Auth (Telegram) | ✅ Done | genericOAuth with explicit OIDC endpoints |
 | RBAC (Proxy) | ✅ Done | Edge proxy role-based route protection |
 | RBAC (Server) | ✅ Done | DAL layer + console-panel layout guard |
 | Backend API | ✅ Done | 30+ endpoints (auth, trades, admin, finance) |
-| OTC Price Engine | ✅ Done | Per-user outcome control |
+| OTC Price Engine | ✅ Done | Shared candles, realistic OHLC, no gaps |
+| WebSocket | ✅ Done | Live candle feed, /ws excluded from proxy |
 | Database | ✅ Done | PostgreSQL via Prisma, 16 models |
 | Docker | ✅ Done | Dockerfile + .dockerignore |
 | Deployment | ✅ Done | Coolify v4, production at nextorx.247play.win |
@@ -720,7 +755,6 @@ Client → Server:
 
 | Module | Status | Notes |
 |---|---|---|
-| Admin login after DB reset | 🚧 | User created but password sign-in returns 401 |
 | Trade execution integration | 🚧 | Frontend panels use mock data, need API wiring |
 
 ### Not Started ❌
@@ -728,7 +762,6 @@ Client → Server:
 | Module | Priority | Notes |
 |---|---|---|
 | Trade execution API wiring | P0 | Frontend trade panel needs to call real /api/trades |
-| WebSocket live candle feed | P1 | Currently using mock candle generation in client |
 | Deposit crypto integration | P1 | USDT wallet generation (TRC20/ERC20) |
 | Withdrawal tiered processing | P1 | Tiered approval flow |
 | Martingale detector | P2 | Pattern detection |
@@ -747,7 +780,6 @@ Client → Server:
 | VPS | Coolify-managed | Backend + database |
 | CDN | Cloudflare | Frontend + DDoS protection |
 | Database | PostgreSQL 17 on VPS | Primary data |
-| Cache | Redis 7.2 on VPS | Sessions + cache |
 | DNS | Cloudflare | Domain: nextorx.247play.win |
 | CI/CD | Coolify v4 | Auto-deploy from main branch |
 
@@ -764,17 +796,36 @@ BETTER_AUTH_URL=https://nextorx.247play.win
 # OAuth
 GOOGLE_CLIENT_ID=from-google-cloud
 GOOGLE_CLIENT_SECRET=from-google-cloud
-TELEGRAM_CLIENT_ID=from-botfather
-TELEGRAM_CLIENT_SECRET=from-botfather
-TELEGRAM_LOGIN_BOT_TOKEN=from-botfather
 
 # Admin
 ADMIN_EMAIL=admin@nextorx.app
 ADMIN_PASSWORD=ChangeMe!123456
 
-# Redis
-REDIS_URL=redis://localhost:6379
+# DB Reset
+DB_RESET_SECRET=nextorx-reset-2026
 ```
+
+### Build & Deploy
+
+```bash
+# Local build
+$env:SKIP_ENV_VALIDATION = "1"; pnpm run build
+
+# Deploy
+git push origin main  # Coolify auto-deploys
+
+# Reset DB (production)
+curl -X POST https://nextorx.247play.win/api/debug/reset-db \
+  -H "Content-Type: application/json" \
+  -d '{"secret":"nextorx-reset-2026"}'
+```
+
+### WebSocket
+
+- Server: custom server.ts with ws library
+- Path: `/ws` (excluded from proxy matcher)
+- Events: subscribe/unsubscribe pair, tick, candle:close, snapshot, ping/pong
+- Auto-reconnect in client (2s delay)
 
 ---
 

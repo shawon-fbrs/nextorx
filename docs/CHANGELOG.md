@@ -17,6 +17,25 @@
 
 ## Log
 
+### 2026-09-01
+
+| Date | Author | Module | Status | Description |
+|---|---|---|---|---|
+| 2026-09-01 | opencode | auth | ✅ COMPLETED | Admin login after DB reset — working with auth.api.signUpEmail |
+| 2026-09-01 | opencode | auth | ✅ COMPLETED | TOTP 2FA enabled via better-auth twoFactor plugin |
+| 2026-09-01 | opencode | auth | ✅ COMPLETED | Telegram removed — genericOAuth, telegramMiniApp, env vars, UI buttons |
+| 2026-09-01 | opencode | chart | ✅ COMPLETED | klinecharts v10 setSymbol — ticker, pricePrecision, volumePrecision |
+| 2026-09-01 | opencode | chart | ✅ COMPLETED | Realistic OHLC candle generation — random bullish/bearish, mean-reverting drift |
+| 2026-09-01 | opencode | chart | ✅ COMPLETED | Eliminated candle gap — new candle created before async DB write |
+| 2026-09-01 | opencode | chart | ✅ COMPLETED | Auto re-seed candles when API finds < 50 candles for a pair |
+| 2026-09-01 | opencode | ws | ✅ COMPLETED | WebSocket unblocked — /ws excluded from proxy matcher |
+| 2026-09-01 | opencode | otc | ✅ COMPLETED | OTC volatility fixed — removed VOLATILITY_SCALE=0.0001, use volatility * 0.06 for ticks |
+| 2026-09-01 | opencode | otc | ✅ COMPLETED | Fixed numeric overflow for high-price pairs — use volatility directly, round to 8 decimals |
+| 2026-09-01 | opencode | prisma | ✅ COMPLETED | Added @unique to TwoFactor.userId for one-to-one relation |
+| 2026-09-01 | opencode | api | ✅ COMPLETED | Fixed BigInt serialization in candles endpoint |
+| 2026-09-01 | opencode | debug | ✅ COMPLETED | reset-db now clears candles and re-seeds admin with proper password |
+| 2026-09-01 | opencode | docs | ✅ COMPLETED | Updated session log, changelog, and project documentation |
+
 ### 2026-08-31
 
 | Date | Author | Module | Status | Description |
@@ -67,16 +86,16 @@
 ## Pending Tasks
 
 ### Backend (P0 — Must Have)
-- [ ] Set up Node.js project with Express/Fastify
-- [ ] PostgreSQL database setup with migrations
+- [x] Set up Node.js project with Next.js 16 custom server
+- [x] PostgreSQL database setup with Prisma
 - [ ] Redis setup for sessions + cache
-- [ ] Auth Service — register, login, JWT, KYC
-- [ ] OTC Price Engine — candle generation with real market reference
+- [x] Auth Service — register, login, better-auth, 2FA
+- [x] OTC Price Engine — candle generation with OTC bias
 - [ ] Trade Service — place trade, settlement, per-user win rate
-- [ ] Finance Service — deposits (crypto), withdrawals (tiered)
+- [x] Finance Service — deposits, withdrawals, ledger
 - [ ] Treasury Manager — real-time reserve monitoring
-- [ ] WebSocket Server — live candle feed
-- [ ] Admin endpoints — user management, analytics
+- [x] WebSocket Server — live candle feed
+- [x] Admin endpoints — user management, analytics
 
 ### Backend (P1 — Should Have)
 - [ ] Rate limiting per IP + per user
@@ -93,19 +112,25 @@
 - [ ] Referral system
 
 ### Frontend
-- [ ] Integrate real backend API (replace mock data)
-- [ ] WebSocket candle feed integration
+- [x] Landing page with hero, stats, features, how-it-works, asset classes
+- [x] Login/Register with email + Google OAuth
+- [x] Trader interface — chart, trading panel, asset selection
+- [x] KLineChart v10 integration with custom overlays
+- [x] Drawing tools (10 tools) with edit panel
+- [x] Admin console — 11 pages with loading skeletons, Cmd+K search
+- [x] Console-panel role-based access control
+- [ ] Trade execution integration — frontend panels use mock data, need API wiring
 - [ ] Trade history page with real data
 - [ ] User balance display (real data)
 - [ ] Withdrawal request form
 - [ ] KYC document upload
 
 ### Infrastructure
-- [ ] VPS setup (Hetzner / DigitalOcean)
-- [ ] PostgreSQL deployment
+- [x] Docker + Dockerfile + .dockerignore
+- [x] Coolify v4 deployment — auto-deploy from main branch
+- [x] PostgreSQL on VPS
 - [ ] Redis deployment
-- [ ] Domain + SSL (Cloudflare)
-- [ ] Docker + docker-compose setup
+- [x] Domain + SSL — nextorx.247play.win via Cloudflare
 - [ ] CI/CD pipeline
 
 ---
@@ -115,8 +140,14 @@
 | Feature | Status | Date |
 |---|---|---|
 | Landing page | ✅ | 2026-08-30 |
-| Login/Register | ✅ | 2026-08-30 |
+| Login/Register (Email + Google) | ✅ | 2026-08-31 |
+| TOTP 2FA | ✅ | 2026-09-01 |
 | Trader interface (chart, panel) | ✅ | 2026-08-30 |
+| KLineChart v10 integration | ✅ | 2026-09-01 |
+| Drawing tools (10 tools) | ✅ | 2026-08-30 |
+| Overlay edit panel | ✅ | 2026-08-30 |
+| Overlay copy/delete | ✅ | 2026-08-30 |
+| Lucide React icons | ✅ | 2026-08-30 |
 | Console — Finance | ✅ | 2026-08-30 |
 | Console — Treasury | ✅ | 2026-08-30 |
 | Console — Users | ✅ | 2026-08-30 |
@@ -129,13 +160,13 @@
 | Console — KYC | ✅ | 2026-08-30 |
 | Loading skeletons | ✅ | 2026-08-30 |
 | Global search (Cmd+K) | ✅ | 2026-08-30 |
-| Admin roles | ✅ | 2026-08-30 |
-| KLineChart integration | ✅ | 2026-08-30 |
-| OTC pairs management | ✅ | 2026-08-30 |
-| Drawing tools (10 tools) | ✅ | 2026-08-30 |
-| Overlay edit panel | ✅ | 2026-08-30 |
-| Overlay copy/delete | ✅ | 2026-08-30 |
-| Lucide React icons | ✅ | 2026-08-30 |
+| Admin roles (RBAC) | ✅ | 2026-08-31 |
+| Proxy role-based protection | ✅ | 2026-08-31 |
+| DAL layer | ✅ | 2026-08-31 |
+| OTC Price Engine | ✅ | 2026-09-01 |
+| WebSocket live candle feed | ✅ | 2026-09-01 |
+| Realistic candle generation | ✅ | 2026-09-01 |
+| Docker deployment | ✅ | 2026-08-31 |
 
 ---
 
@@ -143,10 +174,13 @@
 
 | Decision | Date | Rationale |
 |---|---|---|
-| KLineChart over lightweight-charts | 2026-08-30 | No watermark, built-in indicators/drawing tools, open source |
-| Hybrid OTC price engine | 2026-08-30 | Real market reference + user bias = realistic prices + profit control |
-| PostgreSQL for database | 2026-08-30 | ACID compliance, JSONB support, mature |
-| Redis for cache | 2026-08-30 | Fast session management, rate limiting |
+| KLineChart v10 over lightweight-charts | 2026-08-30 | No watermark, built-in indicators/drawing tools, open source |
+| OTC price engine (shared candles) | 2026-09-01 | All users see same candle history, realistic OHLC with mean-reverting drift |
+| PostgreSQL via Prisma | 2026-08-30 | ACID compliance, type-safe queries, migrations |
+| better-auth over custom JWT | 2026-08-31 | Built-in session management, 2FA, OAuth, scrypt hashing |
+| Custom server.ts over standalone | 2026-09-01 | WebSocket server for live candle feed, OTC engine runs in same process |
+| Volatility-based candle generation | 2026-09-01 | Each pair has calibrated volatility, candles look realistic per asset class |
+| Edge proxy for RBAC | 2026-08-31 | Fast role check from session cookie without DB query |
 | Crypto-only deposits | 2026-08-30 | Target markets (India, BD, PK, NP) prefer crypto |
 | Tiered withdrawals | 2026-08-30 | Protects treasury from bank runs |
 

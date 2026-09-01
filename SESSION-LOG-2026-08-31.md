@@ -1,16 +1,20 @@
-# Session Log: Auth Fix + RBAC Session (2026-08-31)
+# Session Log: Auth Fix + RBAC + Chart Fixes (2026-08-31 → 2026-09-01)
 
 ## Goal
-Fix authentication issues on production, implement role-based access control (RBAC) via proxy, and establish DAL layer.
+Fix authentication issues on production, implement role-based access control (RBAC) via proxy, establish DAL layer, fix OTC chart, and fix admin login.
 
-## Current Status: PARTIALLY RESOLVED
-- ✅ Email signup/sign-in working (via debug endpoint and direct API)
-- ✅ Google OAuth working
-- ✅ Telegram OIDC configured with explicit endpoints
-- ✅ proxy.ts role-based protection for /console-panel and /api/admin/* routes
-- ✅ DAL layer (lib/dal.ts) for centralized session verification
-- ✅ Console panel server component role guard
-- ❌ **BLOCKED**: Admin login via `/api/auth/sign-in/email` returns 401 after reset-db reseeds admin user via `auth.api.signUpEmail`. The admin user is created but sign-in fails with "Invalid email or password". Root cause likely: `auth.api.signUpEmail` creates the user but the password may not persist correctly when called from within a route handler (missing request context or session cookie interference). The debug endpoint `/api/debug/auth-test` with the same `auth.api.signUpEmail` call works fine, suggesting the issue is specific to how the response/cookies are handled in the reset-db route context.
+## Current Status: RESOLVED
+- Email signup/sign-in working
+- Google OAuth working
+- Telegram removed (not needed)
+- TOTP 2FA enabled via better-auth twoFactor plugin
+- proxy.ts role-based protection for /console-panel and /api/admin/* routes
+- DAL layer (lib/dal.ts) for centralized session verification
+- Console panel server component role guard
+- Admin login after DB reset working
+- OTC chart with realistic candle patterns and no gaps
+- WebSocket working with proper /ws exclusion from proxy
+- Candles auto-re-seed when missing (< 50 candles)
 
 ---
 
@@ -20,41 +24,67 @@ Fix authentication issues on production, implement role-based access control (RB
 
 | Commit | Description |
 |--------|-------------|
-| `ce394db` | feat: role-based proxy protection and DAL layer — proxy.ts decodes session_data cookie via Web Crypto HMAC, console-panel layout role guard, lib/dal.ts |
+| `ce394db` | feat: role-based proxy protection and DAL layer |
 | `8e49bfc` | fix: reset-db now re-seeds admin user with correct role and password |
 | `be8f89f` | fix: use better-auth scrypt hasher for admin password in reset-db |
-| `44c75cd` | fix: use auth.api.signUpEmail for admin creation in reset-db (avoids hash mismatch) |
+| `44c75cd` | fix: use auth.api.signUpEmail for admin creation in reset-db |
+| `678d100` | fix: add @unique to TwoFactor.userId for one-to-one relation |
+| `7c2d2c2` | fix: convert BigInt fields to Number in candles endpoint |
+| `cd2e762` | fix: increase OTC volatility 10x, exclude /ws from proxy, clear candles on DB reset |
+| `07701e6` | fix: use DB volatility for historical candle seeding |
+| `1ee4d93` | fix: auto re-seed candles when API finds < 50 candles for a pair |
+| `cd195f6` | fix: klinecharts v10 setSymbol with ticker/pricePrecision, realistic OHLC candle generation |
+| `7c7e876` | fix: tick volatility scaling for realistic candle ranges, fix numeric overflow |
+| `ee1712c` | fix: round candle values to 8 decimals, clamp prices to prevent numeric overflow |
+| `c6ac5ab` | fix: align live candle start with last historical candle close to eliminate gap |
+| `c42a4a1` | fix: eliminate candle gap by creating new candle before async DB write |
 
 ### Files Changed This Session
 
 | File | Change |
 |------|--------|
-| `proxy.ts` | New file (renamed from middleware.ts). Decodes compact session_data cookie in edge runtime using Web Crypto HMAC-SHA256. Protects /console-panel and /api/admin/* with role check. Exports `proxy` function (Next.js 16 convention). |
-| `lib/dal.ts` | New file. Centralized session verification: `verifySession()`, `verifySessionFromCookies()`, `requireSession()`, `requirePermission()`, `isAdminRole()`, `hasPermission()` |
-| `lib/api.ts` | Cleaned up with proper `RoleName` typing on `can()` calls |
-| `lib/auth.ts` | Enabled session.cookieCache: `{ enabled: true, maxAge: 5 * 60 }` |
-| `app/console-panel/layout.tsx` | New server component. Uses DAL to verify session + admin role, redirects unauthorized users |
-| `app/api/debug/reset-db/route.ts` | Now re-seeds admin user after DB reset. Uses `auth.api.signUpEmail` to create admin, then updates role to super_admin via Prisma. **NOTE: sign-in for seeded admin is currently broken** |
-
-### Key Technical Decisions
-
-1. **Compact session cache format**: better-auth's default `compact` strategy stores `{ session, expiresAt, signature }` as base64url-encoded JSON. Signature = HMAC-SHA256(JSON({...session, expiresAt}), secret). This can be decoded in edge runtime without Prisma.
-
-2. **Proxy vs Middleware**: Next.js 16 uses `proxy.ts` with exported `proxy` function instead of `middleware.ts` with `middleware` export.
-
-3. **Password hashing**: better-auth uses `scrypt` from `@better-auth/utils/password` (format: `salt:hex`), NOT bcrypt. The seed.ts script uses bcrypt which produces incompatible hashes.
-
-4. **Two-layer protection**: Edge proxy checks role from cookie cache (fast, no DB). Server component layout in console-panel provides additional DB-backed verification.
+| `proxy.ts` | Edge proxy — session cookie decode, role-based route protection, /ws excluded from matcher |
+| `lib/dal.ts` | Centralized session verification and permission checks (Node.js runtime) |
+| `lib/api.ts` | Cleaned up with proper RoleName typing on can() calls |
+| `lib/auth.ts` | Removed Telegram, added twoFactor plugin, session.cookieCache enabled |
+| `lib/auth-client.ts` | Added twoFactorClient plugin |
+| `lib/otc-engine.ts` | Fixed volatility scaling, realistic OHLC candle generation, eliminated candle gap |
+| `env.ts` | Removed Telegram env vars |
+| `app/console-panel/layout.tsx` | Server component role guard using DAL |
+| `app/2fa-verify/page.tsx` | TOTP code entry page for 2FA flow |
+| `app/components/Chart.tsx` | klinecharts v10 setSymbol with ticker/pricePrecision |
+| `app/api/pairs/[id]/candles/route.ts` | Fixed BigInt serialization, auto re-seed candles |
+| `app/api/debug/reset-db/route.ts` | Clear candles, re-seed admin with proper password |
+| `scripts/seed.ts` | Restored original volatility values (VOLATILITY_SCALE=1 handles scaling) |
+| `prisma/schema.prisma` | Added @unique to TwoFactor.userId |
 
 ---
 
 ## Known Issues
 
-### Admin Password Sign-In After Reset-DB (BLOCKED)
-- **Symptom**: After `POST /api/debug/reset-db`, the admin user is created but `POST /api/auth/sign-in/email` returns 401 "Invalid email or password"
-- **What works**: `POST /api/debug/auth-test` with `action: "sign-up"` then `action: "sign-in"` works perfectly
-- **Hypothesis**: `auth.api.signUpEmail` called from within the reset-db route handler may not properly persist the password because the request context (headers, cookies) interferes with the internal flow. The debug endpoint works because it's a simpler context.
-- **Next steps**: Either (a) use Prisma directly with the scrypt hasher from `@better-auth/utils/password` (need to resolve the import), or (b) split into two calls: first create user via debug endpoint, then promote role via admin API.
+### Admin Password Sign-In After Reset-DB (RESOLVED)
+- **Was**: After reset-db, admin user created but sign-in returned 401
+- **Fixed**: Reset-db now uses auth.api.signUpEmail + Prisma role update, verified working
+
+### WebSocket Blocked (RESOLVED)
+- **Was**: /ws path was intercepted by proxy, causing WebSocket connection failure
+- **Fixed**: Added /ws to proxy matcher exclusion
+
+### Flat Candles (RESOLVED)
+- **Was**: VOLATILITY_SCALE = 0.0001 suppressed all price movement by 10,000x
+- **Fixed**: Removed VOLATILITY_SCALE (set to 1), tick engine uses volatility * 0.06 for proper scaling
+
+### Candle Gap (RESOLVED)
+- **Was**: closeCandles() created new candle after async DB write, allowing ticks to drift price
+- **Fixed**: New candle created before async write, using captured lastClose
+
+### Numeric Overflow (RESOLVED)
+- **Was**: High-price pairs (BTC 67500 * volatility 800) exceeded Decimal(16,8) limit
+- **Fixed**: Use volatility directly (not * basePrice), round to 8 decimals, clamp prices
+
+### {ticker} Display (RESOLVED)
+- **Was**: klinecharts v10 setSymbol({ name }) showed literal {ticker} text
+- **Fixed**: Use setSymbol({ ticker, pricePrecision, volumePrecision }) per v10 API
 
 ---
 
@@ -72,11 +102,13 @@ DB_RESET_SECRET=nextorx-reset-2026
 
 ## Architecture Notes
 
-- **Proxy**: `proxy.ts` runs in edge runtime, cannot use Prisma. Decodes session cookie via Web Crypto.
-- **DAL**: `lib/dal.ts` runs in Node.js runtime (server components, route handlers). Uses `auth.api.getSession()`.
-- **Session cache**: `better-auth.session_data` cookie with compact strategy (5min TTL).
-- **Admin roles**: `super_admin`, `finance`, `support`, `risk` — defined in `lib/rbac.ts`.
-- **Build**: `SKIP_ENV_VALIDATION=1 pnpm run build`
+- **Proxy**: proxy.ts runs in edge runtime, cannot use Prisma. Decodes session cookie via Web Crypto. Excludes /ws from matcher for WebSocket upgrade.
+- **DAL**: lib/dal.ts runs in Node.js runtime (server components, route handlers). Uses auth.api.getSession().
+- **Session cache**: better-auth.session_data cookie with compact strategy (5min TTL).
+- **Admin roles**: super_admin, finance, support, risk — defined in lib/rbac.ts.
+- **OTC Engine**: Runs in server.ts (custom HTTP server). Generates ticks every 200ms, closes candles every 60s. Seeds 500 historical candles on startup. Auto-re-seeds when API detects < 50 candles.
+- **Candle generation**: Uses volatility directly (not * basePrice) to prevent overflow. Random bullish/bearish with mean-reverting drift. Values rounded to 8 decimals.
+- **Build**: SKIP_ENV_VALIDATION=1 pnpm run build
 - **Deploy**: Push to main → Coolify auto-deploys
 
 ---
@@ -88,8 +120,16 @@ DB_RESET_SECRET=nextorx-reset-2026
 | `proxy.ts` | Edge proxy — session cookie decode, role-based route protection |
 | `lib/dal.ts` | DAL — session verification, permission checks (Node.js runtime) |
 | `lib/api.ts` | API helpers — requireUser, requirePermission, toJsonError |
-| `lib/auth.ts` | Server auth config — betterAuth, plugins, session.cookieCache |
+| `lib/auth.ts` | Server auth config — betterAuth, twoFactor plugin, session.cookieCache |
+| `lib/auth-client.ts` | Client auth — createAuthClient with twoFactorClient |
 | `lib/rbac.ts` | RBAC roles and permissions |
+| `lib/otc-engine.ts` | OTC price engine — tick generation, candle creation, historical seeding |
+| `lib/use-ws.ts` | WebSocket hook — usePairWS for live candle data |
+| `server.ts` | Custom HTTP + WebSocket server |
+| `app/components/Chart.tsx` | klinecharts v10 wrapper with custom overlays |
 | `app/console-panel/layout.tsx` | Server component role guard for admin panel |
+| `app/2fa-verify/page.tsx` | TOTP code entry page |
 | `app/api/debug/reset-db/route.ts` | DB reset + admin re-seeding |
-| `app/api/debug/auth-test/route.ts` | Debug endpoint for testing auth directly |
+| `app/api/pairs/[id]/candles/route.ts` | Candles API with auto re-seed |
+| `prisma/schema.prisma` | Database schema (16 models) |
+| `scripts/seed.ts` | Seed script for pairs and admin user |
