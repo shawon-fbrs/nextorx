@@ -10,7 +10,7 @@ export const statements = {
   settings: ["read", "manage"],
   promo: ["read", "manage"],
   payment: ["list", "manage"],
-  pair: ["read", "manage"],
+    pair: ["create", "read", "list", "update", "delete"],
   trade: ["read", "cancel"],
   audit: ["read"],
 } as const;
@@ -48,7 +48,7 @@ export const roles = {
     settings: ["read", "manage"],
     promo: ["read", "manage"],
     payment: ["list", "manage"],
-    pair: ["read", "manage"],
+  pair: ["create", "read", "list", "update", "delete"],
     trade: ["read", "cancel"],
     audit: ["read"],
   }),

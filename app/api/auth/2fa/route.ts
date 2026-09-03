@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireUser, toJsonError } from '@/lib/api';
 import { verifyPassword } from 'better-auth/crypto';
-import { authenticator } from 'otplib';
+import { verifyTOTP } from '@/lib/totp';
 
 export async function POST(req: NextRequest) {
   try {
@@ -75,10 +75,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const codeValid = authenticator.verify({
-        token: code,
-        secret: twoFactor.secret,
-      });
+      const codeValid = verifyTOTP(twoFactor.secret, code);
 
       if (!codeValid) {
         return NextResponse.json(

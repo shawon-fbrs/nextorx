@@ -20,6 +20,8 @@ type User = {
   country?: string | null;
   currencyPref?: string;
   referralCode?: string | null;
+  emailVerified?: boolean;
+  twoFactorEnabled?: boolean;
 };
 
 type Session = {

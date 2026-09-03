@@ -5,29 +5,61 @@ import { hashPassword } from "better-auth/crypto";
 const prisma = new PrismaClient();
 
 const OTC_PAIRS = [
-  { id: "EURUSD", name: "EUR/USD", category: "forex", basePrice: 1.0850, volatility: 0.0008, payoutPercent: 80, sortOrder: 1 },
-  { id: "GBPUSD", name: "GBP/USD", category: "forex", basePrice: 1.2700, volatility: 0.0010, payoutPercent: 77, sortOrder: 2 },
-  { id: "USDJPY", name: "USD/JPY", category: "forex", basePrice: 149.50, volatility: 0.12, payoutPercent: 86, sortOrder: 3 },
-  { id: "EURGBP", name: "EUR/GBP", category: "forex", basePrice: 0.8540, volatility: 0.0006, payoutPercent: 80, sortOrder: 4 },
-  { id: "USDINR", name: "USD/INR", category: "forex", basePrice: 83.20, volatility: 0.08, payoutPercent: 82, sortOrder: 5 },
-  { id: "USDBDT", name: "USD/BDT", category: "forex", basePrice: 117.50, volatility: 0.15, payoutPercent: 80, sortOrder: 6 },
-  { id: "USDPKR", name: "USD/PKR", category: "forex", basePrice: 278.00, volatility: 0.30, payoutPercent: 80, sortOrder: 7 },
-  { id: "USDNPR", name: "USD/NPR", category: "forex", basePrice: 133.50, volatility: 0.15, payoutPercent: 78, sortOrder: 8 },
-  { id: "EURJPY", name: "EUR/JPY", category: "forex", basePrice: 162.30, volatility: 0.15, payoutPercent: 80, sortOrder: 9 },
-  { id: "GBPJPY", name: "GBP/JPY", category: "forex", basePrice: 190.00, volatility: 0.18, payoutPercent: 84, sortOrder: 10 },
-  { id: "BTCUSD", name: "BTC/USD", category: "crypto", basePrice: 67500.00, volatility: 800.00, payoutPercent: 90, sortOrder: 11 },
-  { id: "ETHUSD", name: "ETH/USD", category: "crypto", basePrice: 3450.00, volatility: 50.00, payoutPercent: 88, sortOrder: 12 },
-  { id: "SOLUSD", name: "SOL/USD", category: "crypto", basePrice: 175.00, volatility: 8.00, payoutPercent: 92, sortOrder: 13 },
-  { id: "XRPUSD", name: "XRP/USD", category: "crypto", basePrice: 0.62, volatility: 0.015, payoutPercent: 89, sortOrder: 14 },
-  { id: "DOGEUSD", name: "DOGE/USD", category: "crypto", basePrice: 0.185, volatility: 0.008, payoutPercent: 91, sortOrder: 15 },
-  { id: "ADAUSD", name: "ADA/USD", category: "crypto", basePrice: 0.48, volatility: 0.012, payoutPercent: 87, sortOrder: 16 },
-  { id: "BNBUSD", name: "BNB/USD", category: "crypto", basePrice: 610.00, volatility: 15.00, payoutPercent: 88, sortOrder: 17 },
-  { id: "XAUUSD", name: "Gold", category: "commodities", basePrice: 2350.00, volatility: 25.00, payoutPercent: 87, sortOrder: 18 },
-  { id: "XAGUSD", name: "Silver", category: "commodities", basePrice: 29.50, volatility: 0.40, payoutPercent: 84, sortOrder: 19 },
-  { id: "WTIUSD", name: "Crude Oil", category: "commodities", basePrice: 78.00, volatility: 1.20, payoutPercent: 89, sortOrder: 20 },
-  { id: "SPX500", name: "S&P 500", category: "indices", basePrice: 5250.00, volatility: 40.00, payoutPercent: 85, sortOrder: 21 },
-  { id: "NIFTY50", name: "NIFTY 50", category: "indices", basePrice: 22500.00, volatility: 200.00, payoutPercent: 83, sortOrder: 22 },
-  { id: "NIKKEI225", name: "Nikkei 225", category: "indices", basePrice: 38500.00, volatility: 350.00, payoutPercent: 84, sortOrder: 23 },
+  // ── Forex Majors (7) ──
+  { id: "EURUSD", name: "EUR/USD", symbol: "EUR/USD", category: "forex", basePrice: 1.0850, volatility: 0.0008, payoutPercent: 82, spread: 0.00015, tags: ["major", "popular"], sortOrder: 1 },
+  { id: "GBPUSD", name: "GBP/USD", symbol: "GBP/USD", category: "forex", basePrice: 1.2700, volatility: 0.0010, payoutPercent: 80, spread: 0.00020, tags: ["major", "popular"], sortOrder: 2 },
+  { id: "USDJPY", name: "USD/JPY", symbol: "USD/JPY", category: "forex", basePrice: 149.50, volatility: 0.12, payoutPercent: 84, spread: 0.015, tags: ["major", "popular"], sortOrder: 3 },
+  { id: "USDCHF", name: "USD/CHF", symbol: "USD/CHF", category: "forex", basePrice: 0.8920, volatility: 0.0007, payoutPercent: 79, spread: 0.00018, tags: ["major"], sortOrder: 4 },
+  { id: "USDCAD", name: "USD/CAD", symbol: "USD/CAD", category: "forex", basePrice: 1.3650, volatility: 0.0006, payoutPercent: 80, spread: 0.00020, tags: ["major"], sortOrder: 5 },
+  { id: "AUDUSD", name: "AUD/USD", symbol: "AUD/USD", category: "forex", basePrice: 0.6580, volatility: 0.0007, payoutPercent: 81, spread: 0.00018, tags: ["major"], sortOrder: 6 },
+  { id: "NZDUSD", name: "NZD/USD", symbol: "NZD/USD", category: "forex", basePrice: 0.6050, volatility: 0.0006, payoutPercent: 78, spread: 0.00022, tags: ["major"], sortOrder: 7 },
+
+  // ── Forex Crosses (13) ──
+  { id: "EURGBP", name: "EUR/GBP", symbol: "EUR/GBP", category: "forex", basePrice: 0.8540, volatility: 0.0005, payoutPercent: 80, spread: 0.00015, tags: ["cross"], sortOrder: 8 },
+  { id: "EURJPY", name: "EUR/JPY", symbol: "EUR/JPY", category: "forex", basePrice: 162.30, volatility: 0.14, payoutPercent: 82, spread: 0.018, tags: ["cross", "popular"], sortOrder: 9 },
+  { id: "GBPJPY", name: "GBP/JPY", symbol: "GBP/JPY", category: "forex", basePrice: 190.00, volatility: 0.18, payoutPercent: 83, spread: 0.025, tags: ["cross", "volatile"], sortOrder: 10 },
+  { id: "AUDJPY", name: "AUD/JPY", symbol: "AUD/JPY", category: "forex", basePrice: 98.40, volatility: 0.12, payoutPercent: 80, spread: 0.015, tags: ["cross"], sortOrder: 11 },
+  { id: "CADJPY", name: "CAD/JPY", symbol: "CAD/JPY", category: "forex", basePrice: 109.50, volatility: 0.11, payoutPercent: 79, spread: 0.015, tags: ["cross"], sortOrder: 12 },
+  { id: "CHFJPY", name: "CHF/JPY", symbol: "CHF/JPY", category: "forex", basePrice: 167.60, volatility: 0.13, payoutPercent: 78, spread: 0.020, tags: ["cross"], sortOrder: 13 },
+  { id: "EURCHF", name: "EUR/CHF", symbol: "EUR/CHF", category: "forex", basePrice: 0.9680, volatility: 0.0004, payoutPercent: 79, spread: 0.00015, tags: ["cross"], sortOrder: 14 },
+  { id: "EURAUD", name: "EUR/AUD", symbol: "EUR/AUD", category: "forex", basePrice: 1.6490, volatility: 0.0012, payoutPercent: 80, spread: 0.00030, tags: ["cross"], sortOrder: 15 },
+  { id: "EURCAD", name: "EUR/CAD", symbol: "EUR/CAD", category: "forex", basePrice: 1.4810, volatility: 0.0008, payoutPercent: 79, spread: 0.00025, tags: ["cross"], sortOrder: 16 },
+  { id: "GBPCAD", name: "GBP/CAD", symbol: "GBP/CAD", category: "forex", basePrice: 1.7340, volatility: 0.0010, payoutPercent: 80, spread: 0.00030, tags: ["cross"], sortOrder: 17 },
+  { id: "GBPAUD", name: "GBP/AUD", symbol: "GBP/AUD", category: "forex", basePrice: 1.9300, volatility: 0.0014, payoutPercent: 80, spread: 0.00035, tags: ["cross"], sortOrder: 18 },
+  { id: "AUDCAD", name: "AUD/CAD", symbol: "AUD/CAD", category: "forex", basePrice: 0.8980, volatility: 0.0006, payoutPercent: 79, spread: 0.00020, tags: ["cross"], sortOrder: 19 },
+  { id: "AUDNZD", name: "AUD/NZD", symbol: "AUD/NZD", category: "forex", basePrice: 1.0870, volatility: 0.0007, payoutPercent: 78, spread: 0.00025, tags: ["cross"], sortOrder: 20 },
+  { id: "NZDCAD", name: "NZD/CAD", symbol: "NZD/CAD", category: "forex", basePrice: 0.8260, volatility: 0.0005, payoutPercent: 78, spread: 0.00020, tags: ["cross"], sortOrder: 21 },
+
+  // ── Crypto (10) ──
+  { id: "BTCUSD", name: "BTC/USD", symbol: "BTC/USD", category: "crypto", basePrice: 67500.00, volatility: 800.00, payoutPercent: 90, spread: 25.00, tags: ["major", "popular", "volatile"], sortOrder: 22 },
+  { id: "ETHUSD", name: "ETH/USD", symbol: "ETH/USD", category: "crypto", basePrice: 3450.00, volatility: 50.00, payoutPercent: 88, spread: 1.50, tags: ["major", "popular"], sortOrder: 23 },
+  { id: "SOLUSD", name: "SOL/USD", symbol: "SOL/USD", category: "crypto", basePrice: 175.00, volatility: 8.00, payoutPercent: 91, spread: 0.40, tags: ["volatile"], sortOrder: 24 },
+  { id: "XRPUSD", name: "XRP/USD", symbol: "XRP/USD", category: "crypto", basePrice: 0.62, volatility: 0.015, payoutPercent: 89, spread: 0.001, tags: ["popular"], sortOrder: 25 },
+  { id: "DOGEUSD", name: "DOGE/USD", symbol: "DOGE/USD", category: "crypto", basePrice: 0.185, volatility: 0.008, payoutPercent: 90, spread: 0.0005, tags: ["meme", "volatile"], sortOrder: 26 },
+  { id: "ADAUSD", name: "ADA/USD", symbol: "ADA/USD", category: "crypto", basePrice: 0.48, volatility: 0.012, payoutPercent: 87, spread: 0.001, tags: [], sortOrder: 27 },
+  { id: "BNBUSD", name: "BNB/USD", symbol: "BNB/USD", category: "crypto", basePrice: 610.00, volatility: 15.00, payoutPercent: 88, spread: 1.50, tags: ["major"], sortOrder: 28 },
+  { id: "DOTUSD", name: "DOT/USD", symbol: "DOT/USD", category: "crypto", basePrice: 7.80, volatility: 0.35, payoutPercent: 86, spread: 0.02, tags: [], sortOrder: 29 },
+  { id: "AVAXUSD", name: "AVAX/USD", symbol: "AVAX/USD", category: "crypto", basePrice: 38.50, volatility: 2.00, payoutPercent: 88, spread: 0.10, tags: ["volatile"], sortOrder: 30 },
+  { id: "MATICUSD", name: "POL/USD", symbol: "POL/USD", category: "crypto", basePrice: 0.72, volatility: 0.025, payoutPercent: 87, spread: 0.002, tags: [], sortOrder: 31 },
+
+  // ── Commodities (8) ──
+  { id: "XAUUSD", name: "Gold", symbol: "XAU/USD", category: "commodities", basePrice: 2350.00, volatility: 25.00, payoutPercent: 85, spread: 0.30, tags: ["major", "popular"], sortOrder: 32 },
+  { id: "XAGUSD", name: "Silver", symbol: "XAG/USD", category: "commodities", basePrice: 29.50, volatility: 0.40, payoutPercent: 82, spread: 0.02, tags: ["major"], sortOrder: 33 },
+  { id: "USOIL", name: "Crude Oil", symbol: "WTI/USD", category: "commodities", basePrice: 78.00, volatility: 1.20, payoutPercent: 84, spread: 0.05, tags: ["major", "popular"], sortOrder: 34 },
+  { id: "XPTUSD", name: "Platinum", symbol: "XPT/USD", category: "commodities", basePrice: 1020.00, volatility: 12.00, payoutPercent: 80, spread: 0.80, tags: [], sortOrder: 35 },
+  { id: "XPDUSD", name: "Palladium", symbol: "XPD/USD", category: "commodities", basePrice: 980.00, volatility: 15.00, payoutPercent: 79, spread: 1.00, tags: [], sortOrder: 36 },
+  { id: "NATGAS", name: "Natural Gas", symbol: "NG/USD", category: "commodities", basePrice: 2.45, volatility: 0.12, payoutPercent: 81, spread: 0.005, tags: ["volatile"], sortOrder: 37 },
+  { id: "COPPER", name: "Copper", symbol: "HG/USD", category: "commodities", basePrice: 4.25, volatility: 0.08, payoutPercent: 79, spread: 0.005, tags: [], sortOrder: 38 },
+  { id: "WHEAT", name: "Wheat", symbol: "ZW/USD", category: "commodities", basePrice: 580.00, volatility: 10.00, payoutPercent: 78, spread: 2.00, tags: [], sortOrder: 39 },
+
+  // ── Indices (7) ──
+  { id: "SPX500", name: "S&P 500", symbol: "SPX", category: "indices", basePrice: 5250.00, volatility: 40.00, payoutPercent: 84, spread: 1.00, tags: ["major", "popular"], sortOrder: 40 },
+  { id: "NAS100", name: "Nasdaq 100", symbol: "NDX", category: "indices", basePrice: 18400.00, volatility: 120.00, payoutPercent: 85, spread: 5.00, tags: ["major", "volatile"], sortOrder: 41 },
+  { id: "DJ30", name: "Dow Jones 30", symbol: "DJI", category: "indices", basePrice: 39200.00, volatility: 80.00, payoutPercent: 83, spread: 3.00, tags: ["major"], sortOrder: 42 },
+  { id: "UK100", name: "FTSE 100", symbol: "UKX", category: "indices", basePrice: 8150.00, volatility: 50.00, payoutPercent: 81, spread: 1.50, tags: [], sortOrder: 43 },
+  { id: "DAX40", name: "DAX 40", symbol: "DAX", category: "indices", basePrice: 18200.00, volatility: 60.00, payoutPercent: 82, spread: 2.00, tags: ["popular"], sortOrder: 44 },
+  { id: "NIKKEI225", name: "Nikkei 225", symbol: "NI225", category: "indices", basePrice: 38500.00, volatility: 350.00, payoutPercent: 83, spread: 15.00, tags: [], sortOrder: 45 },
+  { id: "ASX200", name: "ASX 200", symbol: "XJO", category: "indices", basePrice: 7800.00, volatility: 35.00, payoutPercent: 80, spread: 1.00, tags: [], sortOrder: 46 },
 ];
 
 async function main() {
@@ -78,7 +110,21 @@ async function main() {
 
   // ── OTC pairs ──
   for (const pair of OTC_PAIRS) {
-    await prisma.pair.upsert({ where: { id: pair.id }, update: {}, create: pair });
+    await prisma.pair.upsert({
+      where: { id: pair.id },
+      update: {
+        name: pair.name,
+        symbol: pair.symbol,
+        category: pair.category,
+        basePrice: pair.basePrice,
+        volatility: pair.volatility,
+        payoutPercent: pair.payoutPercent,
+        spread: pair.spread,
+        tags: pair.tags,
+        sortOrder: pair.sortOrder,
+      },
+      create: pair,
+    });
   }
   console.log(`Created ${OTC_PAIRS.length} OTC pairs`);
 

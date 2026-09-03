@@ -298,21 +298,30 @@ model PromoCodeUse {
 model Pair {
   id              String   @id
   name            String
+  symbol          String?
   category        String
   basePrice       Decimal  @db.Decimal(16, 8)
   volatility      Decimal  @db.Decimal(12, 6)
-  payoutPercent   Decimal  @db.Decimal(5, 2) @default(80)
-  spread          Decimal  @db.Decimal(8, 6) @default(0.0002)
+  payoutPercent   Decimal  @db.Decimal(5, 2)   @default(80)
+  weekendPayout   Decimal? @db.Decimal(5, 2)
+  spread          Decimal  @db.Decimal(8, 6)   @default(0.0002)
   isActive        Boolean  @default(true)
-  minTrade        Decimal  @db.Decimal(10, 2) @default(1)
-  maxTrade        Decimal  @db.Decimal(10, 2) @default(5000)
+  isFeatured      Boolean  @default(false)
+  minTrade        Decimal  @db.Decimal(10, 2)  @default(1)
+  maxTrade        Decimal  @db.Decimal(10, 2)  @default(5000)
+  maxPayout       Decimal? @db.Decimal(5, 2)   @default(95)
   sortOrder       Int      @default(0)
+  description     String?
+  tradingHours    String?  @default("24/7")
+  tags            String[]                       @default([])
+  maxDailyVolume  Int?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   candles         Candle[]
   trades          Trade[]
 
   @@index([isActive, sortOrder])
+  @@index([category])
 }
 
 model Candle {

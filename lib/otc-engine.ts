@@ -325,6 +325,149 @@ export class OTCEngine {
     return this.pairs.get(pairId)?.subscribers;
   }
 
+  async addPair(pairId: string): Promise<void> {
+    if (this.pairs.has(pairId)) return;
+
+    const p = await prisma.pair.findUnique({ where: { id: pairId } });
+    if (!p || !p.isActive) return;
+
+    const basePrice = Number(p.basePrice);
+    const now = Date.now();
+    const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
+
+    const state: PairState = {
+      pairId: p.id,
+      name: p.name,
+      basePrice,
+      volatility: Number(p.volatility),
+      payoutPercent: Number(p.payoutPercent),
+      spread: Number(p.spread),
+      currentPrice: basePrice,
+      candle: {
+        timestamp: candleStart,
+        open: basePrice,
+        high: basePrice,
+        low: basePrice,
+        close: basePrice,
+        volume: 0,
+      },
+      subscribers: new Set(),
+    };
+
+    this.pairs.set(p.id, state);
+
+    const existingCount = await prisma.candle.count({ where: { pairId } });
+    if (existingCount < 200) {
+      await this.seedHistoricalCandlesForPair(state);
+    }
+
+    const lastCandle = await prisma.candle.findFirst({
+      where: { pairId },
+      orderBy: { timestamp: 'desc' },
+    });
+    if (lastCandle) {
+      const closePrice = Number(lastCandle.close);
+      state.currentPrice = closePrice;
+      state.candle = {
+        timestamp: Number(lastCandle.timestamp),
+        open: closePrice,
+        high: closePrice,
+        low: closePrice,
+        close: closePrice,
+        volume: 0,
+      };
+    }
+
+    console.log(`[OTC] Added pair: ${pairId}`);
+  }
+
+  async removePair(pairId: string): Promise<void> {
+    const state = this.pairs.get(pairId);
+    if (!state) return;
+
+    for (const ws of state.subscribers) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'pair:removed', pairId }));
+      }
+    }
+
+    this.pairs.delete(pairId);
+    console.log(`[OTC] Removed pair: ${pairId}`);
+  }
+
+  async updatePair(pairId: string, changes: Partial<Pick<PairState, 'volatility' | 'payoutPercent' | 'spread' | 'basePrice'>> & { isActive?: boolean }): Promise<void> {
+    if (changes.isActive === false) {
+      await this.removePair(pairId);
+      return;
+    }
+
+    const state = this.pairs.get(pairId);
+    if (!state) return;
+
+    if (changes.volatility !== undefined) state.volatility = changes.volatility;
+    if (changes.payoutPercent !== undefined) state.payoutPercent = changes.payoutPercent;
+    if (changes.spread !== undefined) state.spread = changes.spread;
+    if (changes.basePrice !== undefined) {
+      state.basePrice = changes.basePrice;
+      state.currentPrice = changes.basePrice;
+    }
+
+    for (const ws of state.subscribers) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'pair:updated', pairId, changes }));
+      }
+    }
+  }
+
+  private async seedHistoricalCandlesForPair(state: PairState) {
+    const candles: Array<{
+      pairId: string;
+      timestamp: bigint;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume: number;
+    }> = [];
+
+    let price = state.basePrice;
+    const now = Date.now();
+    const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
+
+    for (let i = 499; i >= 0; i--) {
+      const ts = candleStart - i * CANDLE_INTERVAL_MS;
+      const r = (v: number) => Math.round(v * 1e8) / 1e8;
+      const open = Math.max(0.00000001, r(price));
+
+      const vol = state.volatility;
+      const bodySize = (Math.random() * 0.6 + 0.1) * vol;
+      const isBullish = Math.random() > 0.48;
+      const bodyDir = isBullish ? 1 : -1;
+      const close = Math.max(0.00000001, r(open + bodyDir * bodySize));
+      const maxWick = vol * 0.8;
+      const wickUp = Math.random() * maxWick * (isBullish ? 0.6 : 1.0);
+      const wickDown = Math.random() * maxWick * (isBullish ? 1.0 : 0.6);
+      const high = r(Math.max(open, close) + wickUp);
+      const low = Math.max(0.00000001, r(Math.min(open, close) - wickDown));
+      const volume = Math.floor(Math.random() * 10000) + 100;
+
+      candles.push({
+        pairId: state.pairId,
+        timestamp: BigInt(ts),
+        open,
+        high,
+        low,
+        close,
+        volume,
+      });
+
+      const drift = (Math.random() - 0.5) * vol * 0.15;
+      price = Math.max(state.basePrice * 0.5, Math.min(state.basePrice * 2, r(close + drift)));
+    }
+
+    await prisma.candle.createMany({ data: candles, skipDuplicates: true });
+  }
+
   async ensureHistoricalCandles() {
     await this.seedHistoricalCandles();
   }
