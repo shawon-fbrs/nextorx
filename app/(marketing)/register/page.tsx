@@ -48,7 +48,15 @@ export default function RegisterPage() {
       }
 
       if (data) {
-        router.push('/trade/demo');
+        try {
+          await fetch('/api/auth/send-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+        } catch {}
+
+        router.push(`/verify-email?email=${encodeURIComponent(email)}`);
         router.refresh();
       }
     } catch {

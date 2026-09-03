@@ -1,9 +1,11 @@
 import { prisma } from '@/lib/db';
 import crypto from 'crypto';
 
-// Generate a 6-digit verification code
+// Generate a 6-digit verification code (cryptographically secure)
 export function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b % 10).join('');
 }
 
 // Generate a secure reset token

@@ -184,11 +184,6 @@ export default function Setup2FAPage() {
           )}
         </div>
 
-        <div className="text-center mt-4">
-          <Link href="/trade/demo" className="text-xs text-text-dark hover:text-white transition-colors">
-            Skip for now
-          </Link>
-        </div>
       </div>
     </div>
   );

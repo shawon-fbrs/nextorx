@@ -3,12 +3,13 @@ import { requireUser, toJsonError } from "@/lib/api";
 import { credit } from "@/lib/ledger";
 
 const DEMO_STARTING_BALANCE = 10_000_00; // $10,000 in cents
+const DEMO_MIN_BALANCE = 100_00; // $100 minimum
+const DEMO_MAX_BALANCE = 100_000_00; // $100,000 maximum
 
 export async function POST() {
   try {
     const user = await requireUser();
 
-    // Only credit if user has zero balance and no deposits
     const [depositCount, currentBalance] = await Promise.all([
       prisma.depositRequest.count({ where: { userId: user.id, status: "VERIFIED" } }),
       prisma.user.findUnique({ where: { id: user.id }, select: { balance: true } }),
@@ -21,6 +22,45 @@ export async function POST() {
     await credit({ userId: user.id, type: "PROMO_CREDIT", amount: DEMO_STARTING_BALANCE, description: "Demo starting balance" });
 
     return Response.json({ balance: DEMO_STARTING_BALANCE });
+  } catch (e) {
+    return toJsonError(e);
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await requireUser();
+    const body = await request.json().catch(() => ({})) as { balance?: number };
+    const { balance } = body;
+
+    if (typeof balance !== 'number' || isNaN(balance)) {
+      return Response.json({ error: "Balance must be a number" }, { status: 400 });
+    }
+
+    const cents = Math.round(balance * 100);
+
+    if (cents < DEMO_MIN_BALANCE) {
+      return Response.json({ error: `Minimum balance is $${DEMO_MIN_BALANCE / 100}` }, { status: 400 });
+    }
+
+    if (cents > DEMO_MAX_BALANCE) {
+      return Response.json({ error: `Maximum balance is $${DEMO_MAX_BALANCE / 100}` }, { status: 400 });
+    }
+
+    const depositCount = await prisma.depositRequest.count({
+      where: { userId: user.id, status: "VERIFIED" },
+    });
+
+    if (depositCount > 0) {
+      return Response.json({ error: "Cannot adjust balance on real account" }, { status: 400 });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { balance: cents },
+    });
+
+    return Response.json({ balance: cents });
   } catch (e) {
     return toJsonError(e);
   }

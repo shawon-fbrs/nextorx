@@ -24,7 +24,16 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        setError(authError.message || 'Invalid email or password');
+        const msg = authError.message || '';
+        if (msg.includes('locked') || msg.includes('too many')) {
+          setError('Account temporarily locked due to too many failed attempts. Please try again later.');
+        } else if (msg.includes('banned')) {
+          setError('This account has been banned. Contact support.');
+        } else if (msg.includes('Invalid') || msg.includes('credentials')) {
+          setError('Invalid email or password.');
+        } else {
+          setError(msg || 'Login failed. Please try again.');
+        }
         return;
       }
 
@@ -38,8 +47,12 @@ export default function LoginPage() {
         const user = session?.data?.user as Record<string, unknown>;
         const role = user?.role as string;
         const twoFactorEnabled = user?.twoFactorEnabled as boolean;
-        if (role === 'super_admin' || role === 'admin' || role === 'moderator') {
+        const emailVerified = user?.emailVerified as boolean;
+
+        if (role === 'super_admin' || role === 'finance' || role === 'support' || role === 'risk') {
           router.push('/console-panel');
+        } else if (!emailVerified) {
+          router.push(`/verify-email?email=${encodeURIComponent(email)}`);
         } else if (!twoFactorEnabled) {
           router.push('/setup-2fa');
         } else {
@@ -117,7 +130,7 @@ export default function LoginPage() {
                 <input type="checkbox" className="w-4 h-4 rounded border-border bg-background accent-green" />
                 <span className="text-xs text-text-dark">Remember me</span>
               </label>
-              <a href="/forgot-password" className="text-xs text-blue hover:text-blue-hover transition-colors font-semibold">Forgot password?</a>
+              <Link href="/forgot-password" className="text-xs text-blue hover:text-blue-hover transition-colors font-semibold">Forgot password?</Link>
             </div>
             <button
               type="submit"

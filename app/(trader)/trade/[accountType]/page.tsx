@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import type { ChartHandle } from '../../../components/Chart';
 const Chart = dynamic(() => import('../../../components/Chart').then(m => m.Chart), { ssr: false });
@@ -469,6 +470,8 @@ export default function TradingPage() {
 
   if (!mounted || !activePair) return <div className="h-full w-full bg-background" />;
 
+  const isComingSoon = accountType === 'funded' || accountType === 'tournament';
+
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <div className="flex-1 flex min-w-0 overflow-hidden">
@@ -480,6 +483,27 @@ export default function TradingPage() {
               <SideToolbar onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} onOverlaySelected={setSelectedOverlay} />
+
+                {isComingSoon && (
+                  <div className="absolute inset-0 z-[70] bg-background/80 backdrop-blur-sm flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-orange/15 flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                          <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                      <h2 className="text-xl font-black text-white mb-2">Coming Soon</h2>
+                      <p className="text-sm text-text-dark max-w-xs">
+                        {accountType === 'funded'
+                          ? 'Funded accounts are coming soon. Complete challenges to access funded trading.'
+                          : 'Tournaments are coming soon. Compete against other traders for prizes.'}
+                      </p>
+                      <Link href="/trade/real" className="mt-4 inline-block bg-green hover:bg-green-hover text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-colors">
+                        Trade on Real Account
+                      </Link>
+                    </div>
+                  </div>
+                )}
 
                 {selectedOverlay && (
                   <div className="absolute z-[60] bg-[#1a1e2a]/95 backdrop-blur-md border border-[#2e3548] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden"

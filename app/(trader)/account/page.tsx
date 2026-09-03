@@ -4,6 +4,8 @@ import { useAuth } from '@/lib/auth-context';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
+import { checkPasswordStrength, PASSWORD_REQUIREMENTS } from '@/lib/password';
+import Link from 'next/link';
 
 export default function AccountPage() {
   const router = useRouter();
@@ -16,6 +18,24 @@ export default function AccountPage() {
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('');
 
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMsg, setPasswordMsg] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
+  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+  const [twoFALoading, setTwoFALoading] = useState(false);
+  const [twoFAMsg, setTwoFAMsg] = useState('');
+  const [disableModal, setDisableModal] = useState(false);
+  const [disablePassword, setDisablePassword] = useState('');
+  const [disableCode, setDisableCode] = useState('');
+
+  const [deleteModal, setDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteMsg, setDeleteMsg] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     if (user) {
       setFirstName(user.firstName || '');
@@ -25,6 +45,21 @@ export default function AccountPage() {
       setCountry(user.country || '');
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetch('/api/auth/2fa/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'status' }),
+      })
+        .then((r) => r.json())
+        .then((d) => setTwoFAEnabled(d.enabled))
+        .catch(() => {});
+    }
+  }, [user]);
+
+  const newPassStrength = checkPasswordStrength(newPassword);
 
   const handleSaveProfile = async () => {
     setSaving(true);
@@ -46,6 +81,105 @@ export default function AccountPage() {
       setMessage('Failed to save profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMsg('');
+
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg('Passwords do not match');
+      return;
+    }
+
+    if (!newPassStrength.isValid) {
+      setPasswordMsg('Password does not meet requirements');
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPasswordMsg(data.error || 'Failed to change password');
+      } else {
+        setPasswordMsg('Password changed successfully. Please log in again.');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => {
+          authClient.signOut({ fetchOptions: { onSuccess: () => router.push('/login') } });
+        }, 2000);
+      }
+    } catch {
+      setPasswordMsg('Failed to change password');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const handleToggle2FA = async () => {
+    if (twoFAEnabled) {
+      setDisableModal(true);
+      return;
+    }
+    router.push('/setup-2fa');
+  };
+
+  const handleDisable2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFALoading(true);
+    setTwoFAMsg('');
+    try {
+      const res = await fetch('/api/auth/2fa/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'disable', password: disablePassword, code: disableCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTwoFAMsg(data.error || 'Failed to disable 2FA');
+      } else {
+        setTwoFAEnabled(false);
+        setDisableModal(false);
+        setDisablePassword('');
+        setDisableCode('');
+        setTwoFAMsg('2FA disabled successfully');
+      }
+    } catch {
+      setTwoFAMsg('Failed to disable 2FA');
+    } finally {
+      setTwoFALoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeleting(true);
+    setDeleteMsg('');
+    try {
+      const res = await fetch('/api/auth/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: deletePassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDeleteMsg(data.error || 'Failed to delete account');
+      } else {
+        await authClient.signOut();
+        router.push('/');
+      }
+    } catch {
+      setDeleteMsg('Failed to delete account');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -138,12 +272,21 @@ export default function AccountPage() {
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">Email</label>
-                <input
-                  type="email"
-                  value={user.email}
-                  disabled
-                  className="w-full bg-background/50 border border-border/50 rounded-lg px-3.5 py-2.5 text-sm text-text-dark cursor-not-allowed"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="email"
+                    value={user.email}
+                    disabled
+                    className="w-full bg-background/50 border border-border/50 rounded-lg px-3.5 py-2.5 text-sm text-text-dark cursor-not-allowed"
+                  />
+                  {user.emailVerified ? (
+                    <span className="text-[10px] text-green font-semibold whitespace-nowrap">Verified</span>
+                  ) : (
+                    <Link href={`/verify-email?email=${encodeURIComponent(user.email)}`} className="text-[10px] text-orange font-semibold whitespace-nowrap hover:underline">
+                      Verify
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
             {message && (
@@ -189,7 +332,7 @@ export default function AccountPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-surface border border-border rounded-xl p-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-orange/15 flex items-center justify-center">
@@ -206,12 +349,19 @@ export default function AccountPage() {
               <div className="bg-background rounded-lg p-3 flex items-center justify-between">
                 <div>
                   <span className="text-xs font-semibold text-white block">Two-Factor Authentication</span>
-                  <span className="text-[10px] text-text-dark">Add an extra layer of security</span>
+                  <span className="text-[10px] text-text-dark">{twoFAEnabled ? 'Enabled — extra layer of security' : 'Add an extra layer of security'}</span>
                 </div>
-                <button className="w-10 h-[22px] rounded-full relative transition-colors bg-border/50">
-                  <div className="w-4 h-4 bg-white rounded-full absolute top-[3px] left-[3px]" />
+                <button
+                  onClick={handleToggle2FA}
+                  disabled={twoFALoading}
+                  className={`w-10 h-[22px] rounded-full relative transition-colors ${twoFAEnabled ? 'bg-green' : 'bg-border/50'}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full absolute top-[3px] transition-all ${twoFAEnabled ? 'left-[22px]' : 'left-[3px]'}`} />
                 </button>
               </div>
+              {twoFAMsg && (
+                <p className={`text-[11px] font-semibold ${twoFAMsg.includes('success') || twoFAMsg.includes('Success') ? 'text-green' : 'text-red'}`}>{twoFAMsg}</p>
+              )}
               <div className="bg-background rounded-lg p-3 flex items-center justify-between">
                 <div>
                   <span className="text-xs font-semibold text-white block">Login Notifications</span>
@@ -253,6 +403,105 @@ export default function AccountPage() {
           </div>
         </div>
 
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue/15 flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white">Change Password</h2>
+                <p className="text-[11px] text-text-dark">Update your password regularly</p>
+              </div>
+            </div>
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1">Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Min. 12 characters"
+                  required
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                />
+                {newPassword && (
+                  <div className="mt-2 space-y-1">
+                    {PASSWORD_REQUIREMENTS.map((req) => (
+                      <div key={req.label} className="flex items-center gap-1.5">
+                        <div className={`w-1 h-1 rounded-full ${req.test(newPassword) ? 'bg-green' : 'bg-border'}`} />
+                        <span className={`text-[10px] ${req.test(newPassword) ? 'text-green' : 'text-text-dark'}`}>
+                          {req.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1">Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                />
+                {confirmPassword && newPassword !== confirmPassword && (
+                  <p className="text-[10px] text-red mt-1">Passwords do not match</p>
+                )}
+              </div>
+              {passwordMsg && (
+                <p className={`text-[11px] font-semibold ${passwordMsg.includes('success') || passwordMsg.includes('Success') ? 'text-green' : 'text-red'}`}>{passwordMsg}</p>
+              )}
+              <button
+                type="submit"
+                disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword || !newPassStrength.isValid}
+                className="w-full bg-blue hover:bg-blue-hover text-white text-xs font-bold py-2.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {passwordSaving ? 'Changing...' : 'Change Password'}
+              </button>
+            </form>
+          </div>
+
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red/15 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white">Delete Account</h2>
+                <p className="text-[11px] text-text-dark">Permanently remove your account</p>
+              </div>
+            </div>
+            <div className="bg-red/5 border border-red/10 rounded-lg p-3.5 mb-4">
+              <p className="text-[11px] text-red leading-relaxed">
+                This action is irreversible. All your data, balance, and trade history will be permanently deleted.
+              </p>
+            </div>
+            <button
+              onClick={() => setDeleteModal(true)}
+              className="w-full bg-red/10 hover:bg-red/20 border border-red/20 text-red text-xs font-bold py-2.5 rounded-lg transition-colors"
+            >
+              Delete Account
+            </button>
+          </div>
+        </div>
+
         <div className="bg-surface border border-border rounded-xl p-5">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-xl bg-red/15 flex items-center justify-center">
@@ -273,6 +522,105 @@ export default function AccountPage() {
           </button>
         </div>
       </div>
+
+      {disableModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setDisableModal(false); setTwoFAMsg(''); }}>
+          <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[400px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-border">
+              <h3 className="text-base font-bold text-white">Disable Two-Factor Authentication</h3>
+              <p className="text-xs text-text-dark mt-1">Enter your password and current TOTP code</p>
+            </div>
+            <form onSubmit={handleDisable2FA} className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">Password</label>
+                <input
+                  type="password"
+                  value={disablePassword}
+                  onChange={(e) => setDisablePassword(e.target.value)}
+                  required
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">TOTP Code</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={disableCode}
+                  onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  autoFocus
+                  required
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white text-center tracking-widest font-mono focus:outline-none focus:border-blue transition-colors"
+                />
+              </div>
+              {twoFAMsg && <p className="text-[11px] font-semibold text-red">{twoFAMsg}</p>}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setDisableModal(false); setTwoFAMsg(''); }}
+                  className="flex-1 bg-background border border-border text-text text-xs font-bold py-2.5 rounded-lg transition-colors hover:bg-surface-hover"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={twoFALoading || !disablePassword || disableCode.length !== 6}
+                  className="flex-1 bg-red hover:bg-red/80 text-white text-xs font-bold py-2.5 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {twoFALoading ? 'Disabling...' : 'Disable 2FA'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {deleteModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setDeleteModal(false); setDeleteMsg(''); }}>
+          <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[400px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-border">
+              <h3 className="text-base font-bold text-white">Delete Account</h3>
+              <p className="text-xs text-text-dark mt-1">This action cannot be undone</p>
+            </div>
+            <form onSubmit={handleDeleteAccount} className="px-6 py-5 space-y-4">
+              <div className="bg-red/5 border border-red/10 rounded-lg p-3.5">
+                <p className="text-[11px] text-red leading-relaxed">
+                  Enter your password to confirm. All data, balance, and trade history will be permanently deleted.
+                </p>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">Password</label>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  required
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                />
+              </div>
+              {deleteMsg && <p className="text-[11px] font-semibold text-red">{deleteMsg}</p>}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setDeleteModal(false); setDeleteMsg(''); }}
+                  className="flex-1 bg-background border border-border text-text text-xs font-bold py-2.5 rounded-lg transition-colors hover:bg-surface-hover"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={deleting || !deletePassword}
+                  className="flex-1 bg-red hover:bg-red/80 text-white text-xs font-bold py-2.5 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Delete Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
