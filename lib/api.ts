@@ -28,6 +28,10 @@ export async function requireUser(): Promise<ApiSessionUser> {
   if (!user) {
     throw new ApiError(401, "Unauthorized");
   }
+  const { isExcluded } = await import("@/lib/self-exclusion");
+  if (await isExcluded(user.id)) {
+    throw new ApiError(403, "Account is self-excluded. Contact support when the exclusion period ends.");
+  }
   return user;
 }
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { CookieConsent } from "@/app/components/CookieConsent";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${roboto.variable}`}>
       <body className="antialiased">
         <AuthProvider>{children}</AuthProvider>
+        <CookieConsent />
       </body>
     </html>
   );

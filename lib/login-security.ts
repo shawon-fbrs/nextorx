@@ -28,6 +28,11 @@ export async function checkLoginAllowed(
     return { allowed: true };
   }
 
+  const { isExcluded } = await import("@/lib/self-exclusion");
+  if (await isExcluded(user.id)) {
+    return { allowed: false, error: "Account is self-excluded. Contact support when the exclusion period ends." };
+  }
+
   // Check if user is banned
   const bannedUser = await prisma.bannedUser.findUnique({
     where: { userId: user.id },

@@ -520,6 +520,13 @@ export default function AccountPage() {
           >
             Log Out
           </button>
+          <a
+            href="/api/account/export"
+            download
+            className="block text-center w-full mt-2 bg-background border border-border text-text text-xs font-bold py-2.5 rounded-lg transition-colors hover:bg-surface-hover"
+          >
+            Download My Data (GDPR Export)
+          </a>
         </div>
       </div>
 
@@ -588,6 +595,7 @@ export default function AccountPage() {
               <div className="bg-red/5 border border-red/10 rounded-lg p-3.5">
                 <p className="text-[11px] text-red leading-relaxed">
                   Enter your password to confirm. All data, balance, and trade history will be permanently deleted.
+                  Financial records are retained for 7 years to meet legal obligations.
                 </p>
               </div>
               <div>

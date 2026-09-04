@@ -39,6 +39,7 @@ model User {
   referredBy    String?
   kycStatus     String          @default("NOT_SUBMITTED")
   twoFactorEnabled Boolean     @default(false)
+  depositLimitDaily Int?
 
   sessions      Session[]
   accounts      Account[]
@@ -425,6 +426,41 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, createdAt(sort: Desc)])
+}
+
+// ─────────────────────────── compliance ───────────────────────────
+
+model KycSubmission {
+  id           String    @id @default(uuid())
+  userId       String
+  tier         String    @default("TIER_1")
+  idType       String?
+  idNumber     String?
+  idFront      Bytes?
+  idFrontMime  String?
+  idBack       Bytes?
+  idBackMime   String?
+  selfie       Bytes?
+  selfieMime   String?
+  status       String    @default("PENDING")
+  reviewedById String?
+  reviewedAt   DateTime?
+  note         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model SelfExclusion {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  excludedUntil DateTime
+  reason        String?
+  createdAt     DateTime @default(now())
+
+  @@index([excludedUntil])
 }
 
 model PaymentMethod {

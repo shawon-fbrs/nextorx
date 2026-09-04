@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
+import { SessionTimer } from '../components/SessionTimer';
 
 export default function TraderLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
@@ -38,6 +39,9 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
         <div className="flex-1 min-h-0 overflow-hidden">
           {children}
         </div>
+      </div>
+      <div className="fixed bottom-3 right-3 z-50">
+        <SessionTimer />
       </div>
     </div>
   );

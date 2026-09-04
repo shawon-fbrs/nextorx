@@ -33,6 +33,23 @@ export async function createDepositRequest(
     throw new DepositError("Transaction hash already used");
   }
 
+  const depositor = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { depositLimitDaily: true },
+  });
+  if (depositor?.depositLimitDaily != null) {
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const todayAgg = await prisma.depositRequest.aggregate({
+      where: { userId, createdAt: { gte: dayStart } },
+      _sum: { amount: true },
+    });
+    const todayTotal = todayAgg._sum.amount ?? 0;
+    if (todayTotal + amount > depositor.depositLimitDaily) {
+      throw new DepositError("Daily deposit limit reached");
+    }
+  }
+
   let promoPercent: number | null = null;
   let promoMaxBonus: number | null = null;
   if (promoCode?.trim()) {
