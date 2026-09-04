@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { TradeDirection, TradeStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requireUser, toJsonError } from "@/lib/api";
+import { requireUser, toJsonError, parseListQuery } from "@/lib/api";
 import { postEntryInTx } from "@/lib/ledger";
 import { getSnapshotPrice } from "@/lib/settle-trade";
 import { getPayoutForPair } from "@/lib/payout";
@@ -21,8 +21,7 @@ const tradeSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUser();
-    const limit = Number(request.nextUrl.searchParams.get("limit") ?? 50);
-    const status = request.nextUrl.searchParams.get("status");
+    const { status, limit } = parseListQuery(request.nextUrl, ["PENDING", "ACTIVE", "WON", "LOST", "CANCELLED"]);
 
     const trades = await prisma.trade.findMany({
       where: {
@@ -30,7 +29,7 @@ export async function GET(request: NextRequest) {
         ...(status ? { status: status as TradeStatus } : {}),
       },
       orderBy: { createdAt: "desc" },
-      take: Math.min(limit, 200),
+      take: limit,
       include: { pair: { select: { id: true, name: true, category: true } } },
     });
 

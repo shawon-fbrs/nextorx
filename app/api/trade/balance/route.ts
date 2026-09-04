@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireUser, toJsonError } from "@/lib/api";
+import { requireUser, toJsonError, parseListQuery } from "@/lib/api";
 import { getLedgerHistory } from "@/lib/ledger";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUser();
-    const limit = Number(request.nextUrl.searchParams.get("limit") ?? 50);
+    const { limit } = parseListQuery(request.nextUrl);
 
     const [profile, history] = await Promise.all([
       prisma.user.findUnique({
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
           currencyPref: true,
         },
       }),
-      getLedgerHistory(user.id, Math.min(limit, 200)),
+      getLedgerHistory(user.id, limit),
     ]);
 
     return Response.json({ wallet: profile, history });

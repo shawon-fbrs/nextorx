@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { toJsonError } from "@/lib/api";
+import { toJsonError, ApiError } from "@/lib/api";
 import { getOTCEngine } from "@/lib/otc-engine";
 
 export async function GET(
@@ -9,8 +9,15 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const limit = Number(request.nextUrl.searchParams.get("limit") ?? 200);
+    const rawLimit = Number(request.nextUrl.searchParams.get("limit") ?? 200);
+    if (!Number.isFinite(rawLimit) || rawLimit <= 0) {
+      throw new ApiError(400, "Invalid limit");
+    }
+    const limit = Math.min(Math.floor(rawLimit), 500);
     const before = request.nextUrl.searchParams.get("before");
+    if (before && !/^\d+$/.test(before)) {
+      throw new ApiError(400, "Invalid before cursor");
+    }
 
     let candles = await prisma.candle.findMany({
       where: {
@@ -18,7 +25,7 @@ export async function GET(
         ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
       },
       orderBy: { timestamp: "desc" },
-      take: Math.min(limit, 500),
+      take: limit,
     });
 
     if (candles.length < 50) {
@@ -30,7 +37,7 @@ export async function GET(
           ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
         },
         orderBy: { timestamp: "desc" },
-        take: Math.min(limit, 500),
+        take: limit,
       });
     }
 

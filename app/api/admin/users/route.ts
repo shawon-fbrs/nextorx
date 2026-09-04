@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { requirePermission, toJsonError } from "@/lib/api";
+import { requirePermission, toJsonError, parseListQuery } from "@/lib/api";
 import { logAudit } from "@/lib/services/audit";
 import { prisma } from "@/lib/db";
 import { credit, debit } from "@/lib/ledger";
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   try {
     await requirePermission("user", "list");
     const q = request.nextUrl.searchParams.get("q") ?? "";
-    const limit = Number(request.nextUrl.searchParams.get("limit") ?? 50);
+    const { limit } = parseListQuery(request.nextUrl);
 
     const users = await prisma.user.findMany({
       where: q

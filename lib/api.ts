@@ -61,8 +61,24 @@ export class ApiError extends Error {
   }
 }
 
-export function toJsonError(e: unknown) {
-  if (e instanceof ApiError) {
+export function parseListQuery(
+  url: URL,
+  allowedStatuses?: readonly string[],
+  maxLimit = 200,
+): { status?: string; limit: number } {
+  const rawLimit = Number(url.searchParams.get("limit") ?? 50);
+  if (!Number.isFinite(rawLimit) || rawLimit <= 0) {
+    throw new ApiError(400, "Invalid limit");
+  }
+  const limit = Math.min(Math.floor(rawLimit), maxLimit);
+  const status = url.searchParams.get("status") ?? undefined;
+  if (status && allowedStatuses && !allowedStatuses.includes(status)) {
+    throw new ApiError(400, "Invalid status");
+  }
+  return { status, limit };
+}
+
+export function toJsonError(e: unknown) {  if (e instanceof ApiError) {
     return Response.json({ error: e.message }, { status: e.status });
   }
   const message = e instanceof Error ? e.message : "Internal server error";

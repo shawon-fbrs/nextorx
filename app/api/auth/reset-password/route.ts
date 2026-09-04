@@ -77,8 +77,9 @@ export async function POST(req: NextRequest) {
     // Hash new password using better-auth's hashPassword (scrypt, matches login verification)
     const hashedPassword = await hashPassword(password);
 
-    // Update password in Account table
-    await prisma.account.updateMany({
+    // Update existing credential account, or create one for social-only users
+    // so password recovery actually restores access.
+    const updated = await prisma.account.updateMany({
       where: {
         userId: user.id,
         providerId: 'credential',
@@ -87,6 +88,17 @@ export async function POST(req: NextRequest) {
         password: hashedPassword,
       },
     });
+
+    if (updated.count === 0) {
+      await prisma.account.create({
+        data: {
+          userId: user.id,
+          accountId: user.id,
+          providerId: 'credential',
+          password: hashedPassword,
+        },
+      });
+    }
 
     // Invalidate all existing sessions for this user
     await prisma.session.deleteMany({

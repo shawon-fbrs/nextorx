@@ -1,15 +1,14 @@
 import { NextRequest } from "next/server";
-import { requirePermission, toJsonError } from "@/lib/api";
+import { requirePermission, toJsonError, parseListQuery } from "@/lib/api";
 import { prisma } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
     await requirePermission("trade", "list");
-    const status = request.nextUrl.searchParams.get("status");
-    const limit = Number(request.nextUrl.searchParams.get("limit") ?? 100);
+    const { status, limit } = parseListQuery(request.nextUrl, ["PENDING", "ACTIVE", "WON", "LOST", "CANCELLED"], 500);
 
     const trades = await prisma.trade.findMany({
-      where: status ? { status: status as any } : undefined,
+      where: status ? { status: status as "ACTIVE" } : undefined,
       orderBy: { createdAt: "desc" },
       take: Math.min(limit, 500),
       include: {

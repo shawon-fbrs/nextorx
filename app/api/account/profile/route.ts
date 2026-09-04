@@ -51,7 +51,7 @@ export async function PATCH(request: Request) {
     });
     if (!user) throw new Error("User not found");
 
-    const verified = user.kycStatus === "APPROVED";
+    const verified = user.kycStatus === "TIER_1";
     if (verified) {
       for (const field of ["firstName", "lastName", "country"] as const) {
         if (body[field] !== undefined) {

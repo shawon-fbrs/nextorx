@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { requirePermission, toJsonError } from "@/lib/api";
+import { requirePermission, toJsonError, parseListQuery } from "@/lib/api";
 import { logAudit } from "@/lib/services/audit";
 import { prisma } from "@/lib/db";
 import { approveWithdrawal, rejectWithdrawal, markWithdrawalPaid } from "@/lib/services/withdrawals";
@@ -14,11 +14,10 @@ const actionSchema = z.discriminatedUnion("action", [
 export async function GET(request: NextRequest) {
   try {
     await requirePermission("withdrawal", "list");
-    const status = (request.nextUrl.searchParams.get("status") ?? "PENDING") as any;
-    const limit = Number(request.nextUrl.searchParams.get("limit") ?? 50);
+    const { status, limit } = parseListQuery(request.nextUrl, ["PENDING", "APPROVED", "REJECTED", "PAID"]);
 
     const withdrawals = await prisma.withdrawalRequest.findMany({
-      where: { status },
+      where: { status: (status ?? "PENDING") as "PENDING" },
       orderBy: { createdAt: "asc" },
       take: Math.min(limit, 200),
       include: {

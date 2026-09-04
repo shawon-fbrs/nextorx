@@ -105,8 +105,8 @@ export async function recordFailedLogin(
     },
   });
 
-  if (recentAttempts >= MAX_FAILED_ATTEMPTS) {
-    // Send alert email
+  if (recentAttempts === MAX_FAILED_ATTEMPTS) {
+    // Send alert email exactly once when the threshold is first hit
     if (user.email) {
       await sendLoginNotificationEmail(
         user.email,
