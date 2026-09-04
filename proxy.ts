@@ -37,6 +37,7 @@ const RATE_LIMITS: Array<{ match: (pathname: string, method: string) => boolean;
   { match: (p, m) => m === "POST" && p === "/api/auth/reset-password", rule: { max: 5, windowMs: 15 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/trade/deposit", rule: { max: 10, windowMs: 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/auth/check-login", rule: { max: 10, windowMs: 5 * 60 * 1000 } },
+  { match: (p, m) => m === "POST" && p === "/api/auth/login-hint", rule: { max: 5, windowMs: 15 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/auth/record-login-attempt", rule: { max: 10, windowMs: 5 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/account/kyc", rule: { max: 3, windowMs: 60 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/trade/trades", rule: { max: 10, windowMs: 60 * 1000 } },

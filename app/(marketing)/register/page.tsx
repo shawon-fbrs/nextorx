@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
+  const [accountExists, setAccountExists] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const passwordStrength = checkPasswordStrength(password);
@@ -21,6 +22,7 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setAccountExists(false);
 
     if (!agreed) {
       setError('You must agree to the Terms of Service');
@@ -44,7 +46,13 @@ export default function RegisterPage() {
       } as Parameters<typeof authClient.signUp.email>[0]);
 
       if (authError) {
-        setError(authError.message || 'Registration failed');
+        const msg = authError.message || '';
+        if (msg.toLowerCase().includes('already')) {
+          setAccountExists(true);
+          setError('An account with this email already exists.');
+        } else {
+          setError(msg || 'Registration failed');
+        }
         return;
       }
 
@@ -99,6 +107,11 @@ export default function RegisterPage() {
           {error && (
             <div className="mb-4 p-3 bg-red/10 border border-red/20 rounded-xl text-red text-xs font-semibold">
               {error}
+              {accountExists && (
+                <Link href="/login" className="block mt-2 text-green hover:text-green-hover">
+                  Log in instead →
+                </Link>
+              )}
             </div>
           )}
 

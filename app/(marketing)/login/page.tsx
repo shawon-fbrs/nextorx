@@ -45,7 +45,17 @@ export default function LoginPage() {
         } else if (msg.includes('banned')) {
           setError('This account has been banned. Contact support.');
         } else if (msg.includes('Invalid') || msg.includes('credentials')) {
-          setError('Invalid email or password.');
+          const hint = await fetch('/api/auth/login-hint', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          }).then((r) => r.json()).catch(() => ({ methods: [] }));
+          const methods = (hint?.methods ?? []) as string[];
+          if (methods.length > 0 && !methods.includes('password')) {
+            setError('This email uses Google sign-in. Continue with Google below, or use Forgot password to set a password.');
+          } else {
+            setError('Invalid email or password.');
+          }
         } else {
           setError(msg || 'Login failed. Please try again.');
         }

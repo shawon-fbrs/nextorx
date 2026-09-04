@@ -65,6 +65,12 @@ export const auth = betterAuth({
     minPasswordLength: 12,
     requireEmailVerification: true,
   },
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google"],
+    },
+  },
   rateLimit: {
     enabled: true,
     window: 60,
