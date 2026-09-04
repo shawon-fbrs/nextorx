@@ -30,6 +30,7 @@ export default function AccountPage() {
   const [disableModal, setDisableModal] = useState(false);
   const [disablePassword, setDisablePassword] = useState('');
   const [disableCode, setDisableCode] = useState('');
+  const [hasPassword, setHasPassword] = useState(true);
 
   const [deleteModal, setDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
@@ -55,6 +56,10 @@ export default function AccountPage() {
       })
         .then((r) => r.json())
         .then((d) => setTwoFAEnabled(d.enabled))
+        .catch(() => {});
+      fetch('/api/auth/has-password')
+        .then((r) => r.json())
+        .then((d) => setHasPassword(d.hasPassword ?? true))
         .catch(() => {});
     }
   }, [user]);
@@ -535,19 +540,21 @@ export default function AccountPage() {
           <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[400px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5 border-b border-border">
               <h3 className="text-base font-bold text-white">Disable Two-Factor Authentication</h3>
-              <p className="text-xs text-text-dark mt-1">Enter your password and current TOTP code</p>
+              <p className="text-xs text-text-dark mt-1">{hasPassword ? 'Enter your password and current TOTP code' : 'Enter your current TOTP code'}</p>
             </div>
             <form onSubmit={handleDisable2FA} className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">Password</label>
-                <input
-                  type="password"
-                  value={disablePassword}
-                  onChange={(e) => setDisablePassword(e.target.value)}
-                  required
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
-                />
-              </div>
+              {hasPassword && (
+                <div>
+                  <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">Password</label>
+                  <input
+                    type="password"
+                    value={disablePassword}
+                    onChange={(e) => setDisablePassword(e.target.value)}
+                    required
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">TOTP Code</label>
                 <input
@@ -573,7 +580,7 @@ export default function AccountPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={twoFALoading || !disablePassword || disableCode.length !== 6}
+                  disabled={twoFALoading || (hasPassword && !disablePassword) || disableCode.length !== 6}
                   className="flex-1 bg-red hover:bg-red/80 text-white text-xs font-bold py-2.5 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {twoFALoading ? 'Disabling...' : 'Disable 2FA'}

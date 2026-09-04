@@ -84,6 +84,7 @@ export const auth = betterAuth({
     bearer(),
     twoFactor({
       issuer: "NextOrx",
+      allowPasswordless: true,
       totpOptions: {
         period: 30,
         digits: 6,

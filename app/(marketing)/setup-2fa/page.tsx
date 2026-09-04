@@ -9,6 +9,7 @@ import QRCode from 'qrcode';
 export default function Setup2FAPage() {
   const router = useRouter();
   const [step, setStep] = useState<'password' | 'qr' | 'verify'>('password');
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
   const [password, setPassword] = useState('');
   const [totpUri, setTotpUri] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
@@ -16,32 +17,43 @@ export default function Setup2FAPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    fetch('/api/auth/has-password')
+      .then((r) => r.json())
+      .then((d) => setHasPassword(d.hasPassword ?? true))
+      .catch(() => setHasPassword(true));
+  }, []);
+
+  const startEnable = async (pw?: string) => {
+    const { data, error: authError } = await authClient.twoFactor.enable(
+      pw ? { password: pw } : {},
+    );
+
+    if (authError) {
+      setError(authError.message || 'Could not start 2FA setup');
+      return;
+    }
+
+    if (data && (data as Record<string, unknown>).totpURI) {
+      const uri = (data as Record<string, unknown>).totpURI as string;
+      setTotpUri(uri);
+      const qrUrl = await QRCode.toDataURL(uri, {
+        width: 256,
+        margin: 2,
+        color: { dark: '#ffffff', light: '#00000000' },
+      });
+      setQrDataUrl(qrUrl);
+      setStep('qr');
+    }
+  };
+
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const { data, error: authError } = await authClient.twoFactor.enable({
-        password,
-      });
-
-      if (authError) {
-        setError(authError.message || 'Invalid password');
-        return;
-      }
-
-      if (data && (data as Record<string, unknown>).totpURI) {
-        const uri = (data as Record<string, unknown>).totpURI as string;
-        setTotpUri(uri);
-        const qrUrl = await QRCode.toDataURL(uri, {
-          width: 256,
-          margin: 2,
-          color: { dark: '#ffffff', light: '#00000000' },
-        });
-        setQrDataUrl(qrUrl);
-        setStep('qr');
-      }
+      await startEnable(password || undefined);
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
@@ -95,7 +107,7 @@ export default function Setup2FAPage() {
           </div>
           <h1 className="text-2xl font-black text-white mb-2">Set Up Two-Factor Authentication</h1>
           <p className="text-sm text-text-dark">
-            {step === 'password' && 'Enter your password to confirm your identity'}
+            {step === 'password' && (hasPassword === false ? 'Confirm it is you to continue' : 'Enter your password to confirm your identity')}
             {step === 'qr' && 'Scan this QR code with your authenticator app'}
             {step === 'verify' && 'Enter the 6-digit code from your authenticator app'}
           </p>
@@ -110,22 +122,30 @@ export default function Setup2FAPage() {
 
           {step === 'password' && (
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">
-                  Current Password
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
-                />
-              </div>
+              {hasPassword === false ? (
+                <div className="bg-blue/5 border border-blue/20 rounded-xl p-3.5">
+                  <p className="text-[11px] text-text leading-relaxed">
+                    You signed in with Google, so there is no password to confirm. Continue to get your authenticator QR code.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    required
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
+                  />
+                </div>
+              )}
               <button
                 type="submit"
-                disabled={loading || !password}
+                disabled={loading || (hasPassword !== false && !password)}
                 className="w-full bg-green hover:bg-green-hover text-white font-bold text-sm py-3 rounded-xl transition-colors shadow-lg shadow-green/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Verifying...' : 'Continue'}

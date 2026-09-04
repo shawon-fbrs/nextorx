@@ -19,9 +19,23 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'disable') {
-      if (!password || !code) {
+      const account = await prisma.account.findFirst({
+        where: {
+          userId: sessionUser.id,
+          providerId: 'credential',
+        },
+      });
+      const hasPassword = Boolean(account?.password);
+
+      if (hasPassword && !password) {
         return NextResponse.json(
-          { error: 'Password and TOTP code are required' },
+          { error: 'Password is required' },
+          { status: 400 }
+        );
+      }
+      if (!code) {
+        return NextResponse.json(
+          { error: 'TOTP code is required' },
           { status: 400 }
         );
       }
@@ -38,30 +52,25 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const account = await prisma.account.findFirst({
-        where: {
-          userId: sessionUser.id,
-          providerId: 'credential',
-        },
-      });
+      if (hasPassword) {
+        if (!account || !account.password) {
+          return NextResponse.json(
+            { error: 'No password set' },
+            { status: 400 }
+          );
+        }
 
-      if (!account || !account.password) {
-        return NextResponse.json(
-          { error: 'No password set' },
-          { status: 400 }
-        );
-      }
+        const valid = await verifyPassword({
+          password,
+          hash: account.password,
+        });
 
-      const valid = await verifyPassword({
-        password,
-        hash: account.password,
-      });
-
-      if (!valid) {
-        return NextResponse.json(
-          { error: 'Incorrect password' },
-          { status: 400 }
-        );
+        if (!valid) {
+          return NextResponse.json(
+            { error: 'Incorrect password' },
+            { status: 400 }
+          );
+        }
       }
 
       const twoFactor = await prisma.twoFactor.findUnique({
