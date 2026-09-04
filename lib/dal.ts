@@ -23,6 +23,12 @@ export async function verifySession(): Promise<SessionUser | null> {
     });
     if (!session?.user) return null;
     const user = session.user as unknown as SessionUser;
+    const [ban, exclusion] = await Promise.all([
+      prisma.user.findUnique({ where: { id: user.id }, select: { banned: true, banExpires: true } }),
+      prisma.selfExclusion.findUnique({ where: { userId: user.id } }),
+    ]);
+    if (ban?.banned && (!ban.banExpires || ban.banExpires.getTime() > Date.now())) return null;
+    if (exclusion && exclusion.excludedUntil.getTime() > Date.now()) return null;
     return user;
   } catch {
     return null;

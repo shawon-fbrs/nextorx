@@ -13,6 +13,7 @@ const userActionSchema = z.discriminatedUnion("action", [
     expiresAt: z.string().datetime().optional(),
   }),
   z.object({ action: z.literal("unban"), userId: z.string() }),
+  z.object({ action: z.literal("2fa-reset"), userId: z.string(), note: z.string().min(3) }),
   z.object({
     action: z.literal("set-role"),
     userId: z.string(),
@@ -121,6 +122,20 @@ export async function POST(request: NextRequest) {
         data: { banned: false, banReason: null, banExpires: null },
       });
       await logAudit(admin.id, "user.unban", "User", parsed.data.userId);
+      return Response.json({ ok: true });
+    }
+
+    if (action === "2fa-reset") {
+      await prisma.$transaction(async (tx) => {
+        await tx.twoFactor.deleteMany({ where: { userId: parsed.data.userId } });
+        await tx.user.update({
+          where: { id: parsed.data.userId },
+          data: { twoFactorEnabled: false },
+        });
+      });
+      await logAudit(admin.id, "user.2fa-reset", "User", parsed.data.userId, {
+        note: parsed.data.note,
+      });
       return Response.json({ ok: true });
     }
 

@@ -8,12 +8,14 @@ import QRCode from 'qrcode';
 
 export default function Setup2FAPage() {
   const router = useRouter();
-  const [step, setStep] = useState<'password' | 'qr' | 'verify'>('password');
+  const [step, setStep] = useState<'password' | 'qr' | 'verify' | 'backup'>('password');
   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
   const [password, setPassword] = useState('');
   const [totpUri, setTotpUri] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [code, setCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [backupSaved, setBackupSaved] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -77,8 +79,14 @@ export default function Setup2FAPage() {
       }
 
       if (data) {
-        router.push('/trade/demo');
-        router.refresh();
+        const codes = (data as Record<string, unknown>).backupCodes as string[] | undefined;
+        if (codes && codes.length > 0) {
+          setBackupCodes(codes);
+          setStep('backup');
+        } else {
+          router.push('/trade/demo');
+          router.refresh();
+        }
       }
     } catch {
       setError('Verification failed. Please try again.');
@@ -110,6 +118,7 @@ export default function Setup2FAPage() {
             {step === 'password' && (hasPassword === false ? 'Confirm it is you to continue' : 'Enter your password to confirm your identity')}
             {step === 'qr' && 'Scan this QR code with your authenticator app'}
             {step === 'verify' && 'Enter the 6-digit code from your authenticator app'}
+            {step === 'backup' && 'Save your recovery codes'}
           </p>
         </div>
 
@@ -201,6 +210,37 @@ export default function Setup2FAPage() {
                 {loading ? 'Verifying...' : 'Enable 2FA'}
               </button>
             </form>
+          )}
+          {step === 'backup' && (
+            <div className="space-y-4">
+              <div className="bg-background/50 rounded-xl px-4 py-3">
+                <p className="text-[11px] text-text-dark font-semibold uppercase tracking-wider mb-2">Recovery codes — store somewhere safe</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {backupCodes.map((c) => (
+                    <p key={c} className="text-xs text-white font-mono bg-background rounded-lg px-3 py-2 text-center">{c}</p>
+                  ))}
+                </div>
+                <p className="text-[11px] text-text-dark mt-3 leading-relaxed">
+                  Each code works once. If you lose your authenticator, support will ask for one of these.
+                </p>
+              </div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={backupSaved}
+                  onChange={(e) => setBackupSaved(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded border-border bg-background accent-green"
+                />
+                <span className="text-[11px] text-text-dark leading-relaxed">I have saved these codes</span>
+              </label>
+              <button
+                onClick={() => { router.push('/trade/demo'); router.refresh(); }}
+                disabled={!backupSaved}
+                className="w-full bg-green hover:bg-green-hover text-white font-bold text-sm py-3 rounded-xl transition-colors shadow-lg shadow-green/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Done
+              </button>
+            </div>
           )}
         </div>
 

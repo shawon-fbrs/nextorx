@@ -184,6 +184,20 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setAdjustBalanceOpen(true)}>Adjust Balance</Button>
+          {user.twoFactorEnabled && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={acting}
+              onClick={() => {
+                if (!userId) return;
+                const note = window.prompt('Reason for 2FA reset (audited, min 3 chars):');
+                if (note && note.trim().length >= 3) postAction({ action: '2fa-reset', userId, note: note.trim() });
+              }}
+            >
+              Reset 2FA
+            </Button>
+          )}
           <Button variant={user.banned ? 'secondary' : 'danger'} size="sm" onClick={() => setBanOpen(true)}>
             {user.banned ? 'Unban User' : 'Ban User'}
           </Button>
