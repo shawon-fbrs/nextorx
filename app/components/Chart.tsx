@@ -180,7 +180,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
 
           if (type === 'init') {
             try {
-              const res = await fetch(`/api/pairs/${pid}/candles?limit=300`);
+              const res = await fetch(`/api/market/pairs/${pid}/candles?limit=300`);
               const data = await res.json();
               const bars: KLineData[] = (data.candles || []).map((c: any) => ({
                 timestamp: c.timestamp,
@@ -196,7 +196,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
             }
           } else if (type === 'backward' && timestamp) {
             try {
-              const res = await fetch(`/api/pairs/${pid}/candles?limit=100&before=${timestamp}`);
+              const res = await fetch(`/api/market/pairs/${pid}/candles?limit=100&before=${timestamp}`);
               const data = await res.json();
               const bars: KLineData[] = (data.candles || []).map((c: any) => ({
                 timestamp: c.timestamp,

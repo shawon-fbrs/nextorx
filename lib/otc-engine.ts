@@ -51,8 +51,7 @@ export class OTCEngine {
       try {
         const dbPairs = await prisma.pair.findMany({ where: { isActive: true } });
         if (dbPairs.length === 0) {
-          console.log('[OTC] No active pairs found. Running seed...');
-          await this.runSeed();
+          console.log('[OTC] No active pairs. Engine running empty — pairs are admin-created.');
         }
         const pairs = await prisma.pair.findMany({ where: { isActive: true } });
         for (const p of pairs) {
@@ -117,12 +116,7 @@ export class OTCEngine {
   }
 
   private async runSeed() {
-    try {
-      const { execSync } = await import('child_process');
-      execSync('npx tsx scripts/seed.ts', { stdio: 'inherit', timeout: 30000 });
-    } catch {
-      console.log('[OTC] Seed script failed or not found, continuing...');
-    }
+    console.log('[OTC] Auto-seed disabled. Pairs are admin-created only.');
   }
 
   private async seedHistoricalCandles() {
@@ -153,11 +147,11 @@ export class OTCEngine {
         const open = Math.max(0.00000001, r(price));
 
         const vol = state.volatility;
-        const bodySize = (Math.random() * 0.6 + 0.1) * vol;
+        const bodySize = open * (Math.random() * 0.6 + 0.1) * vol * 0.002;
         const isBullish = Math.random() > 0.48;
         const bodyDir = isBullish ? 1 : -1;
         const close = Math.max(0.00000001, r(open + bodyDir * bodySize));
-        const maxWick = vol * 0.8;
+        const maxWick = open * vol * 0.0016;
         const wickUp = Math.random() * maxWick * (isBullish ? 0.6 : 1.0);
         const wickDown = Math.random() * maxWick * (isBullish ? 1.0 : 0.6);
         const high = r(Math.max(open, close) + wickUp);
@@ -174,7 +168,7 @@ export class OTCEngine {
           volume,
         });
 
-        const drift = (Math.random() - 0.5) * vol * 0.15;
+        const drift = close * (Math.random() - 0.5) * vol * 0.0003;
         price = Math.max(state.basePrice * 0.5, Math.min(state.basePrice * 2, r(close + drift)));
       }
 
@@ -211,10 +205,12 @@ export class OTCEngine {
   }
 
   private generateTick(state: PairState, now: number): TickMessage | null {
-    const priceChange = (Math.random() - 0.5) * state.volatility * 0.06;
+    // TRACK-B B1: UNCALIBRATED hand-tuned random walk. Quant calibration
+    // (O-U + GARCH fitted to real tick data) replaces this before L5.
+    const relativeChange = (Math.random() - 0.5) * state.volatility * 0.0006;
     const newPrice = Math.max(
       state.basePrice * 0.5,
-      Math.min(state.basePrice * 2, state.currentPrice + priceChange)
+      Math.min(state.basePrice * 2, state.currentPrice * (1 + relativeChange))
     );
 
     state.currentPrice = Number(newPrice.toFixed(8));

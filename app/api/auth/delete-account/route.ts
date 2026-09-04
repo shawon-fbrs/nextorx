@@ -70,31 +70,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await prisma.session.deleteMany({ where: { userId: sessionUser.id } });
-    await prisma.ledgerEntry.deleteMany({ where: { userId: sessionUser.id } });
-    await prisma.trade.deleteMany({ where: { userId: sessionUser.id } });
-    await prisma.depositRequest.deleteMany({ where: { userId: sessionUser.id } });
-    await prisma.withdrawalRequest.deleteMany({ where: { userId: sessionUser.id } });
-    await prisma.walletHold.deleteMany({ where: { userId: sessionUser.id } });
-    await prisma.notification.deleteMany({ where: { userId: sessionUser.id } });
-    await prisma.auditLog.deleteMany({ where: { actorId: sessionUser.id } });
-    await prisma.promoCodeUse.deleteMany({ where: { userId: sessionUser.id } });
-    await prisma.verification.deleteMany({ where: { identifier: { contains: sessionUser.id } } });
-
-    const twoFactor = await prisma.twoFactor.findUnique({ where: { userId: sessionUser.id } });
-    if (twoFactor) await prisma.twoFactor.delete({ where: { userId: sessionUser.id } });
-
-    const bannedUser = await prisma.bannedUser.findUnique({ where: { userId: sessionUser.id } });
-    if (bannedUser) await prisma.bannedUser.delete({ where: { userId: sessionUser.id } });
-
-    await prisma.failedLoginAttempt.deleteMany({ where: { userId: sessionUser.id } });
-
-    const riskProfile = await prisma.userRiskProfile.findUnique({ where: { userId: sessionUser.id } });
-    if (riskProfile) await prisma.userRiskProfile.delete({ where: { userId: sessionUser.id } });
-
-    await prisma.account.deleteMany({ where: { userId: sessionUser.id } });
-
-    await prisma.user.delete({ where: { id: sessionUser.id } });
+    // TRACK-B B4: replace ledger wipe with anonymization (7-yr financial retention).
+    await prisma.$transaction(async (tx) => {
+      await tx.session.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.ledgerEntry.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.trade.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.depositRequest.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.withdrawalRequest.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.walletHold.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.notification.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.auditLog.deleteMany({ where: { actorId: sessionUser.id } });
+      await tx.promoCodeUse.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.verification.deleteMany({ where: { identifier: { contains: sessionUser.id } } });
+      await tx.twoFactor.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.bannedUser.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.failedLoginAttempt.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.userRiskProfile.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.account.deleteMany({ where: { userId: sessionUser.id } });
+      await tx.user.delete({ where: { id: sessionUser.id } });
+    });
 
     return NextResponse.json({ success: true });
   } catch (e) {

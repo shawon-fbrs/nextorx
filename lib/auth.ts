@@ -65,6 +65,16 @@ export const auth = betterAuth({
     minPasswordLength: 12,
     requireEmailVerification: true,
   },
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 60,
+    customRules: {
+      "/sign-in/email": { window: 900, max: 10 },
+      "/sign-up/email": { window: 3600, max: 5 },
+      "/forget-password": { window: 900, max: 3 },
+    },
+  },
   plugins: [
     admin({
       defaultRole: "player",

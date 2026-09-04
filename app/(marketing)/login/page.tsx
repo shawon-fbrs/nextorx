@@ -18,12 +18,27 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      const preCheck = await fetch('/api/auth/check-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }).then((r) => r.json()).catch(() => ({ allowed: true }));
+      if (preCheck && preCheck.allowed === false) {
+        setError(preCheck.error || 'Login is temporarily blocked. Please try again later.');
+        return;
+      }
+
       const { data, error: authError } = await authClient.signIn.email({
         email,
         password,
       });
 
       if (authError) {
+        await fetch('/api/auth/record-login-attempt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, success: false }),
+        }).catch(() => {});
         const msg = authError.message || '';
         if (msg.includes('locked') || msg.includes('too many')) {
           setError('Account temporarily locked due to too many failed attempts. Please try again later.');
@@ -38,6 +53,11 @@ export default function LoginPage() {
       }
 
       if (data) {
+        await fetch('/api/auth/record-login-attempt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, success: true }),
+        }).catch(() => {});
         const d = data as Record<string, unknown>;
         if (d.twoFactorRedirect) {
           router.push('/2fa-verify');
@@ -71,7 +91,7 @@ export default function LoginPage() {
     try {
       await authClient.signIn.social({
         provider: 'google',
-        callbackURL: '/trade/demo',
+        callbackURL: '/auth/post-login',
       });
     } catch {
       setError('Google login failed');

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, type RateLimitRule } from "@/lib/rate-limit";
 
 const ADMIN_ROLES = new Set([
   "super_admin",
@@ -16,15 +17,33 @@ const PUBLIC_PATHS = [
   "/verify-email",
   "/setup-2fa",
   "/2fa-verify",
+  "/auth/post-login",
   "/trade/demo",
   "/api/auth",
   "/api/health",
-  "/api/pairs",
-  "/api/debug",
-  "/api/trade/demo-balance",
+  "/api/market",
+  "/api/trade/payment-methods",
   "/_next",
   "/favicon.ico",
 ];
+
+const RATE_LIMITS: Array<{ match: (pathname: string, method: string) => boolean; rule: RateLimitRule }> = [
+  { match: (p, m) => m === "POST" && p === "/api/auth/verify-email", rule: { max: 3, windowMs: 5 * 60 * 1000 } },
+  { match: (p, m) => m === "POST" && p === "/api/auth/send-verification", rule: { max: 3, windowMs: 5 * 60 * 1000 } },
+  { match: (p, m) => m === "POST" && p === "/api/auth/forgot-password", rule: { max: 3, windowMs: 15 * 60 * 1000 } },
+  { match: (p, m) => m === "POST" && p === "/api/auth/check-login", rule: { max: 10, windowMs: 5 * 60 * 1000 } },
+  { match: (p, m) => m === "POST" && p === "/api/auth/record-login-attempt", rule: { max: 10, windowMs: 5 * 60 * 1000 } },
+  { match: (p, m) => m === "POST" && p === "/api/trade/trades", rule: { max: 10, windowMs: 60 * 1000 } },
+  { match: (p, m) => m === "POST" && p === "/api/trade/withdraw", rule: { max: 3, windowMs: 60 * 60 * 1000 } },
+];
+
+function getClientIP(request: NextRequest): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === "/") return true;
@@ -134,6 +153,19 @@ function redirectToLogin(request: NextRequest): NextResponse {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  for (const { match, rule } of RATE_LIMITS) {
+    if (match(pathname, request.method)) {
+      const key = `${getClientIP(request)}:${request.method}:${pathname}`;
+      if (!checkRateLimit(key, rule)) {
+        return NextResponse.json(
+          { error: "Too many requests. Please try again later." },
+          { status: 429 },
+        );
+      }
+      break;
+    }
+  }
 
   if (isPublicPath(pathname)) {
     return NextResponse.next();

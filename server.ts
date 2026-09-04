@@ -1,9 +1,10 @@
-import { createServer } from 'http';
+import { createServer, IncomingMessage } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { getOTCEngine, type TickMessage, type CandleCloseMessage } from './lib/otc-engine';
 import { reconcileExpiredTrades } from './lib/trade-reconciliation';
+import { prisma } from './lib/db';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = '0.0.0.0';
@@ -23,6 +24,46 @@ app.prepare().then(async () => {
       res.end('Internal Server Error');
     }
   });
+
+const SESSION_COOKIE_NAMES = [
+  '__Secure-better-auth.session_token',
+  'better-auth.session_token',
+];
+
+function getSessionTokenCandidates(req: IncomingMessage): string[] {
+  const header = req.headers.cookie;
+  if (!header) return [];
+  const cookies = header.split(';').map((s) => s.trim());
+  for (const name of SESSION_COOKIE_NAMES) {
+    const found = cookies.find((c) => c.startsWith(name + '='));
+    if (found) {
+      const value = decodeURIComponent(found.slice(name.length + 1));
+      const candidates = [value];
+      const unsigned = value.split('.')[0];
+      if (unsigned && unsigned !== value) candidates.push(unsigned);
+      return candidates;
+    }
+  }
+  return [];
+}
+
+async function authorizeWs(req: IncomingMessage): Promise<{ userId: string; role: string } | null> {
+  try {
+    const candidates = getSessionTokenCandidates(req);
+    if (candidates.length === 0) return null;
+    const session = await prisma.session.findFirst({
+      where: { token: { in: candidates }, expiresAt: { gt: new Date() } },
+      include: { user: { select: { id: true, role: true, banned: true } } },
+    });
+    if (!session) return null;
+    if (session.user.banned) return null;
+    const ban = await prisma.bannedUser.findUnique({ where: { userId: session.user.id } });
+    if (ban) return null;
+    return { userId: session.user.id, role: session.user.role };
+  } catch {
+    return null;
+  }
+}
 
   const wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -45,7 +86,13 @@ app.prepare().then(async () => {
 
   engine.start();
 
-  wss.on('connection', (ws: WebSocket) => {
+  wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
+    const authed = await authorizeWs(req);
+    if (!authed) {
+      ws.close(4401, 'Unauthorized');
+      return;
+    }
+
     const subscribedPairs = new Set<string>();
 
     ws.on('message', (raw: Buffer) => {

@@ -70,7 +70,7 @@ export default function RegisterPage() {
     try {
       await authClient.signIn.social({
         provider: 'google',
-        callbackURL: '/trade/demo',
+        callbackURL: '/auth/post-login',
       });
     } catch {
       setError('Google registration failed');

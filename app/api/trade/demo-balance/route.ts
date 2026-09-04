@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireUser, toJsonError } from "@/lib/api";
-import { credit } from "@/lib/ledger";
+import { credit, debit } from "@/lib/ledger";
 
 const DEMO_STARTING_BALANCE = 10_000_00; // $10,000 in cents
 const DEMO_MIN_BALANCE = 100_00; // $100 minimum
@@ -55,10 +55,33 @@ export async function PATCH(request: Request) {
       return Response.json({ error: "Cannot adjust balance on real account" }, { status: 400 });
     }
 
-    await prisma.user.update({
+    const current = await prisma.user.findUnique({
       where: { id: user.id },
-      data: { balance: cents },
+      select: { balance: true },
     });
+    const currentCents = current?.balance ?? 0;
+    const diff = cents - currentCents;
+
+    if (diff !== 0) {
+      const referenceId = `demo-adjust:${user.id}:${Date.now()}`;
+      if (diff > 0) {
+        await credit({
+          userId: user.id,
+          type: "PROMO_CREDIT",
+          amount: diff,
+          referenceId,
+          description: "Demo balance top-up",
+        });
+      } else {
+        await debit({
+          userId: user.id,
+          type: "ADMIN_ADJUSTMENT",
+          amount: -diff,
+          referenceId,
+          description: "Demo balance reset",
+        });
+      }
+    }
 
     return Response.json({ balance: cents });
   } catch (e) {

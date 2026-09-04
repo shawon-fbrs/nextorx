@@ -65,7 +65,12 @@ export async function verifyCode(
     return { valid: false, error: 'Verification code has expired' };
   }
 
-  if (verification.value !== code) {
+  const expected = Buffer.from(verification.value, 'utf8');
+  const provided = Buffer.from(code, 'utf8');
+  const matches =
+    expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
+
+  if (!matches) {
     return { valid: false, error: 'Invalid verification code' };
   }
 

@@ -48,7 +48,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (user) {
-      fetch('/api/auth/2fa/toggle', {
+      fetch('/api/auth/2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'status' }),
@@ -137,7 +137,7 @@ export default function AccountPage() {
     setTwoFALoading(true);
     setTwoFAMsg('');
     try {
-      const res = await fetch('/api/auth/2fa/toggle', {
+      const res = await fetch('/api/auth/2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'disable', password: disablePassword, code: disableCode }),

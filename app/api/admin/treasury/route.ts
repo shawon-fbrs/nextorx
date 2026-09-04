@@ -87,21 +87,22 @@ export async function GET() {
       .map(([date, val]) => ({ date, ...val }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
+    let running = 0;
+    const historyWithClosing = historyArray.map((row) => {
+      running += row.deposits - row.withdrawals;
+      return { ...row, closing: running };
+    });
+
     return Response.json({
       snapshot: {
         totalBalance,
         userLiabilities: totalBalance,
-        pendingWithdrawals: { count: pendingCount, amount: pendingAmount },
-        dailyDeposits: {
-          count: todayDeposits._count,
-          amount: Number(todayDeposits._sum.amount ?? 0),
-        },
-        dailyWithdrawals: {
-          count: todayWithdrawals._count,
-          amount: Number(todayWithdrawals._sum.amount ?? 0),
-        },
+        pendingWithdrawals: pendingCount,
+        pendingWithdrawalAmount: pendingAmount,
+        todayDeposits: Number(todayDeposits._sum.amount ?? 0),
+        todayWithdrawals: Number(todayWithdrawals._sum.amount ?? 0),
       },
-      history: historyArray,
+      history: historyWithClosing,
     });
   } catch (e) {
     return toJsonError(e);

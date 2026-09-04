@@ -29,7 +29,7 @@ export default function WithdrawPage() {
 
   const fetchMethods = async () => {
     try {
-      const res = await fetch('/api/admin/payment-methods');
+      const res = await fetch('/api/trade/payment-methods');
       const data = await res.json();
       if (data.methods) {
         setMethods(data.methods.filter((m: PaymentMethod) => m.minWithdraw > 0));
