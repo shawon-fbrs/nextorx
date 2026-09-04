@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { verifySession, isAdminRole } from "@/lib/dal";
+import { prisma } from "@/lib/db";
 
 export default async function ConsolePanelRootLayout({
   children,
@@ -14,6 +15,14 @@ export default async function ConsolePanelRootLayout({
 
   if (!isAdminRole(user.role)) {
     redirect("/trade/demo");
+  }
+
+  const profile = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { twoFactorEnabled: true },
+  });
+  if (!profile?.twoFactorEnabled) {
+    redirect("/setup-2fa");
   }
 
   return <>{children}</>;
