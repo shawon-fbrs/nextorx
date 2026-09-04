@@ -48,6 +48,71 @@ export async function getVaultLedger(limit = 100) {
   });
 }
 
+export const MIN_RESERVE_PERCENT = 20;
+
+export interface VaultSnapshot {
+  totalLiabilities: number;
+  activeExposure: number;
+  pendingWithdrawals: number;
+  availableReserve: number;
+  reservePercent: number;
+  coverageWeeks: number | null;
+}
+
+export async function getVaultSnapshot(): Promise<VaultSnapshot> {
+  const [balanceAgg, exposureAgg, pendingAgg, recentPaid] = await Promise.all([
+    prisma.user.aggregate({
+      where: { id: { notIn: SYSTEM_USER_IDS } },
+      _sum: { balance: true },
+    }),
+    prisma.trade.aggregate({ where: { status: "ACTIVE" }, _sum: { amount: true } }),
+    prisma.withdrawalRequest.aggregate({
+      where: { status: "PENDING" },
+      _sum: { amount: true },
+    }),
+    prisma.withdrawalRequest.aggregate({
+      where: {
+        status: { in: ["APPROVED", "PAID"] },
+        createdAt: { gte: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000) },
+      },
+      _sum: { amount: true },
+    }),
+  ]);
+  const totalLiabilities = balanceAgg._sum.balance ?? 0;
+  const activeExposure = exposureAgg._sum.amount ?? 0;
+  const pendingWithdrawals = pendingAgg._sum.amount ?? 0;
+  const availableReserve = totalLiabilities - activeExposure - pendingWithdrawals;
+  const reservePercent = totalLiabilities > 0 ? (availableReserve / totalLiabilities) * 100 : 100;
+  const weeklyOutflow = Number(recentPaid._sum.amount ?? 0) / 4;
+  const coverageWeeks =
+    weeklyOutflow > 0 ? Math.floor((availableReserve / weeklyOutflow) * 10) / 10 : null;
+  return {
+    totalLiabilities,
+    activeExposure,
+    pendingWithdrawals,
+    availableReserve,
+    reservePercent,
+    coverageWeeks,
+  };
+}
+
+export async function canProcessWithdrawal(
+  amount: number,
+): Promise<{ allowed: boolean; reason?: string }> {
+  const snapshot = await getVaultSnapshot();
+  if (snapshot.totalLiabilities <= 0) {
+    return { allowed: false, reason: "Treasury has no funds" };
+  }
+  const afterReserve = ((snapshot.availableReserve - amount) / snapshot.totalLiabilities) * 100;
+  if (afterReserve < MIN_RESERVE_PERCENT) {
+    return {
+      allowed: false,
+      reason: `Withdrawal would breach the ${MIN_RESERVE_PERCENT}% reserve requirement`,
+    };
+  }
+  return { allowed: true };
+}
+
 export async function creditVault(input: {
   type: LedgerType;
   amount: number;

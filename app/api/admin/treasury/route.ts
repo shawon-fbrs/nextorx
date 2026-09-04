@@ -1,5 +1,6 @@
 import { requirePermission, toJsonError } from "@/lib/api";
 import { prisma } from "@/lib/db";
+import { getVaultSnapshot } from "@/lib/vault";
 
 export async function GET() {
   try {
@@ -17,6 +18,7 @@ export async function GET() {
       todayDeposits,
       todayWithdrawals,
       history,
+      vault,
     ] = await Promise.all([
       prisma.user.aggregate({
         _sum: { balance: true },
@@ -68,6 +70,7 @@ export async function GET() {
         GROUP BY TO_CHAR(w."createdAt", 'YYYY-MM-DD')
         ORDER BY date ASC
       `,
+      getVaultSnapshot(),
     ]);
 
     const totalBalance = Number(balanceAgg._sum.balance ?? 0);
@@ -101,6 +104,10 @@ export async function GET() {
         pendingWithdrawalAmount: pendingAmount,
         todayDeposits: Number(todayDeposits._sum.amount ?? 0),
         todayWithdrawals: Number(todayWithdrawals._sum.amount ?? 0),
+        activeExposure: vault.activeExposure,
+        availableReserve: vault.availableReserve,
+        reservePercent: Math.round(vault.reservePercent * 100) / 100,
+        coverageWeeks: vault.coverageWeeks,
       },
       history: historyWithClosing,
     });

@@ -18,6 +18,10 @@ type TreasuryData = {
     pendingWithdrawalAmount: number;
     todayDeposits: number;
     todayWithdrawals: number;
+    activeExposure: number;
+    availableReserve: number;
+    reservePercent: number;
+    coverageWeeks: number | null;
   };
   history: { date: string; deposits: number; withdrawals: number; closing: number }[];
 };
@@ -105,6 +109,8 @@ export default function TreasuryPage() {
         <StatsCard title="Today's Withdrawals" value={`$${(snap.todayWithdrawals / 100).toFixed(2)}`} />
         <StatsCard title="Pending Withdrawals" value={snap.pendingWithdrawals} />
         <StatsCard title="Reserve %" value={`${reservePercent}%`} />
+        <StatsCard title="Active Exposure" value={`$${(snap.activeExposure / 100).toFixed(2)}`} />
+        <StatsCard title="Withdrawal Coverage" value={snap.coverageWeeks != null ? `${snap.coverageWeeks} wks` : '—'} />
       </div>
 
       {history.length > 0 && (

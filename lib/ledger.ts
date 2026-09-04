@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { prisma } from "@/lib/db";
 import { LedgerType } from "@prisma/client";
 
@@ -25,9 +26,23 @@ export interface LedgerInput {
   allowNegative?: boolean;
   referenceId?: string;
   description?: string;
+  reversalOfId?: string;
+}
+
+export function computeChecksum(
+  previousChecksum: string | null,
+  type: string,
+  signedAmount: number,
+  balanceAfter: number,
+): string {
+  return createHash("sha256")
+    .update(`${previousChecksum ?? "genesis"}|${type}|${signedAmount}|${balanceAfter}`)
+    .digest("hex");
 }
 
 async function postEntry(tx: LedgerTx, input: LedgerInput) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.userId}))`;
+
   const signed = input.debit ? -Math.abs(input.amount) : Math.abs(input.amount);
   const bonusSigned = input.bonusAmount ?? 0;
 
@@ -46,6 +61,13 @@ async function postEntry(tx: LedgerTx, input: LedgerInput) {
     throw new LedgerError("Insufficient bonus balance", "INSUFFICIENT_BALANCE");
   }
 
+  const previous = await tx.ledgerEntry.findFirst({
+    where: { userId: input.userId, checksum: { not: null } },
+    orderBy: { createdAt: "desc" },
+    select: { checksum: true },
+  });
+  const checksum = computeChecksum(previous?.checksum ?? null, input.type, signed, newBalance);
+
   try {
     const [entry] = await Promise.all([
       tx.ledgerEntry.create({
@@ -57,6 +79,8 @@ async function postEntry(tx: LedgerTx, input: LedgerInput) {
           bonusBalanceAfter: newBonusBalance,
           referenceId: input.referenceId,
           description: input.description,
+          checksum,
+          reversalOfId: input.reversalOfId,
         },
       }),
       tx.user.update({
@@ -136,4 +160,57 @@ export async function getLedgerHistory(
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+}
+
+export async function reverseEntry(input: {
+  userId: string;
+  entryId: string;
+  type: LedgerType;
+  reason: string;
+}): Promise<{ entryId: string; balanceAfter: number }> {
+  const original = await prisma.ledgerEntry.findFirst({
+    where: { id: input.entryId, userId: input.userId },
+  });
+  if (!original) throw new LedgerError("Original entry not found", "NOT_FOUND");
+  if (original.amount === 0) throw new LedgerError("Nothing to reverse", "INVALID");
+
+  const reversal: Omit<LedgerInput, "debit"> = {
+    userId: input.userId,
+    type: input.type,
+    amount: Math.abs(original.amount),
+    referenceId: `reversal:${original.id}`,
+    description: `Reversal of ${original.id}: ${input.reason}`,
+    reversalOfId: original.id,
+  };
+  return original.amount > 0 ? debit(reversal) : credit(reversal);
+}
+
+export interface IntegrityResult {
+  ok: boolean;
+  checked: number;
+  legacy: number;
+  failedId?: string;
+}
+
+export async function verifyLedgerIntegrity(userId: string): Promise<IntegrityResult> {
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+  });
+  let previousChecksum: string | null = null;
+  let checked = 0;
+  let legacy = 0;
+  for (const entry of entries) {
+    if (!entry.checksum) {
+      legacy++;
+      continue;
+    }
+    const expected = computeChecksum(previousChecksum, entry.type, entry.amount, entry.balanceAfter);
+    if (entry.checksum !== expected) {
+      return { ok: false, checked, legacy, failedId: entry.id };
+    }
+    previousChecksum = entry.checksum;
+    checked++;
+  }
+  return { ok: true, checked, legacy };
 }

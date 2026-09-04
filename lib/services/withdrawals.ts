@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { debit, credit, postEntryInTx } from "@/lib/ledger";
 import { createNotification } from "@/lib/notify";
 import { ensurePlatformAccount } from "@/lib/platform";
-import { VAULT_ACCOUNT_ID } from "@/lib/vault";
+import { VAULT_ACCOUNT_ID, canProcessWithdrawal } from "@/lib/vault";
 
 export class WithdrawalError extends Error {}
 
@@ -29,6 +29,11 @@ export async function requestWithdrawal(
   const maxWithdraw = paymentMethod?.maxWithdraw ?? 10000000;
   if (amount > maxWithdraw) {
     throw new WithdrawalError(`Maximum withdrawal is $${(maxWithdraw / 100).toFixed(2)}`);
+  }
+
+  const reserve = await canProcessWithdrawal(amount);
+  if (!reserve.allowed) {
+    throw new WithdrawalError(reserve.reason ?? "Withdrawal blocked by reserve requirement");
   }
 
   return prisma.$transaction(async (tx) => {
@@ -135,6 +140,11 @@ export async function approveWithdrawal(
     if (!withdrawal) throw new WithdrawalError("Withdrawal not found");
     if (withdrawal.status !== "PENDING") {
       throw new WithdrawalError(`Withdrawal already ${withdrawal.status.toLowerCase()}`);
+    }
+
+    const reserve = await canProcessWithdrawal(withdrawal.amount);
+    if (!reserve.allowed) {
+      throw new WithdrawalError(reserve.reason ?? "Withdrawal blocked by reserve requirement");
     }
 
     const result = await tx.withdrawalRequest.update({

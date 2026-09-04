@@ -176,6 +176,8 @@ model LedgerEntry {
   bonusBalanceAfter Int?
   referenceId       String?
   description       String?
+  checksum          String?
+  reversalOfId      String?
   createdAt         DateTime  @default(now())
 
   @@index([userId, createdAt(sort: Desc)])
