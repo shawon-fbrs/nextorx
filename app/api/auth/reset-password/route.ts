@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
       },
       data: {
         password: hashedPassword,
+        issuer: 'local:credential',
       },
     });
 
@@ -95,6 +96,7 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           accountId: user.id,
           providerId: 'credential',
+          issuer: 'local:credential',
           password: hashedPassword,
         },
       });

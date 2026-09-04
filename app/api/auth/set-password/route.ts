@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       if (existing) {
         await tx.account.update({
           where: { id: existing.id },
-          data: { password: hash },
+          data: { password: hash, issuer: "local:credential" },
         });
       } else {
         await tx.account.create({
@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
             userId: sessionUser.id,
             accountId: sessionUser.id,
             providerId: "credential",
+            issuer: "local:credential",
             password: hash,
           },
         });
