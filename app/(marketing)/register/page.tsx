@@ -37,6 +37,17 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      const hint = await fetch('/api/auth/login-hint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }).then((r) => r.json()).catch(() => ({ methods: [] }));
+      if (((hint?.methods ?? []) as string[]).length > 0) {
+        setAccountExists(true);
+        setError('An account with this email already exists.');
+        return;
+      }
+
       const { data, error: authError } = await authClient.signUp.email({
         email,
         password,
