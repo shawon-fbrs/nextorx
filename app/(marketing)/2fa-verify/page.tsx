@@ -35,7 +35,7 @@ export default function TwoFactorVerifyPage() {
         const session = await authClient.getSession();
         const user = session?.data?.user as Record<string, unknown>;
         const role = user?.role as string;
-        if (role === 'super_admin' || role === 'admin' || role === 'moderator') {
+        if (role === 'super_admin' || role === 'finance' || role === 'support' || role === 'risk') {
           router.push('/console-panel');
         } else {
           router.push('/trade/demo');
