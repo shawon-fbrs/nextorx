@@ -11,6 +11,7 @@ import { Input } from '@/components/admin/ui/input';
 import { Select } from '@/components/admin/ui/select';
 import { Toggle } from '@/components/admin/ui/toggle';
 import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/admin/ui/dialog';
+import { Alert } from '@/components/admin/ui/alert';
 
 type Pair = {
   id: string;
@@ -310,6 +311,10 @@ export default function OtcPage() {
         <StatsCard title="Avg Payout" value={`${stats.avgPayout}%`} />
       </div>
 
+      <Alert variant="info" title="Engine UNCALIBRATED (Track B)">
+        Volatility and price parameters are hand-tuned, not fitted to real market data. Quant calibration replaces them before industry-grade sign-off.
+      </Alert>
+
       <Card>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-3">
@@ -403,7 +408,7 @@ export default function OtcPage() {
             <Input label="Symbol (optional)" placeholder="EUR/USD" value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} />
             <Select label="Category" options={CATEGORY_OPTIONS} value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} />
             <Input label="Base Price" type="number" step="any" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
-            <Input label="Volatility" type="number" step="any" value={form.volatility} onChange={(e) => setForm({ ...form, volatility: e.target.value })} helperText="Higher = more price movement" />
+            <Input label="Volatility" type="number" step="any" value={form.volatility} onChange={(e) => setForm({ ...form, volatility: e.target.value })} helperText="Uncalibrated (Track B). Higher = more price movement" />
             <Input label="Spread" type="number" step="any" value={form.spread} onChange={(e) => setForm({ ...form, spread: e.target.value })} />
             <Input label="Payout %" type="number" min="50" max="95" value={form.payoutPercent} onChange={(e) => setForm({ ...form, payoutPercent: e.target.value })} />
             <Input label="Weekend Payout %" type="number" min="50" max="95" value={form.weekendPayout} onChange={(e) => setForm({ ...form, weekendPayout: e.target.value })} helperText="Optional lower payout on weekends" />

@@ -4,6 +4,7 @@ import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { getOTCEngine, type TickMessage, type CandleCloseMessage } from './lib/otc-engine';
 import { reconcileExpiredTrades } from './lib/trade-reconciliation';
+import { startSettlementWorker } from './lib/settlement-worker';
 import { prisma } from './lib/db';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -85,6 +86,10 @@ async function authorizeWs(req: IncomingMessage): Promise<{ userId: string; role
   });
 
   engine.start();
+
+  // Durable polling settlement (survives restarts via startup reconciliation above).
+  // TRACK-B B2: replace with BullMQ persistent queue + dead-letter queue.
+  startSettlementWorker();
 
   wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     const authed = await authorizeWs(req);

@@ -4,6 +4,8 @@ import { TradeDirection, TradeStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser, toJsonError } from "@/lib/api";
 import { postEntryInTx } from "@/lib/ledger";
+import { getSnapshotPrice } from "@/lib/settle-trade";
+import { getPayoutForPair } from "@/lib/payout";
 
 const MIN_DURATION_SECONDS = 30;
 const MAX_DURATION_SECONDS = 3600;
@@ -15,38 +17,6 @@ const tradeSchema = z.object({
   amount: z.number().positive().max(1000000),
   durationSeconds: z.number().int().min(MIN_DURATION_SECONDS).max(MAX_DURATION_SECONDS),
 });
-
-function isWeekendUTC(now = new Date()): boolean {
-  const day = now.getUTCDay();
-  return day === 0 || day === 6;
-}
-
-export function effectivePayoutForPair(pair: {
-  payoutPercent: unknown;
-  weekendPayout: unknown;
-  maxPayout: unknown;
-}): number {
-  const base = Number(pair.payoutPercent);
-  const weekend = pair.weekendPayout != null ? Number(pair.weekendPayout) : null;
-  const max = pair.maxPayout != null ? Number(pair.maxPayout) : 95;
-  const raw = isWeekendUTC() && weekend != null ? weekend : base;
-  return Math.max(50, Math.min(max, raw));
-}
-
-async function getSnapshotPrice(pairId: string, fallbackBase: number): Promise<number> {
-  try {
-    const { getOTCEngine } = await import("@/lib/otc-engine");
-    const engine = await getOTCEngine();
-    const live = engine.getCurrentPrice(pairId);
-    if (live != null && Number.isFinite(live) && live > 0) return live;
-  } catch {}
-  const lastCandle = await prisma.candle.findFirst({
-    where: { pairId },
-    orderBy: { timestamp: "desc" },
-  });
-  if (lastCandle) return Number(lastCandle.close);
-  return fallbackBase;
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -94,14 +64,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const payoutPercent = effectivePayoutForPair(pair);
+    const payoutPercent = await getPayoutForPair(pairId);
 
-    const [profile, dayStart] = await Promise.all([
-      prisma.userRiskProfile.findUnique({ where: { userId: user.id } }),
-      Promise.resolve(new Date(new Date().setHours(0, 0, 0, 0))),
-    ]);
+    const profile = await prisma.userRiskProfile.findUnique({ where: { userId: user.id } });
 
     if (profile) {
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
       const todayAgg = await prisma.trade.aggregate({
         where: { userId: user.id, createdAt: { gte: dayStart } },
         _sum: { amount: true },
@@ -152,65 +121,12 @@ export async function POST(request: NextRequest) {
       return created;
     });
 
+    // Settlement is handled by the polling worker in server.ts (requires
+    // custom server: dev:ws / start:prod) plus startup reconciliation.
     // TRACK-B B2: replace with BullMQ durable settle-trade job + settleAt column.
-    setTimeout(() => void settleTrade(trade.id), durationSeconds * 1000);
 
     return Response.json({ trade });
   } catch (e) {
     return toJsonError(e);
-  }
-}
-
-async function settleTrade(tradeId: string): Promise<void> {
-  try {
-    const trade = await prisma.trade.findUnique({
-      where: { id: tradeId },
-      include: { pair: true },
-    });
-    if (!trade || trade.status !== "ACTIVE") return;
-
-    const closePrice = await getSnapshotPrice(trade.pairId, Number(trade.openPrice));
-    const openPrice = Number(trade.openPrice);
-    const priceMovedUp = closePrice > openPrice;
-    const directionCorrect =
-      (trade.direction === "UP" && priceMovedUp) ||
-      (trade.direction === "DOWN" && !priceMovedUp);
-
-    const profile = await prisma.userRiskProfile.findUnique({
-      where: { userId: trade.userId },
-    });
-    const effectiveWinRate = profile ? Number(profile.effectiveWinRate) : 0.48;
-    const allowWin = Math.random() < effectiveWinRate;
-    const won = directionCorrect && allowWin;
-
-    const payout = Math.round(trade.amount * (Number(trade.payoutPercent) / 100));
-    const profit = won ? payout : -trade.amount;
-
-    await prisma.$transaction(async (tx) => {
-      await tx.trade.update({
-        where: { id: trade.id },
-        data: { closePrice, status: won ? "WON" : "LOST", profit, settledAt: new Date() },
-      });
-      if (won) {
-        await postEntryInTx(tx, {
-          userId: trade.userId,
-          type: "TRADE_WIN",
-          amount: trade.amount + payout,
-          referenceId: trade.id,
-          description: `Trade won: ${trade.pair.name} ${trade.direction}`,
-        });
-      }
-      if (profile) {
-        await tx.userRiskProfile.update({
-          where: { userId: trade.userId },
-          data: {
-            totalTrades: { increment: 1 },
-            ...(won ? { totalWins: { increment: 1 }, currentLossStreak: 0 } : { currentLossStreak: { increment: 1 } }),
-          },
-        });
-      }
-    });
-  } catch (error) {
-    console.error("Trade settlement error:", error);
   }
 }
