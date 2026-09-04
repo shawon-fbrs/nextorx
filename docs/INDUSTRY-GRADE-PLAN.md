@@ -1,1551 +1,453 @@
 # Nextorx — Industry-Grade Implementation Plan
 
-**Version:** 1.0
-**Date:** 2026-09-03
-**Status:** Active
-**Target:** Full industry-grade binary options trading platform
+**Version:** 2.0
+**Date:** 2026-09-04
+**Status:** Active — supersedes v1.0
+**Strategy:** Two-track — Launch in 8 months, harden to industry-grade in parallel (18 months total)
 
 ---
 
 ## Table of Contents
 
-1. [Executive Summary](#1-executive-summary)
-2. [Current State Audit](#2-current-state-audit)
-3. [Target Architecture](#3-target-architecture)
-4. [Implementation Phases](#4-implementation-phases)
-5. [Technical Specifications](#5-technical-specifications)
-6. [Security Requirements](#6-security-requirements)
-7. [Compliance Requirements](#7-compliance-requirements)
-8. [Infrastructure Requirements](#8-infrastructure-requirements)
-9. [Quality Standards](#9-quality-standards)
-10. [Team Guidelines](#10-team-guidelines)
-11. [Success Metrics](#11-success-metrics)
-12. [Risk Management](#12-risk-management)
+1. [Honest Reassessment of v1.0](#1-honest-reassessment-of-v10)
+2. [Maturity Model](#2-maturity-model)
+3. [Executive Summary — Two-Track Strategy](#3-executive-summary--two-track-strategy)
+4. [Current State (Summary)](#4-current-state-summary)
+5. [Track A — Production-Ready Launch (Months 1-8)](#5-track-a--production-ready-launch-months-1-8)
+6. [Track B — Harden to Industry-Grade (Months 1-18)](#6-track-b--harden-to-industry-grade-months-1-18)
+7. [Target Architecture v2](#7-target-architecture-v2)
+8. [Technical Specification Deltas](#8-technical-specification-deltas)
+9. [Compliance Path](#9-compliance-path)
+10. [Security Requirements (Split by Track)](#10-security-requirements-split-by-track)
+11. [Infrastructure Requirements (Split by Track)](#11-infrastructure-requirements-split-by-track)
+12. [Quality Gates](#12-quality-gates)
+13. [Team, Budget, Ownership](#13-team-budget-ownership)
+14. [Success Metrics](#14-success-metrics)
+15. [Risk Management](#15-risk-management)
+16. [Decision Log](#16-decision-log)
+
+Related docs: `OTC-PAIR-MANAGEMENT-PLAN.md`, `COMPLETE-PLATFORM-AUDIT.md`, `PROJECT.md`, `AUTH-IMPROVEMENT-PLAN.md`
 
 ---
 
-## 1. Executive Summary
+## 1. Honest Reassessment of v1.0
 
-### Vision
+v1.0 of this plan (34 weeks, "9.5/10 industry-grade") was overstated. It is accurately rated:
 
-Build a fully regulated, bank-grade binary options trading platform that meets industry standards for security, compliance, fairness, and reliability. The platform must handle real money, real users, and real regulatory scrutiny.
+| Plan | Rating | What it actually delivers |
+|------|--------|---------------------------|
+| v1.0 as written | **7/10 — production-ready first launch** | Working product, basic security, manual ops |
+| True industry-grade | **9.5/10** | Calibrated quant engine, durable settlement, audited security, licensed compliance, multi-region ops |
 
-### Current State Rating: 2.5/10
+Why v1.0 falls short of industry-grade:
 
-The platform has a solid architectural foundation (Prisma schema, better-auth, RBAC, OTC engine, ledger system) but most features are broken or non-functional when a real user tries to use them. The admin panel has the best implementation. The trader-facing side is largely non-functional.
+1. **OTC engine is uncalibrated.** O-U + GARCH formulas without parameter estimation from real tick data is "looks realistic", not "statistically valid". Industry platforms spend 3-6 months with a quant calibrating against 10 years of data + backtests + KS/ADF tests.
+2. **Settlement worker is still fragile.** A `setInterval` poller dies on restart and loses in-flight trades. Industry-grade is a persistent job queue (BullMQ + Redis) with dead-letter queue, retries, reconciliation.
+3. **Ledger has no reconciliation pipeline.** Checksum chain is necessary but not sufficient. Industry-grade reconciles hourly automatically and pages on a $0.01 mismatch.
+4. **Security stops at basics.** Rate limiting + auth is anti-script-kiddie, not anti-fraud-ring. Missing: third-party pentest, WAF tuning, bug bounty, SOC 2.
+5. **Compliance lists features, not a program.** Real compliance = legal counsel + compliance officer + license + regulator reporting + ongoing monitoring.
+6. **Timeline ignores legal/quant lead times.** License applications (3-12 months) and quant calibration (3-6 months) cannot be compressed into dev sprints.
 
-### Target State Rating: 9.5/10
-
-A production-ready platform with:
-- Realistic OTC price generation (not random)
-- Reliable trade settlement (not setTimeout)
-- Bank-grade financial system (double-entry ledger)
-- Full compliance (KYC/AML, responsible gambling)
-- Enterprise infrastructure (monitoring, auto-scaling, disaster recovery)
-
-### Timeline: 34 Weeks (8 Months)
-
-### Investment: ~$400k-700k (development + infrastructure)
+**Correction adopted in v2.0:** Track A ships a production-ready product in 8 months. Track B hardens it to industry-grade over 18 months, running in parallel from day one.
 
 ---
 
-## 2. Current State Audit
+## 2. Maturity Model
 
-### 2.1 What Works
+Use this scale in all status updates. No more "industry-grade" without a level number.
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Prisma Schema | ✅ Good | Well-designed models, proper relations |
-| better-auth Integration | ✅ Good | Email/password, Google OAuth, 2FA |
-| RBAC System | ✅ Good | Server-side permission checks work |
-| Admin Dashboard | ✅ Good | Real stats, real charts |
-| Admin Users Page | ✅ Good | Lists real users |
-| Admin Trades Page | ✅ Good | Lists real trades |
-| Admin Finance Page | ⚠️ Partial | Deposit verify works, no withdrawal UI |
-| Admin OTC Pairs | ✅ Good | Full CRUD works |
-| Ledger System | ⚠️ Partial | Basic but functional |
-| Vault System | ⚠️ Partial | Basic but functional |
+| Level | Name | Definition | Example |
+|-------|------|------------|---------|
+| L1 | Prototype | Works on localhost, no auth, no money | Demo |
+| L2 | Current state | Real stack, most user paths broken (we are here) | **2.5/10** |
+| L3 | Production-ready launch | End-to-end works, basic security, manual ops, single region | **7/10 — Track A target** |
+| L4 | Hardened | Durable jobs, monitored, audited once, licensed in 1 jurisdiction | 8.5/10 |
+| L5 | Industry-grade | Calibrated engine, zero-loss settlement, SOC 2, multi-region, 99.9% SLA | **9.5/10 — Track B target** |
 
-### 2.2 What's Broken
-
-| Component | Issue | Severity | Files |
-|-----------|-------|----------|-------|
-| Chart | Fetches from `/api/pairs/` (doesn't exist) | CRITICAL | `Chart.tsx:183` |
-| 2FA Toggle | Calls `/api/auth/2fa/toggle` (doesn't exist) | CRITICAL | `account/page.tsx:51,140` |
-| Deposits | Calls admin-only endpoint | CRITICAL | `more/deposit/page.tsx:34` |
-| Withdrawals | Calls admin-only endpoint | CRITICAL | `more/withdraw/page.tsx:31` |
-| OAuth | Bypasses email verification + 2FA | CRITICAL | `login/page.tsx:70-79` |
-| Settings | Never calls API | CRITICAL | `settings/page.tsx` |
-| Treasury | Data shape mismatch | CRITICAL | `treasury/page.tsx` |
-| Trade Settlement | Uses setTimeout | CRITICAL | `trades/route.ts:84` |
-| Trade Atomicity | Not in transaction | CRITICAL | `trades/route.ts:63-82` |
-| WebSocket | No authentication | CRITICAL | `server.ts:27` |
-| Verify Email | No auth required | CRITICAL | `verify-email/route.ts:6` |
-| Login Security | Dead code (never imported) | HIGH | `lib/login-security.ts` |
-| Route Protection | No middleware.ts | HIGH | MISSING |
-| Ban Button | No onClick handler | HIGH | `users/[id]/page.tsx:129` |
-| User Detail | Fetches ALL users then filters | HIGH | `users/[id]/page.tsx:52-61` |
-| Bet Limit | Never enforced | HIGH | `trades/route.ts` |
-| Delete Account | Not in transaction | HIGH | `delete-account/route.ts:73-97` |
-| Demo Balance | Bypasses ledger | HIGH | `demo-balance/route.ts:58-60` |
-| OTC Engine | Fails on empty DB | HIGH | `otc-engine.ts:52-56` |
-| Smart Payout | Not implemented | HIGH | `otc-engine.ts` |
-| Max Payout | Not enforced | HIGH | `trades/route.ts` |
-| KYC Page | Unimplemented | HIGH | `kyc/page.tsx` |
-| Support Form | Simulated | HIGH | `support/page.tsx:101-108` |
-
-### 2.3 What's Missing
-
-| Feature | Status | Priority |
-|---------|--------|----------|
-| Real OTC market maker | ❌ | Critical |
-| Proper trade settlement | ❌ | Critical |
-| Payment gateway integration | ❌ | Critical |
-| KYC/AML verification | ❌ | Critical |
-| Rate limiting | ❌ | Critical |
-| Monitoring & alerting | ❌ | High |
-| Database backups | ❌ | High |
-| Multi-currency support | ❌ | High |
-| Responsible gambling | ❌ | High |
-| Mobile PWA | ❌ | Medium |
-| Social trading | ❌ | Medium |
-| Tournaments (real) | ❌ | Medium |
+Rules:
+- Never claim L5 without passing the Industry-Grade Gate (Section 12).
+- Launch requires passing the Launch Gate (Section 12), which is L3.
+- Investor updates must state current level explicitly.
 
 ---
 
-## 3. Target Architecture
+## 3. Executive Summary — Two-Track Strategy
 
-### 3.1 System Architecture
+### Vision (unchanged)
+
+Build a regulated, bank-grade binary options platform. Get to revenue fast without lying about readiness.
+
+### The two tracks
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CDN / WAF (Cloudflare)                   │
-│                    DDoS Protection, Bot Detection               │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────────────┐
-│                     Load Balancer (AWS ALB)                      │
-│                   TLS 1.3 Termination, Health Checks            │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-          ┌────────────────┼────────────────┐
-          │                │                │
-┌─────────▼────────┐ ┌────▼──────┐ ┌───────▼────────┐
-│   App Server 1   │ │ App Srv 2 │ │   App Server N │
-│    (Next.js)     │ │ (Next.js) │ │    (Next.js)   │
-│  Trade Engine    │ │ Settlement│ │   API Routes    │
-└─────────┬────────┘ └────┬──────┘ └───────┬────────┘
-          │                │                │
-          └────────────────┼────────────────┘
-                           │
-          ┌────────────────┼────────────────┐
-          │                │                │
-┌─────────▼────────┐ ┌────▼──────┐ ┌───────▼────────┐
-│   PostgreSQL     │ │   Redis   │ │     S3         │
-│   (Primary)      │ │  (Cache)  │ │   (Files)      │
-│   Financial Data │ │  Sessions │ │  KYC Documents │
-└─────────┬────────┘ └────┬──────┘ └────────────────┘
-          │                │
-┌─────────▼────────┐ ┌────▼──────┐
-│   PostgreSQL     │ │   Redis   │
-│   (Replica)      │ │  (PubSub) │
-│   Read Queries   │ │ WebSocket │
-└──────────────────┘ └───────────┘
+Month:  1   2   3   4   5   6   7   8           12          18
+        |---|---|---|---|---|---|---|-------------|------------|
+Track A ████████████████████████████████████████
+        A1  A2      A3          A4          A5          A6
+        Fix Engine  Finance   Comply-min  Admin/Ops   Scale-min
+                                         LAUNCH ─────▶
+Track B ████████████████████████████████████████████████████████████
+        B1 quant ──────────────────────▶
+        B2 settlement ──────────▶
+        B3 security ────────────────────────▶
+        B4 compliance ───────────────────────────────────▶
+        B5 ops/SRE ────────────────────▶
+                                                     L5 ─▶
 ```
 
-### 3.2 Trading Engine Architecture
+- **Track A (Months 1-8):** Ship L3. OTC-only trading, manual finance ops, minimum compliance to operate under Vanuatu/St. Vincent, single region. Budget: $200k-300k.
+- **Track B (Months 1-18):** Harden to L5 in parallel. Quant calibration, BullMQ settlement, pentest + SOC 2, full license, multi-region + DR. Budget: additional $250k-400k.
+- **Total: 18 months, $450k-700k** for true L5. Track A is cash-flow positive early to fund Track B.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                   Market Maker Engine                    │
-│                                                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │
-│  │   Price     │  │  Volatility │  │   Spread    │    │
-│  │  Generator  │  │   Engine    │  │  Calculator │    │
-│  │ (O-U Process)│  │  (GARCH)   │  │             │    │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘    │
-│         │                │                │            │
-│         └────────────────┼────────────────┘            │
-│                          │                             │
-│  ┌───────────────────────▼───────────────────────┐    │
-│  │              Session Manager                  │    │
-│  │  (London, NY, Asian, Overlap)                 │    │
-│  └───────────────────────┬───────────────────────┘    │
-│                          │                             │
-│  ┌───────────────────────▼───────────────────────┐    │
-│  │           Correlation Engine                  │    │
-│  │  (EURUSD ↔ GBPUSD, etc.)                      │    │
-│  └───────────────────────┬───────────────────────┘    │
-│                          │                             │
-│  ┌───────────────────────▼───────────────────────┐    │
-│  │              Payout Calculator                │    │
-│  │  (Weekend, Time-of-day, Volume, Vault Health) │    │
-│  └───────────────────────┬───────────────────────┘    │
-│                          │                             │
-│  ┌───────────────────────▼───────────────────────┐    │
-│  │           Risk Management                     │    │
-│  │  (Exposure Limits, Circuit Breakers)          │    │
-│  └───────────────────────┬───────────────────────┘    │
-│                          │                             │
-└──────────────────────────┼─────────────────────────────┘
-                           │
-                    Price Ticks (200ms)
-                           │
-                    ┌──────▼──────┐
-                    │  WebSocket  │
-                    │  Broadcast  │
-                    └─────────────┘
-```
+### Non-goals for Track A (explicit)
 
-### 3.3 Trade Settlement Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   Trade Creation Flow                    │
-│                                                         │
-│  User Request → Validate → Snapshot Price → Create Hold │
-│                                                         │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │              $transaction                       │   │
-│  │  1. Create Trade (status: ACTIVE)               │   │
-│  │  2. Debit Balance (TRADE_HOLD)                  │   │
-│  │  3. Record Price Snapshot                       │   │
-│  │  4. Create Ledger Entry                         │   │
-│  └─────────────────────────────────────────────────┘   │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-                           │
-                    Active Trade
-                           │
-┌──────────────────────────▼─────────────────────────────┐
-│                   Settlement Worker                     │
-│                   (Runs every 1 second)                 │
-│                                                         │
-│  1. Find trades WHERE settleAt <= NOW                   │
-│  2. Get current price from OTC engine                   │
-│  3. Determine win/loss from REAL price movement         │
-│  4. Settle atomically:                                  │
-│     ┌─────────────────────────────────────────────┐    │
-│     │              $transaction                   │    │
-│     │  - Release hold (TRADE_RELEASE)             │    │
-│     │  - Credit if won (TRADE_WIN)                │    │
-│     │  - Update trade status                      │    │
-│     │  - Record close price                       │    │
-│     │  - Create ledger entry                      │    │
-│     └─────────────────────────────────────────────┘    │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 3.4 Financial System Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   Double-Entry Ledger                    │
-│                                                         │
-│  Every financial movement has TWO entries:              │
-│  - DEBIT (money leaves)                                │
-│  - CREDIT (money arrives)                              │
-│                                                         │
-│  Ledger Chain (Tamper-Evident):                        │
-│  ┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐            │
-│  │Entry│───▶│Entry│───▶│Entry│───▶│Entry│            │
-│  │  1  │    │  2  │    │  3  │    │  4  │            │
-│  └─────┘    └─────┘    └─────┘    └─────┘            │
-│     │          │          │          │                  │
-│  checksum   checksum   checksum   checksum             │
-│     │          │          │          │                  │
-│  SHA-256(    SHA-256(   SHA-256(   SHA-256(           │
-│  genesis +   entry1 +   entry2 +   entry3 +           │
-│  type +      type +     type +     type +             │
-│  amount +    amount +    amount +    amount            │
-│  direction)  direction)  direction)  direction)       │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-                           │
-                    ┌──────▼──────┐
-                    │   Vault     │
-                    │  Manager    │
-                    └──────┬──────┘
-                           │
-              ┌────────────┼────────────┐
-              │            │            │
-        ┌─────▼─────┐ ┌───▼────┐ ┌────▼────┐
-        │  Reserve  │ │ Payout │ │ Revenue │
-        │  Manager  │ │ Engine │ │ Tracker │
-        └───────────┘ └────────┘ └─────────┘
-```
+- No calibrated quant engine (uses sensible hand-tuned params, documented as uncalibrated).
+- No P2P matching / order book (platform is counterparty; exposure caps contain risk).
+- No multi-region / auto-failover.
+- No SOC 2, no bug bounty.
+- No CySEC license (Vanuatu/St. Vincent first).
 
 ---
 
-## 4. Implementation Phases
+## 4. Current State (Summary)
 
-### Phase 1: Foundation Repair (Weeks 1-3)
+Full audit lives in `COMPLETE-PLATFORM-AUDIT.md` and `OTC-PAIR-MANAGEMENT-PLAN.md`. Summary:
 
-**Goal:** Make the current platform actually work.
+**Works:** Prisma schema, better-auth + 2FA, RBAC, admin dashboard/users/trades, OTC pair CRUD (just shipped), basic ledger/vault.
 
-#### Week 1: Critical Path Fixes
+**Broken (must fix in Track A):** Chart API path, 2FA toggle path, deposit/withdraw user endpoints, OAuth verification bypass, settings persistence, treasury shape, setTimeout settlement, non-atomic trade creation, unauthenticated WebSocket, dead login-security module, missing middleware, unenforced limits, ledger-bypassing demo balance, empty-DB OTC crash.
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Fix Chart API path `/api/pairs/` → `/api/market/pairs/` | `Chart.tsx:183` | 10 min | Chart shows data |
-| Fix 2FA toggle path `/api/auth/2fa/toggle` → `/api/auth/2fa` | `account/page.tsx:51,140` | 10 min | 2FA management works |
-| Create public `/api/trade/payment-methods` endpoint | New route file | 30 min | Deposits/withdrawals work |
-| Fix Google OAuth redirect to check emailVerified + 2FA | `login/page.tsx:70-79` | 1 hour | OAuth doesn't bypass security |
-| Wrap trade creation + debit in `$transaction` | `trades/route.ts:63-82` | 2 hours | No orphaned trades |
-| Fix demo balance PATCH to use ledger | `demo-balance/route.ts:58-60` | 1 hour | Audit trail |
-| Wire Settings page to real API | `settings/page.tsx` | 3 hours | Settings persist |
-| Fix Treasury data shape mismatch | `treasury/page.tsx` + API | 2 hours | Treasury displays correctly |
+**Missing (split):** Track A adds minimum KYC, manual finance review, rate limiting, monitoring basics. Track B adds calibration, BullMQ, pentest, full KYC/AML provider, responsible-gambling suite, multi-region.
 
-#### Week 2: Trade Engine Foundation
-
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Create `lib/trade-settlement.ts` — background worker | New file | 4 hours | Trades settle reliably |
-| Replace setTimeout with database polling | `trades/route.ts:84` | 3 hours | Survives server restart |
-| Add price snapshot to every trade | `trades/route.ts` | 2 hours | Audit trail for outcomes |
-| Enforce `maxPayout` from pair config | `trades/route.ts` | 1 hour | Risk management |
-| Enforce `betLimitDaily` from UserRiskProfile | `trades/route.ts` | 2 hours | Daily loss limits |
-| Add trade duration validation (30s-3600s) | `trades/route.ts` | 30 min | Prevent abuse |
-| Add duplicate trade prevention (debounce) | `trades/route.ts` | 1 hour | Prevent rapid submissions |
-
-#### Week 3: Security Hardening
-
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Add rate limiting middleware | `middleware.ts` | 4 hours | DDoS protection |
-| Add WebSocket authentication | `server.ts:27` | 3 hours | Only authorized users |
-| Wrap account deletion in `$transaction` | `delete-account/route.ts:73-97` | 2 hours | No partial deletions |
-| Add audit logging to financial operations | Various API routes | 4 hours | Full audit trail |
-| Fix email verification — add rate limiting | `verify-email/route.ts:6` | 1 hour | Prevent brute-force |
-| Add constant-time comparison for codes | `verification.ts:68` | 1 hour | Timing attack prevention |
-
-**Phase 1 Deliverable:** Platform works end-to-end, trades settle correctly, no broken paths, basic security.
+Current level: **L2 (2.5/10).**
 
 ---
 
-### Phase 2: Real Trading Engine (Weeks 4-8)
+## 5. Track A — Production-Ready Launch (Months 1-8)
 
-**Goal:** Replace the toy OTC engine with a proper market maker.
+Goal: L3. Every user path works, money is safe under normal conditions, ops can run the business manually.
 
-#### Week 4-5: OTC Engine v2
+### A1: Foundation Repair (Weeks 1-3)
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Create `lib/market-maker.ts` — new engine | New file | 8 hours | Realistic price generation |
-| Implement Ornstein-Uhlenbeck mean reversion | `market-maker.ts` | 4 hours | Prices oscillate realistically |
-| Implement GARCH volatility clustering | `market-maker.ts` | 4 hours | Volatility follows patterns |
-| Implement fat-tail distribution | `market-maker.ts` | 2 hours | Extreme moves happen |
-| Add session-based volatility (London/NY/Asian) | `market-maker.ts` | 3 hours | Time-of-day behavior |
-| Add admin-configurable parameters per pair | Schema + API | 4 hours | Control over each pair |
-| Add direction bias control (bull/bear) | `market-maker.ts` | 2 hours | Admin controls |
+Same as v1.0 Phase 1. No changes except explicit acceptance: all P0 audit items closed.
 
-#### Week 6-7: Settlement Engine v2
+- Fix Chart `/api/pairs/` → `/api/market/pairs`, 2FA toggle path, public payment-methods endpoint.
+- OAuth must check `emailVerified` + 2FA before session issue.
+- Trade creation + debit in `$transaction`. Demo balance via ledger. Account deletion in `$transaction`.
+- `middleware.ts` rate limiting. WebSocket session check. Verify-email rate limit + constant-time compare.
+- OTC engine must boot with zero pairs (empty state, no crash).
+- Exit criteria: happy-path E2E (register → verify → deposit → trade → settle → withdraw request → admin approve) passes on staging.
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Create `lib/settlement-worker.ts` — background process | New file | 6 hours | Reliable trade settlement |
-| Implement price snapshot at settlement time | `settlement-worker.ts` | 3 hours | Verifiable outcomes |
-| Add settlement queue with retry logic | `settlement-worker.ts` | 4 hours | Handles failures gracefully |
-| Add settlement monitoring/alerting | `settlement-worker.ts` | 2 hours | Know when things break |
-| Implement provably fair verification | New endpoint | 4 hours | Users can verify outcomes |
-| Add trade outcome history with chart data | New endpoint | 3 hours | Users see past trades |
+### A2: Trading Engine — Sensible Defaults (Weeks 4-8)
 
-#### Week 8: Smart Payout System
+Ship the v1.0 O-U/GARCH/smart-payout code **labeled uncalibrated**:
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Implement `getPayoutForPair(pairId, context)` | `otc-engine.ts` | 3 hours | Dynamic payouts |
-| Add weekend payout logic | `getPayoutForPair` | 1 hour | Lower payouts on weekends |
-| Add time-of-day payout adjustment | `getPayoutForPair` | 1 hour | Peak hours = lower payout |
-| Add volume-based payout adjustment | `getPayoutForPair` | 2 hours | High volume = lower payout |
-| Add vault health check → payout reduction | `getPayoutForPair` | 2 hours | Emergency payout control |
-| Add admin payout override per pair | API + UI | 2 hours | Manual control |
+- `lib/market-maker.ts` with hand-tuned per-category defaults (forex 0.3-0.8, crypto 1.5-3.0, etc.).
+- Document params as `UNCALIBRATED — Track B will fit via MLE` in code + admin UI tooltip.
+- DB-polling settlement worker (1s tick, batch 100, 3 retries) as stepping stone to BullMQ. Add startup reconciliation: on boot, settle any `ACTIVE` trades past `settleAt`.
+- Price snapshot on open + close on every trade. Enforce `maxPayout`, `betLimitDaily`, duration 30s-3600s, idempotency key against double-submit.
+- Smart payout: weekend rate + peak-hour −2 + vault-health adjustment + volume adjustment, clamped 50-95.
+- Exit criteria: 10k trades on staging settle with zero orphans across 3 forced restarts.
 
-**Phase 2 Deliverable:** Realistic OTC prices, reliable settlement, dynamic payouts, provably fair.
+### A3: Financial Infrastructure — Manual-Grade (Weeks 9-14)
 
----
+- Double-entry ledger with checksum chain (v1.0 spec). All money movement via `credit`/`debit`/`releaseHold`.
+- Vault with 20% reserve rule enforced in code: block withdrawals/payout increases that breach it.
+- Multi-currency **deferred to Track B** unless a provider is already signed. Track A supports USD base + crypto deposits via one provider only.
+- Daily P&L report endpoint + treasury dashboard showing: balance, exposure, pending withdrawals, reserve ratio, withdrawal coverage (weeks).
+- Exit criteria: ledger integrity check passes on 1M-row staging dataset; manual withdrawal flow completes in <24h.
 
-### Phase 3: Financial Infrastructure (Weeks 9-14)
+### A4: Minimum Compliance (Weeks 15-20, scoped down)
 
-**Goal:** Bank-grade financial system.
+Track A ships the minimum to operate + open Track B license application in week 1:
 
-#### Week 9-10: Double-Entry Ledger
+- KYC Tiers 0-1 only: email + phone + ID upload stored encrypted, manual admin approve/reject. Tiers 2-3 and provider integration (Sumsub) are Track B.
+- Responsible gambling minimum: self-exclusion (24h-6mo), daily deposit limit, session timer. Loss limits + reality checks + cool-down are Track B.
+- GDPR minimum: data export endpoint, account deletion with 7-yr financial retention note, privacy policy + cookie consent.
+- License application for Vanuatu or St. Vincent filed by end of month 2 (Track B owns follow-through).
+- Exit criteria: counsel confirms Track A feature set is operable under target jurisdiction with disclosures shown.
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Refactor ledger to use checksum chain | `ledger.ts` | 6 hours | Tamper-evident |
-| Add `direction` field (DEBIT/CREDIT) to ledger | Schema migration | 3 hours | Proper accounting |
-| Add ledger verification endpoint | New endpoint | 4 hours | Can verify integrity |
-| Refactor all financial operations to use new ledger | Various | 8 hours | Consistent accounting |
+### A5: Admin + Ops Minimum (Weeks 21-26)
 
-#### Week 11-12: Vault Management
+- Finish admin gaps: user detail ban button, withdrawal review UI, KYC review UI, payment-method UI, trade cancel, settings persistence, health endpoint (`/api/health`: db, ws, engine, settlement backlog).
+- Monitoring minimum: Sentry + structured JSON logs + uptime check + treasury-low and settlement-backlog alerts (Slack/email). Prometheus/Grafana/PagerDuty are Track B.
+- Backups: daily full + hourly WAL, tested restore monthly. Cross-region + PITR drills are Track B.
+- CI/CD: staging → production pipeline, migration gate, smoke tests.
+- Exit criteria: runbook covers top 10 incidents; restore test succeeds; deploy takes <15 min with rollback.
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Create `lib/vault.ts` — proper vault management | Refactor | 6 hours | Financial control |
-| Add vault health monitoring | `vault.ts` | 4 hours | Real-time health checks |
-| Add vault reserve ratio enforcement | `vault.ts` | 3 hours | Can't overdraw |
-| Add treasury dashboard with real metrics | Admin page | 4 hours | Financial visibility |
-| Add daily P&L reports | New endpoint | 3 hours | Business intelligence |
+### A6: Scale Minimum + Launch (Weeks 27-34)
 
-#### Week 13-14: Multi-Currency
-
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Add currency model to schema | Schema | 2 hours | Support multiple currencies |
-| Add exchange rate API integration | New service | 4 hours | Real-time rates |
-| Refactor balance to support multiple currencies | Schema + API | 8 hours | Users can hold BTC, ETH |
-| Add crypto deposit/withdrawal | New endpoints | 8 hours | Crypto payments |
-
-**Phase 3 Deliverable:** Proper accounting, vault management, multi-currency support.
+- Redis for sessions/pair cache, single-region read replica, CDN for static, PWA basics. Redis PubSub multi-server WS and auto-scaling are Track B (Track A runs max 2 app servers with sticky WS documented as limitation).
+- Load test to 10k concurrent users; fix p95 API <200ms, settlement lag <2s.
+- Competitive features deferred: social trading, real tournaments, signals are post-L3 roadmap, not launch blockers.
+- **Launch Gate (Section 12) must pass before public traffic.**
 
 ---
 
-### Phase 4: Compliance & Security (Weeks 15-20)
+## 6. Track B — Harden to Industry-Grade (Months 1-18)
 
-**Goal:** Meet regulatory requirements.
+Five workstreams, each with owner, deliverable, and done-definition. Start all in month 1-2; they finish at different times.
 
-#### Week 15-16: KYC/AML
+### B1: Quantitative Research (Months 1-9) — Owner: Quant / Data
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Integrate KYC provider (Sumsub recommended) | New service | 8 hours | Identity verification |
-| Implement KYC tier system | Schema + API | 4 hours | Tiered limits |
-| Add AML screening (PEP, sanctions) | New service | 6 hours | Compliance |
-| Add source of funds verification | New endpoint | 4 hours | High-tier KYC |
-| Add KYC status to admin panel | Admin page | 3 hours | Admin visibility |
+Problem: Track A engine is hand-tuned. L5 requires calibrated, validated, regulator-explainable pricing.
 
-#### Week 17-18: Responsible Gambling
+Deliverables:
+1. Tick dataset: 10yr forex majors, 5yr crypto/commodities/indices (licensed vendor).
+2. Parameter estimation: MLE fit of O-U theta/mu/sigma + GARCH omega/alpha/beta per pair category + session multipliers per venue hour.
+3. Validation suite: KS test vs real returns, ADF stationarity, volatility-clustering check, spread-impact test. Must run in CI on engine changes.
+4. Calibration report: methodology + params + test results, versioned per engine release (regulator artifact).
+5. Admin exposure: per-pair calibrated params locked behind `risk:calibrate` permission; changes require report version bump.
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Implement self-exclusion | Schema + API | 6 hours | User can ban themselves |
-| Implement deposit limits | Schema + API | 4 hours | Prevent overspending |
-| Implement loss limits | Schema + API | 3 hours | Protect users |
-| Implement reality check (pop-up) | Frontend | 4 hours | Awareness |
-| Implement cool-down period | API | 3 hours | Prevent chase losses |
-| Add responsible gambling settings | Frontend | 3 hours | User control |
+Done when: engine passes validation suite + report signed off + params deployed behind feature flag with rollback.
 
-#### Week 19-20: Data Protection
+Cost: $50k-100k (data license + quant contract).
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Implement data export (GDPR) | New endpoint | 4 hours | User right |
-| Implement account deletion with retention | `delete-account/route.ts` | 4 hours | GDPR compliance |
-| Add data retention policies | New service | 3 hours | Automatic cleanup |
-| Add privacy policy page | Frontend | 2 hours | Legal requirement |
-| Add cookie consent | Frontend | 2 hours | GDPR requirement |
+### B2: Durable Settlement (Months 2-6) — Owner: Backend
 
-**Phase 4 Deliverable:** KYC/AML system, responsible gambling, GDPR compliance.
+Problem: polling worker loses jobs on crash. L5 requires guaranteed exactly-once settlement.
 
----
+Deliverables:
+1. BullMQ + Redis: `settle-trade` jobs with persistence, exponential backoff, dead-letter queue.
+2. Exactly-once: job id = trade id, DB unique constraint on settlement, idempotent handler.
+3. Hourly auto-reconciliation: compare open trades vs engine clock, alert + auto-heal; daily ledger-vs-trades reconciliation report.
+4. Circuit breaker: auto-pause new trades if backlog > N or lag > S seconds; auto-resume with admin override logged.
+5. Manual review dashboard for DLQ with retry/void actions (all audited).
 
-### Phase 5: Admin & Operations (Weeks 21-26)
+Done when: chaos test (kill server mid-settlement × 10) yields zero lost/double-settled trades.
 
-**Goal:** Full admin control and operational infrastructure.
+Cost: $20k-30k.
 
-#### Week 21-22: Admin Panel Completion
+### B3: Security Hardening (Months 2-12) — Owner: Security
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Fix admin user detail (Ban button, trade filter) | `users/[id]/page.tsx` | 4 hours | Admin can manage users |
-| Add withdrawal UI to Finance page | `finance/page.tsx` | 4 hours | Admin can process withdrawals |
-| Add KYC approval/rejection UI | New admin page | 6 hours | Admin can review KYC |
-| Add payment method management UI | New admin page | 6 hours | Admin can manage payments |
-| Add promo code management UI | New admin page | 4 hours | Admin can manage promos |
-| Add trade cancellation UI | `trades/page.tsx` | 3 hours | Admin can cancel trades |
-| Add real-time health dashboard | `operations/page.tsx` | 4 hours | Real health checks |
+Deliverables:
+1. OWASP Top 10 pentest by third party (pre-launch + annually). All criticals fixed before L5 sign-off.
+2. WAF + bot management tuned (Cloudflare Pro → Business/Enterprise as volume grows).
+3. WS message signing + replay protection; secrets in vault (not env files); key rotation runbook.
+4. SOC 2 Type I (L5 requirement), Type II roadmap.
+5. Bug bounty (post-launch, scoped) + disclosure policy.
 
-#### Week 23-24: Monitoring & Alerting
+Done when: pentest clean (no critical/high open) + SOC 2 Type I report issued.
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Integrate Sentry for error tracking | Config | 3 hours | Error visibility |
-| Add Prometheus metrics endpoint | New endpoint | 4 hours | Performance monitoring |
-| Set up Grafana dashboards | Infrastructure | 6 hours | Visual monitoring |
-| Add alerting rules (PagerDuty/Slack) | Infrastructure | 4 hours | Know when things break |
-| Add structured logging | Various | 4 hours | Debug issues |
-| Add APM monitoring | Infrastructure | 3 hours | Performance visibility |
+Cost: $30k-50k + SOC 2 audit fees.
 
-#### Week 25-26: Backup & Deployment
+### B4: Compliance Program (Months 1-18) — Owner: Compliance + Counsel
 
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Set up automated database backups | Infrastructure | 4 hours | Data safety |
-| Set up point-in-time recovery | Infrastructure | 4 hours | Recovery capability |
-| Set up staging environment | Infrastructure | 6 hours | Test before production |
-| Set up CI/CD pipeline | Infrastructure | 6 hours | Automated deployment |
-| Set up load testing | Infrastructure | 4 hours | Performance baseline |
-| Set up security scanning | Infrastructure | 3 hours | Vulnerability detection |
+Deliverables:
+1. License: Vanuatu/St. Vincent grant (months 3-6), CySEC application started month 6+ (6-12mo track).
+2. KYC/AML provider (Sumsub/Jumio): tiers 0-3, PEP/sanctions screening, source-of-funds, ongoing monitoring, SAR workflow.
+3. Responsible gambling full suite: loss limits, reality checks, cool-down enforcement, activity statements, regulator reports.
+4. Data protection: DPA chain, DPO, retention automation, breach notification drill.
+5. Policy docs versioned: terms, privacy, RG policy, AML manual.
 
-**Phase 5 Deliverable:** Complete admin panel, monitoring, automated deployment.
+Done when: license granted in 1 jurisdiction + provider live + counsel signs L5 compliance memo.
+
+Cost: $100k-300k depending on jurisdiction (see Section 9).
+
+### B5: Operations / SRE (Months 3-14) — Owner: Platform
+
+Deliverables:
+1. Multi-region active-passive (DB + app), RPO ≤ 1h financial / RTO ≤ 4h.
+2. Redis PubSub WS fan-out (no sticky sessions), autoscaling on CPU + WS connections + settlement lag.
+3. Prometheus + Grafana + PagerDuty with SLOs: 99.9% uptime, p95 API <200ms, settlement lag <1s.
+4. Load test to 100k concurrent; capacity model per 10k users with cost table.
+5. Incident program: on-call rotation, blameless postmortems, quarterly DR drill.
+
+Done when: DR drill passes + 100k load test passes + 90-day SLO burn within budget.
+
+Cost: $30k-50k + infra uplift.
 
 ---
 
-### Phase 6: Scale & Polish (Weeks 27-34)
+## 7. Target Architecture v2
 
-**Goal:** Prepare for growth and add competitive features.
-
-#### Week 27-28: Infrastructure Scaling
-
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Add Redis for session cache | Infrastructure | 4 hours | Faster auth |
-| Add Redis PubSub for WebSocket | `server.ts` | 6 hours | Multi-server WebSocket |
-| Add PostgreSQL read replicas | Infrastructure | 4 hours | Read scaling |
-| Add CDN for static assets | Infrastructure | 3 hours | Faster loading |
-| Add auto-scaling group | Infrastructure | 6 hours | Handle traffic spikes |
-| Load test at 10,000 users | Testing | 6 hours | Performance baseline |
-
-#### Week 29-30: Mobile & UX
-
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Convert to PWA | `manifest.json` + SW | 6 hours | Mobile install |
-| Optimize mobile trade UI | `TradingPanel.tsx` | 8 hours | Mobile trading |
-| Add push notifications | New service | 6 hours | Trade alerts |
-| Add offline support | Service Worker | 4 hours | Works offline |
-| Add gesture support | Frontend | 4 hours | Mobile UX |
-
-#### Week 31-32: Competitive Features
-
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Add social trading | New module | 12 hours | Competitive feature |
-| Add real tournaments | New module | 10 hours | Engagement |
-| Add advanced charting | `Chart.tsx` | 8 hours | Professional feel |
-| Add economic calendar | New page | 4 hours | Information |
-| Add trading signals | New module | 6 hours | User value |
-| Add leaderboard | New page | 3 hours | Competition |
-
-#### Week 33-34: Final Polish
-
-| Task | Files | Effort | Impact |
-|------|-------|--------|--------|
-| Security audit (penetration testing) | External | 8 hours | Find vulnerabilities |
-| Performance optimization | Various | 6 hours | Faster everything |
-| Accessibility audit (WCAG 2.1) | Frontend | 4 hours | Legal compliance |
-| Documentation | Docs | 8 hours | User support |
-| Load test at 100,000 users | Testing | 6 hours | Scale confidence |
-
-**Phase 6 Deliverable:** Scalable, mobile-ready, feature-complete platform.
-
----
-
-## 5. Technical Specifications
-
-### 5.1 OTC Engine — Market Maker
-
-#### Price Generation: Ornstein-Uhlenbeck Process
-
-```typescript
-// lib/market-maker.ts
-
-interface MarketMakerConfig {
-  // Mean reversion
-  theta: number;        // Reversion speed (0.01-0.5)
-  mu: number;           // Long-term mean (usually current price)
-  sigma: number;        // Base volatility
-  
-  // Spread
-  baseSpread: number;   // Minimum spread (e.g., 0.0002)
-  spreadMultiplier: number; // How spread widens in volatile periods
-  
-  // Direction bias
-  bullBias: number;     // -0.1 to 0.1 (positive = more ups)
-  
-  // Session behavior
-  sessionMultipliers: Record<string, number>;
-}
-
-function generatePrice(
-  currentPrice: number,
-  config: MarketMakerConfig,
-  sessionVolatility: number,
-  dt: number = 1 / 86400 // 1 second in day fraction
-): number {
-  // Ornstein-Uhlenbeck process
-  const dW = normalRandom(); // Standard normal random variable
-  const drift = config.theta * (config.mu - currentPrice) * dt;
-  const diffusion = config.sigma * sessionVolatility * Math.sqrt(dt) * dW;
-  const bias = config.bullBias * dt;
-  
-  const newPrice = currentPrice + drift + diffusion + bias;
-  
-  // Ensure price stays positive
-  return Math.max(0.00000001, newPrice);
-}
-```
-
-#### Volatility: GARCH(1,1) Model
-
-```typescript
-interface GARCHParams {
-  omega: number;   // Constant (0.00001)
-  alpha: number;   // ARCH coefficient (0.05-0.15)
-  beta: number;    // GARCH coefficient (0.80-0.90)
-  // Constraint: alpha + beta < 1
-}
-
-function nextVolatility(
-  currentVol: number,
-  lastReturn: number,
-  params: GARCHParams
-): number {
-  const variance = params.omega 
-    + params.alpha * lastReturn * lastReturn 
-    + params.beta * currentVol * currentVol;
-  
-  return Math.sqrt(variance);
-}
-```
-
-#### Session-Based Behavior
-
-```typescript
-function getSessionMultiplier(pairId: string, utcHour: number): number {
-  // Forex sessions (UTC)
-  const sessions = {
-    asian: { start: 0, end: 7, multiplier: 0.6 },
-    london: { start: 7, end: 16, multiplier: 1.2 },
-    ny: { start: 12, end: 21, multiplier: 1.0 },
-    overlap: { start: 12, end: 16, multiplier: 1.5 }, // London-NY overlap
-    offHours: { start: 21, end: 24, multiplier: 0.4 },
-  };
-  
-  // Crypto is 24/7 but has its own patterns
-  if (pairId.includes('USD')) {
-    // Check if it's crypto
-    const cryptoPairs = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'ADA', 'BNB'];
-    if (cryptoPairs.some(p => pairId.startsWith(p))) {
-      return 1.0; // Crypto has more uniform volatility
-    }
-  }
-  
-  for (const [name, session] of Object.entries(sessions)) {
-    if (utcHour >= session.start && utcHour < session.end) {
-      return session.multiplier;
-    }
-  }
-  
-  return 0.5; // Default
-}
-```
-
-### 5.2 Trade Settlement Worker
-
-```typescript
-// lib/settlement-worker.ts
-
-import { prisma } from './db';
-import { getOTCEngine } from './otc-engine';
-import { credit, releaseHold } from './ledger';
-
-const SETTLEMENT_INTERVAL_MS = 1000; // Check every second
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 5000;
-
-export class SettlementWorker {
-  private timer: NodeJS.Timeout | null = null;
-  private isRunning = false;
-  
-  start() {
-    if (this.timer) return;
-    this.timer = setInterval(() => this.tick(), SETTLEMENT_INTERVAL_MS);
-    console.log('[Settlement] Worker started');
-  }
-  
-  stop() {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
-    console.log('[Settlement] Worker stopped');
-  }
-  
-  private async tick() {
-    if (this.isRunning) return; // Prevent overlapping runs
-    this.isRunning = true;
-    
-    try {
-      const engine = await getOTCEngine();
-      
-      // Find trades ready to settle
-      const pendingTrades = await prisma.trade.findMany({
-        where: {
-          status: 'ACTIVE',
-          settleAt: { lte: new Date() },
-        },
-        orderBy: { settleAt: 'asc' },
-        take: 100, // Process in batches
-      });
-      
-      for (const trade of pendingTrades) {
-        await this.settleTrade(trade, engine);
-      }
-    } catch (error) {
-      console.error('[Settlement] Tick error:', error);
-    } finally {
-      this.isRunning = false;
-    }
-  }
-  
-  private async settleTrade(trade: Trade, engine: OTCEngine) {
-    const closePrice = engine.getCurrentPrice(trade.pairId);
-    if (!closePrice) {
-      console.warn(`[Settlement] No price for ${trade.pairId}, skipping`);
-      return;
-    }
-    
-    // Determine win/loss from REAL price movement
-    const priceMovedUp = closePrice > Number(trade.openPrice);
-    const won = (trade.direction === 'UP' && priceMovedUp) || 
-                (trade.direction === 'DOWN' && !priceMovedUp);
-    
-    const payout = won 
-      ? Math.round(Number(trade.amount) * Number(trade.payoutPercent) / 100)
-      : 0;
-    
-    const profit = won ? payout - Number(trade.amount) : -Number(trade.amount);
-    
-    // Settle atomically
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        await prisma.$transaction(async (tx) => {
-          // Release the hold
-          await releaseHold(tx, trade.userId, trade.id, won ? 'TRADE_WIN' : 'TRADE_LOSS');
-          
-          // Credit if won
-          if (won) {
-            await credit(tx, trade.userId, Number(trade.amount) + payout, 'TRADE_WIN', trade.id);
-          }
-          
-          // Update trade record
-          await tx.trade.update({
-            where: { id: trade.id },
-            data: {
-              closePrice,
-              status: won ? 'WON' : 'LOST',
-              profit,
-              settledAt: new Date(),
-            },
-          });
-        });
-        
-        console.log(`[Settlement] Trade ${trade.id} settled: ${won ? 'WIN' : 'LOSS'}`);
-        return; // Success
-      } catch (error) {
-        console.error(`[Settlement] Attempt ${attempt + 1} failed for trade ${trade.id}:`, error);
-        if (attempt < MAX_RETRIES - 1) {
-          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
-        }
-      }
-    }
-    
-    // All retries failed — mark for manual review
-    console.error(`[Settlement] CRITICAL: Failed to settle trade ${trade.id} after ${MAX_RETRIES} attempts`);
-  }
-}
-```
-
-### 5.3 Double-Entry Ledger
-
-```typescript
-// lib/ledger.ts
-
-import { createHash } from 'crypto';
-import { prisma } from './db';
-
-type LedgerDirection = 'DEBIT' | 'CREDIT';
-
-interface NewLedgerEntry {
-  userId: string;
-  type: string;
-  amount: number;
-  direction: LedgerDirection;
-  referenceId: string;
-  description?: string;
-}
-
-async function createLedgerEntry(
-  tx: PrismaTransactionClient,
-  entry: NewLedgerEntry
-) {
-  // Get previous entry for chain
-  const previousEntry = await tx.ledgerEntry.findFirst({
-    where: { userId: entry.userId },
-    orderBy: { createdAt: 'desc' },
-  });
-  
-  // Calculate checksum
-  const checksum = createHash('sha256')
-    .update(`${previousEntry?.checksum || 'genesis'}${entry.type}${entry.amount}${entry.direction}`)
-    .digest('hex');
-  
-  // Get current balance
-  const user = await tx.user.findUnique({ where: { id: entry.userId } });
-  const currentBalance = user?.balance || 0;
-  
-  // Calculate new balance
-  const newBalance = entry.direction === 'CREDIT' 
-    ? currentBalance + entry.amount 
-    : currentBalance - entry.amount;
-  
-  // Create entry
-  const ledgerEntry = await tx.ledgerEntry.create({
-    data: {
-      userId: entry.userId,
-      type: entry.type as any,
-      amount: entry.amount,
-      balanceAfter: newBalance,
-      referenceId: entry.referenceId,
-      description: entry.description,
-      createdAt: new Date(),
-    },
-  });
-  
-  // Update user balance
-  await tx.user.update({
-    where: { id: entry.userId },
-    data: { balance: newBalance },
-  });
-  
-  return { ledgerEntry, newBalance };
-}
-
-export async function credit(
-  tx: PrismaTransactionClient,
-  userId: string,
-  amount: number,
-  type: string,
-  referenceId: string,
-  description?: string
-) {
-  return createLedgerEntry(tx, {
-    userId,
-    type,
-    amount: Math.round(amount),
-    direction: 'CREDIT',
-    referenceId,
-    description,
-  });
-}
-
-export async function debit(
-  tx: PrismaTransactionClient,
-  userId: string,
-  amount: number,
-  type: string,
-  referenceId: string,
-  description?: string
-) {
-  return createLedgerEntry(tx, {
-    userId,
-    type,
-    amount: Math.round(amount),
-    direction: 'DEBIT',
-    referenceId,
-    description,
-  });
-}
-
-export async function releaseHold(
-  tx: PrismaTransactionClient,
-  userId: string,
-  tradeId: string,
-  type: string
-) {
-  // Find the original hold
-  const hold = await tx.ledgerEntry.findFirst({
-    where: {
-      userId,
-      referenceId: tradeId,
-      type: 'TRADE_HOLD',
-    },
-  });
-  
-  if (!hold) {
-    throw new Error(`No hold found for trade ${tradeId}`);
-  }
-  
-  // Release it
-  return createLedgerEntry(tx, {
-    userId,
-    type,
-    amount: hold.amount,
-    direction: 'CREDIT',
-    referenceId: tradeId,
-    description: `Released hold for trade ${tradeId}`,
-  });
-}
-
-// Verify ledger integrity
-export async function verifyLedgerIntegrity(userId: string): Promise<boolean> {
-  const entries = await prisma.ledgerEntry.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'asc' },
-  });
-  
-  let runningBalance = 0;
-  let previousChecksum = 'genesis';
-  
-  for (const entry of entries) {
-    // Verify checksum chain
-    const expectedChecksum = createHash('sha256')
-      .update(`${previousChecksum}${entry.type}${entry.amount}${entry.direction === 'CREDIT' ? 'CREDIT' : 'DEBIT'}`)
-      .digest('hex');
-    
-    if (entry.checksum !== expectedChecksum) {
-      console.error(`[Ledger] Checksum mismatch at entry ${entry.id}`);
-      return false;
-    }
-    
-    // Verify balance
-    if (entry.direction === 'CREDIT') {
-      runningBalance += entry.amount;
-    } else {
-      runningBalance -= entry.amount;
-    }
-    
-    if (entry.balanceAfter !== runningBalance) {
-      console.error(`[Ledger] Balance mismatch at entry ${entry.id}`);
-      return false;
-    }
-    
-    previousChecksum = entry.checksum;
-  }
-  
-  return true;
-}
-```
-
-### 5.4 Smart Payout System
-
-```typescript
-// lib/payout.ts
-
-import { prisma } from './db';
-import { getVaultHealth } from './vault';
-
-interface PayoutContext {
-  isWeekend: boolean;
-  utcHour: number;
-  vaultHealth: 'healthy' | 'warning' | 'critical';
-  todayVolume: number;
-  maxDailyVolume: number;
-}
-
-export async function getPayoutForPair(
-  pairId: string,
-  context?: PayoutContext
-): Promise<number> {
-  const pair = await prisma.pair.findUnique({ where: { id: pairId } });
-  if (!pair) return 0;
-  
-  let basePayout = Number(pair.payoutPercent);
-  
-  // Get context if not provided
-  if (!context) {
-    const now = new Date();
-    const health = await getVaultHealth();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    const todayVolume = await prisma.trade.aggregate({
-      where: {
-        pairId,
-        createdAt: { gte: todayStart },
-      },
-      _sum: { amount: true },
-    });
-    
-    context = {
-      isWeekend: now.getDay() === 0 || now.getDay() === 6,
-      utcHour: now.getUTCHours(),
-      vaultHealth: health.healthStatus,
-      todayVolume: Number(todayVolume._sum.amount || 0),
-      maxDailyVolume: Number(pair.maxDailyVolume || 500000),
-    };
-  }
-  
-  // 1. Weekend adjustment
-  if (context.isWeekend && pair.weekendPayout) {
-    basePayout = Number(pair.weekendPayout);
-  }
-  
-  // 2. Time-of-day adjustment (peak hours = lower payout)
-  const peakHours = [8, 9, 10, 14, 15, 16, 17, 20, 21]; // London + NY overlap
-  if (peakHours.includes(context.utcHour)) {
-    basePayout -= 2;
-  }
-  
-  // 3. Vault health adjustment
-  if (context.vaultHealth === 'critical') {
-    basePayout -= 5;
-  } else if (context.vaultHealth === 'warning') {
-    basePayout -= 2;
-  }
-  
-  // 4. Volume-based adjustment
-  const volumeRatio = context.todayVolume / context.maxDailyVolume;
-  if (volumeRatio > 0.8) {
-    basePayout -= 3;
-  } else if (volumeRatio > 0.5) {
-    basePayout -= 1;
-  }
-  
-  // Clamp to limits
-  return Math.max(50, Math.min(95, basePayout));
-}
-```
-
-### 5.5 Rate Limiting
-
-```typescript
-// middleware.ts
-
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-
-// In-memory rate limiter (use Redis in production)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
-  'POST /api/auth/login': { max: 5, windowMs: 15 * 60 * 1000 }, // 5 per 15min
-  'POST /api/auth/register': { max: 3, windowMs: 60 * 60 * 1000 }, // 3 per hour
-  'POST /api/trade/trades': { max: 10, windowMs: 60 * 1000 }, // 10 per minute
-  'POST /api/trade/withdraw': { max: 3, windowMs: 60 * 60 * 1000 }, // 3 per hour
-  'POST /api/auth/verify-email': { max: 3, windowMs: 5 * 60 * 1000 }, // 3 per 5min
-};
-
-function getClientIP(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0] || 
-         request.headers.get('x-real-ip') || 
-         'unknown';
-}
-
-function checkRateLimit(key: string, limit: { max: number; windowMs: number }): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(key);
-  
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + limit.windowMs });
-    return true;
-  }
-  
-  if (entry.count >= limit.max) {
-    return false;
-  }
-  
-  entry.count++;
-  return true;
-}
-
-export function middleware(request: NextRequest) {
-  const ip = getClientIP(request);
-  const method = request.method;
-  const pathname = request.nextUrl.pathname;
-  
-  // Check rate limit
-  const rateLimitKey = `${method} ${pathname}`;
-  const rateLimit = RATE_LIMITS[rateLimitKey];
-  
-  if (rateLimit) {
-    const key = `${ip}:${rateLimitKey}`;
-    if (!checkRateLimit(key, rateLimit)) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { status: 429 }
-      );
-    }
-  }
-  
-  // ... rest of middleware
-}
-```
-
----
-
-## 6. Security Requirements
-
-### 6.1 Authentication
-
-| Requirement | Implementation |
-|-------------|----------------|
-| Password minimum 12 characters | better-auth `minPasswordLength: 12` |
-| Password complexity (uppercase, lowercase, number, special) | Server-side validation in `lib/password.ts` |
-| Bcrypt rounds >= 12 | better-auth default |
-| Session timeout 30 minutes | better-auth `cookieCache.maxAge` |
-| Maximum 3 concurrent sessions | Session management in better-auth |
-| 2FA for withdrawals | Enforce in trade/withdraw route |
-| Account lockout after 5 failed attempts | `lib/login-security.ts` (must be wired) |
-
-### 6.2 API Security
-
-| Requirement | Implementation |
-|-------------|----------------|
-| Rate limiting per endpoint | `middleware.ts` rate limiter |
-| Input validation (Zod) | All POST/PUT endpoints |
-| SQL injection prevention | Prisma ORM (parameterized queries) |
-| XSS prevention | React auto-escaping + CSP headers |
-| CSRF protection | SameSite cookies + CSRF token |
-| CORS configuration | `lib/auth.ts` trusted origins |
-
-### 6.3 Data Security
-
-| Requirement | Implementation |
-|-------------|----------------|
-| Passwords: bcrypt hash, never plaintext | better-auth |
-| TOTP secrets: encrypted at rest | Application-level encryption |
-| KYC documents: encrypted storage | S3 server-side encryption |
-| Database: TDE (Transparent Data Encryption) | Cloud provider |
-| Backups: encrypted with separate key | AWS KMS |
-| TLS 1.3 only | Load balancer configuration |
-
-### 6.4 Audit Trail
-
-| Requirement | Implementation |
-|-------------|----------------|
-| All financial operations logged | `lib/audit.ts` |
-| Ledger entries with checksum chain | `lib/ledger.ts` |
-| Admin actions logged | `logAudit()` in all admin routes |
-| Immutable audit logs | Append-only, no updates/deletes |
-| IP address capture | Request headers |
-
----
-
-## 7. Compliance Requirements
-
-### 7.1 Licensing
-
-| Jurisdiction | Regulator | Capital Requirement | Timeline |
-|-------------|-----------|---------------------|----------|
-| Cyprus | CySEC | €200,000 | 6-12 months |
-| Vanuatu | VFSC | $50,000 | 3-6 months |
-| St. Vincent | FSA | $10,000 | 2-4 months |
-| Mauritius | FSC | $25,000 | 4-6 months |
-
-**Recommendation:** Start with Vanuatu or St. Vincent for faster launch, then apply for CySEC for EU market access.
-
-### 7.2 KYC/AML
-
-| Tier | Requirements | Limits |
-|------|--------------|--------|
-| Tier 0 | Email only | $1,000 deposit, $500 withdrawal |
-| Tier 1 | Email + Phone | $10,000 deposit, $5,000 withdrawal |
-| Tier 2 | Government ID + Selfie | $100,000 deposit, $50,000 withdrawal |
-| Tier 3 | Proof of Address + Source of Funds | Unlimited |
-
-### 7.3 Responsible Gambling
-
-| Feature | Implementation |
-|---------|----------------|
-| Self-exclusion | 24h, 7d, 30d, 90d, 6mo, 1y, permanent |
-| Deposit limits | Daily, weekly, monthly |
-| Loss limits | Daily, weekly, monthly |
-| Reality check | Pop-up every 1 hour of trading |
-| Cool-down period | 7-day waiting period for limit increases |
-| Age verification | Part of KYC Tier 1 |
-
-### 7.4 Data Protection (GDPR)
-
-| Right | Implementation |
-|-------|----------------|
-| Right to access | Data export endpoint |
-| Right to erasure | Account deletion with retention |
-| Right to rectification | Profile update endpoint |
-| Right to portability | JSON/CSV export |
-| Data retention | 7 years for financial, 2 years for marketing |
-
----
-
-## 8. Infrastructure Requirements
-
-### 8.1 Production Environment
-
-| Component | Specification |
-|-----------|---------------|
-| App Servers | AWS EC2 t3.large (2 vCPU, 8GB RAM) |
-| Database | AWS RDS PostgreSQL db.r6g.large (2 vCPU, 16GB RAM) |
-| Cache | AWS ElastiCache Redis cache.r6g.large |
-| Storage | AWS S3 for files, EBS for database |
-| CDN | Cloudflare Pro |
-| Load Balancer | AWS ALB |
-| DNS | Cloudflare |
-
-### 8.2 Scaling Strategy
-
-| Users | Servers | Database | Cost/Month |
-|-------|---------|----------|------------|
-| 0-1,000 | 2 | Single RDS | $500-1,000 |
-| 1,000-10,000 | 3-5 | RDS + Read Replica | $2,000-5,000 |
-| 10,000-100,000 | 5-10 | RDS Cluster | $10,000-30,000 |
-| 100,000+ | 10-20 | Multi-region | $30,000-100,000 |
-
-### 8.3 Monitoring Stack
-
-| Tool | Purpose |
-|------|---------|
-| Sentry | Error tracking |
-| Prometheus + Grafana | Metrics and dashboards |
-| PagerDuty | Alerting |
-| Datadog | APM (optional) |
-| Cloudflare Analytics | Traffic and security |
-
-### 8.4 Backup Strategy
-
-| Backup Type | Frequency | Retention |
-|-------------|-----------|-----------|
-| Full database | Daily at 03:00 UTC | 30 days |
-| Incremental | Hourly | 72 hours |
-| WAL archive | Continuous | 7 days |
-| Cross-region | Continuous | 30 days |
-
----
-
-## 9. Quality Standards
-
-### 9.1 Code Quality
-
-| Standard | Requirement |
-|----------|-------------|
-| TypeScript | Strict mode, no `any` types |
-| Linting | ESLint with no warnings |
-| Formatting | Prettier with consistent config |
-| Comments | No comments (self-documenting code) |
-| Naming | camelCase for variables, PascalCase for types |
-| File structure | One component per file |
-
-### 9.2 Testing
-
-| Type | Coverage Target | Tools |
-|------|-----------------|-------|
-| Unit tests | 80% | Jest |
-| Integration tests | 70% | Jest + Supertest |
-| E2E tests | Critical paths | Playwright |
-| Load tests | 10,000 users | k6 |
-| Security tests | OWASP Top 10 | OWASP ZAP |
-
-### 9.3 Performance
-
-| Metric | Target |
-|--------|--------|
-| API response time (p95) | < 200ms |
-| WebSocket tick latency | < 50ms |
-| Page load time (p95) | < 2 seconds |
-| Time to interactive | < 3 seconds |
-| Trade settlement latency | < 1 second |
-| Database query time (p95) | < 50ms |
-
-### 9.4 Reliability
-
-| Metric | Target |
-|--------|--------|
-| Uptime | 99.9% |
-| Mean time to recovery (MTTR) | < 4 hours |
-| Mean time between failures (MTBF) | > 30 days |
-| Data loss tolerance | 0 (financial), < 1 hour (analytics) |
-
----
-
-## 10. Team Guidelines
-
-### 10.1 Development Workflow
-
-1. **Branch strategy:** GitFlow (main, develop, feature/*, release/*, hotfix/*)
-2. **Commit messages:** Conventional Commits (feat:, fix:, chore:, docs:)
-3. **PR requirements:** 1 approval, all checks pass, no `any` types
-4. **Code review:** Focus on security, performance, correctness
-5. **Deployment:** CI/CD pipeline, staging → production
-
-### 10.2 Communication
-
-| Channel | Purpose |
-|---------|---------|
-| GitHub Issues | Task tracking |
-| GitHub Discussions | Architecture decisions |
-| Slack/Teams | Daily communication |
-| Weekly sync | Progress updates |
-| Monthly review | Phase completion |
-
-### 10.3 Documentation
-
-| Document | Location | Update Frequency |
-|----------|----------|------------------|
-| Architecture | `docs/ARCHITECTURE.md` | On major changes |
-| API docs | Auto-generated from code | Every PR |
-| Deployment | `docs/DEPLOYMENT.md` | On infrastructure changes |
-| Runbook | `docs/RUNBOOK.md` | On incidents |
-
-### 10.4 Onboarding
-
-New team members should:
-1. Read this document
-2. Read `docs/PROJECT.md`
-3. Set up local development environment
-4. Complete a starter task
-5. Shadow a senior developer for 1 week
-
----
-
-## 11. Success Metrics
-
-### 11.1 Technical Metrics
-
-| Metric | Current | Target | How to Measure |
-|--------|---------|--------|----------------|
-| Uptime | Unknown | 99.9% | Monitoring tools |
-| API Response Time | Unknown | < 200ms | APM |
-| Error Rate | Unknown | < 0.1% | Sentry |
-| Test Coverage | 0% | 80% | Jest coverage |
-| Security Incidents | Unknown | 0 | Security audit |
-
-### 11.2 Business Metrics
-
-| Metric | Current | Target | How to Measure |
-|--------|---------|--------|----------------|
-| Active Users | 0 | 1,000 | Analytics |
-| Daily Volume | $0 | $100,000 | Database |
-| Revenue | $0 | $10,000/day | Ledger |
-| User Satisfaction | N/A | > 4.5/5 | NPS surveys |
-| Support Tickets | N/A | < 10/day | Ticketing system |
-
-### 11.3 Compliance Metrics
-
-| Metric | Current | Target | How to Measure |
-|--------|---------|--------|----------------|
-| KYC Completion Rate | 0% | > 80% | KYC system |
-| AML Alerts | N/A | < 1% of users | AML screening |
-| Responsible Gambling Features | 0/5 | 5/5 | Feature checklist |
-| Data Protection Compliance | 0% | 100% | Audit |
-
----
-
-## 12. Risk Management
-
-### 12.1 Technical Risks
-
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| Trade engine bugs | Medium | High | Extensive testing, gradual rollout |
-| Database corruption | Low | Critical | Automated backups, point-in-time recovery |
-| Security breach | Low | Critical | Security audit, bug bounty program |
-| Performance issues | Medium | Medium | Load testing, auto-scaling |
-| Third-party failures | Medium | High | Multiple providers, fallbacks |
-
-### 12.2 Business Risks
-
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| License rejection | Medium | Critical | Start application early, hire consultant |
-| Regulatory changes | Low | High | Monitor regulations, flexible architecture |
-| Competition | High | Medium | Focus on UX, unique features |
-| User fraud | Medium | High | KYC/AML, velocity checks |
-| Payment gateway issues | Medium | High | Multiple providers, crypto backup |
-
-### 12.3 Operational Risks
-
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| Key person dependency | High | High | Documentation, cross-training |
-| Scope creep | High | Medium | Strict phase gates, MVP mindset |
-| Budget overrun | Medium | Medium | Regular reviews, contingency fund |
-| Timeline delays | High | Medium | Buffer time, prioritize critical path |
-
----
-
-## Appendix A: File Structure
+Track A (L3, single region):
 
 ```
-nextorx/
-├── app/
-│   ├── (admin)/              # Admin panel
-│   │   └── console-panel/
-│   │       ├── (dashboard)/  # Admin pages
-│   │       └── layout.tsx    # Admin layout with auth guard
-│   ├── (marketing)/          # Public pages
-│   │   ├── login/
-│   │   ├── register/
-│   │   └── ...
-│   ├── (trader)/             # Trader pages
-│   │   ├── trade/
-│   │   ├── account/
-│   │   └── ...
-│   ├── api/                  # API routes
-│   │   ├── admin/            # Admin APIs
-│   │   ├── auth/             # Auth APIs
-│   │   ├── market/           # Public market data
-│   │   └── trade/            # Trading APIs
-│   └── components/           # Shared components
-├── lib/                      # Core libraries
-│   ├── auth.ts               # better-auth config
-│   ├── rbac.ts               # Role-based access control
-│   ├── ledger.ts             # Double-entry ledger
-│   ├── market-maker.ts       # OTC engine v2 (NEW)
-│   ├── settlement-worker.ts  # Trade settlement (NEW)
-│   ├── payout.ts             # Smart payout system (NEW)
-│   ├── vault.ts              # Vault management (NEW)
-│   └── ...
-├── prisma/
-│   └── schema.prisma         # Database schema
-├── docs/                     # Documentation
-│   ├── INDUSTRY-GRADE-PLAN.md
-│   ├── PROJECT.md
-│   └── ...
-├── scripts/                  # Scripts
-│   └── seed.ts
-└── server.ts                 # Custom server (WebSocket)
+Cloudflare → ALB → Next.js ×2 (sticky WS) → PostgreSQL (1 primary + 1 replica)
+                                              → Redis (sessions/cache)
+                                              → S3 (KYC docs, encrypted)
+Settlement: in-app poller (1s) + startup reconciliation
+Monitoring: Sentry + logs + uptime + Slack alerts
 ```
 
-## Appendix B: API Endpoints
+Track B upgrades to L5 (diff only):
 
-### Auth APIs
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/api/auth/register` | Public | Register new user |
-| POST | `/api/auth/login` | Public | Login |
-| POST | `/api/auth/logout` | Auth | Logout |
-| POST | `/api/auth/forgot-password` | Public | Request password reset |
-| POST | `/api/auth/reset-password` | Public | Reset password with token |
-| POST | `/api/auth/send-verification` | Public | Send verification email |
-| POST | `/api/auth/verify-email` | Public | Verify email with code |
-| POST | `/api/auth/change-password` | Auth | Change password |
-| POST | `/api/auth/delete-account` | Auth | Delete account |
-| GET | `/api/auth/2fa` | Auth | Get 2FA status |
-| POST | `/api/auth/2fa` | Auth | Enable/disable 2FA |
-
-### Trade APIs
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/api/trade/balance` | Auth | Get user balance |
-| POST | `/api/trade/demo-balance` | Auth | Credit demo balance |
-| PATCH | `/api/trade/demo-balance` | Auth | Adjust demo balance |
-| POST | `/api/trade/trades` | Auth | Create trade |
-| GET | `/api/trade/trades` | Auth | Get user trades |
-| POST | `/api/trade/deposit` | Auth | Request deposit |
-| POST | `/api/trade/withdraw` | Auth | Request withdrawal |
-| GET | `/api/trade/payment-methods` | Public | Get payment methods |
-
-### Market APIs
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/api/market/pairs` | Public | Get active pairs |
-| GET | `/api/market/pairs/[id]` | Public | Get pair details |
-| GET | `/api/market/pairs/[id]/candles` | Public | Get pair candles |
-
-### Admin APIs
-
-| Method | Endpoint | Permission | Description |
-|--------|----------|------------|-------------|
-| GET | `/api/admin/stats` | user:list | Get platform stats |
-| GET | `/api/admin/users` | user:list | List users |
-| POST | `/api/admin/users` | user:update | User actions (ban, role, balance) |
-| GET | `/api/admin/trades` | trade:list | List trades |
-| GET | `/api/admin/treasury` | deposit:list | Treasury snapshot |
-| GET | `/api/admin/finance` | deposit:list | Financial overview |
-| GET | `/api/admin/deposits` | deposit:list | List deposits |
-| POST | `/api/admin/deposits` | deposit:verify | Verify/reject deposit |
-| GET | `/api/admin/withdrawals` | withdrawal:list | List withdrawals |
-| POST | `/api/admin/withdrawals` | withdrawal:approve | Approve/reject withdrawal |
-| GET | `/api/admin/settings` | settings:read | Get settings |
-| PUT | `/api/admin/settings` | settings:manage | Update settings |
-| GET | `/api/admin/pairs` | pair:list | List pairs |
-| POST | `/api/admin/pairs` | pair:create | Create pair |
-| PUT | `/api/admin/pairs/[id]` | pair:update | Update pair |
-| DELETE | `/api/admin/pairs/[id]` | pair:delete | Delete pair |
-| PUT | `/api/admin/pairs/[id]/toggle` | pair:update | Toggle pair active |
-| POST | `/api/admin/pairs/reorder` | pair:update | Reorder pairs |
-| GET | `/api/admin/promos` | promo:read | List promos |
-| POST | `/api/admin/promos` | promo:manage | Create/update promo |
-| GET | `/api/admin/payment-methods` | payment:list | List payment methods |
-| POST | `/api/admin/payment-methods` | payment:manage | Create/update payment method |
-| GET | `/api/admin/audit` | audit:read | List audit logs |
-
-## Appendix C: Database Schema (Key Models)
-
-```prisma
-// User model
-model User {
-  id                String    @id @default(uuid())
-  email             String    @unique
-  emailVerified     Boolean   @default(false)
-  name              String
-  role              String    @default("player")
-  balance           Int       @default(0)  // cents
-  bonusBalance      Int       @default(0)
-  twoFactorEnabled  Boolean   @default(false)
-  banned            Boolean?  @default(false)
-  kycStatus         String    @default("NOT_SUBMITTED")
-  // ... other fields
-}
-
-// Pair model
-model Pair {
-  id              String   @id
-  name            String
-  symbol          String?
-  category        String   // forex, crypto, commodities, indices
-  basePrice       Decimal  @db.Decimal(16, 8)
-  volatility      Decimal  @db.Decimal(12, 6)
-  payoutPercent   Decimal  @db.Decimal(5, 2) @default(80)
-  weekendPayout   Decimal? @db.Decimal(5, 2)
-  spread          Decimal  @db.Decimal(8, 6) @default(0.0002)
-  isActive        Boolean  @default(true)
-  isFeatured      Boolean  @default(false)
-  minTrade        Decimal  @db.Decimal(10, 2) @default(1)
-  maxTrade        Decimal  @db.Decimal(10, 2) @default(5000)
-  maxPayout       Decimal? @db.Decimal(5, 2) @default(95)
-  maxDailyVolume  Int?
-  // ... other fields
-}
-
-// Trade model
-model Trade {
-  id              String        @id @default(uuid())
-  userId          String
-  pairId          String
-  direction       TradeDirection
-  amount          Int           // cents
-  payoutPercent   Decimal       @db.Decimal(5, 2)
-  durationSeconds Int
-  openPrice       Decimal       @db.Decimal(16, 8)
-  closePrice      Decimal?      @db.Decimal(16, 8)
-  status          TradeStatus   @default(PENDING)
-  profit          Int?
-  settledAt       DateTime?
-  createdAt       DateTime      @default(now())
-  // ... relations
-}
-
-// LedgerEntry model
-model LedgerEntry {
-  id                String    @id @default(uuid())
-  userId            String
-  type              LedgerType
-  amount            Int       // cents
-  balanceAfter      Int       // running balance
-  referenceId       String
-  description       String?
-  checksum          String?   // SHA-256 for integrity
-  createdAt         DateTime  @default(now())
-  // ... relations
-}
 ```
+- Sticky WS → Redis PubSub fan-out (any server serves any client)
+- Poller → BullMQ durable queue + DLQ + reconciliation jobs
+- Single region → active-passive multi-region, automated failover drill
+- Logs → Prometheus/Grafana/PagerDuty + SLO dashboards
+- Manual backups → PITR + cross-region + quarterly DR test
+- Env secrets → vault with rotation
+```
+
+Rule: every Track A shortcut must have a Track B ticket filed before launch, linked in code comment (`TRACK-B: <id>`).
 
 ---
 
-## Document History
+## 8. Technical Specification Deltas
 
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0 | 2026-09-03 | System | Initial document |
+v1.0 specs for market-maker, settlement worker, ledger, payout, rate limiting are adopted for Track A with these corrections:
+
+1. **Market maker:** add `calibrationVersion` + `uncalibrated: true` flag to every pair config. Validation suite (B1) blocks promotion to calibrated.
+2. **Settlement:** Track A poller must include startup reconciliation + backlog metric + pause switch. Replaceable by BullMQ handler with identical function signature (design for swap).
+3. **Ledger:** add `reversalOfId` nullable field for error correction (append-only reversals, never updates). Hourly integrity job is Track B; Track A runs it daily via cron.
+4. **Payout:** cap weekend/peak/volume adjustments so combined reduction ≤ 10 points; log every adjustment with reason (auditable).
+5. **Rate limiting:** move from in-memory Map to Redis in A6 (multi-server correctness). Ship in-memory only if single-server flag is on, with warning banner in admin.
 
 ---
 
-**This document is the single source of truth for the Nextorx industry-grade implementation. All team members must read and understand it before starting work.**
+## 9. Compliance Path
 
-**Last Updated:** 2026-09-03
-**Next Review:** Weekly during implementation
+| Jurisdiction | Regulator | Capital | Timeline | Role in plan |
+|-------------|-----------|---------|----------|--------------|
+| St. Vincent | FSA | ~$10k | 2-4 mo | Fastest launch cover |
+| Vanuatu | VFSC | ~$50k | 3-6 mo | **Recommended Track A license** |
+| Mauritius | FSC | ~$25k | 4-6 mo | Alternative |
+| Cyprus | CySEC | ~€200k | 6-12 mo | **Track B EU target** |
+
+Track A: file Vanuatu (or St. Vincent if speed critical) by end of month 2. Operate with disclosures + Tier 0-1 KYC + RG minimum.
+Track B: engage counsel month 1, run full KYC/AML provider + RG suite, start CySEC month 6+.
+
+KYC tiers (unchanged from v1.0): T0 email ($1k/$500), T1 +phone ($10k/$5k), T2 +ID/selfie ($100k/$50k), T3 +PoA/SoF (unlimited). Tiers 2-3 provider-verified in Track B.
+
+---
+
+## 10. Security Requirements (Split by Track)
+
+Track A must-ship: 12+ char passwords, bcrypt, 30-min session, 2FA for withdrawals + admins, login lockout (wire `lib/login-security.ts`), Zod on all mutations, Prisma-only queries, CSP + HSTS + X-Frame-Options, SameSite cookies, CORS allowlist, rate limits (login 5/15min, register 3/hr, trades 10/min, withdraw 3/hr, verify 3/5min), WS session check, audit log on all financial + admin actions, no debug endpoints, no default secrets.
+
+Track B adds: pentest clean, WAF/bot tuning, WS signing, vault secrets + rotation, immutable SIEM audit copy, SOC 2 Type I, bug bounty.
+
+---
+
+## 11. Infrastructure Requirements (Split by Track)
+
+Track A: 2× t3.large app, RDS db.r6g.large + replica, ElastiCache large, S3 + Cloudflare Pro, ALB, daily full + hourly WAL backups, staging env, CI/CD. Cost: $0.5k-1k/mo (0-1k users) → $2k-5k/mo (1-10k).
+
+Track B: multi-region passive, PubSub WS, autoscaling, PITR + cross-region + DR drills, full observability. Cost: $10k-30k/mo (10-100k) → $30k-100k/mo (100k+). Capacity model required before crossing each band.
+
+---
+
+## 12. Quality Gates
+
+### Launch Gate (L3 — must pass for public traffic)
+
+- [ ] Zero P0 audit items open; pentest-lite (automated ZAP, no criticals).
+- [ ] E2E happy path green on staging + 10k-trade restart test with zero orphans.
+- [ ] Ledger integrity check green on staging dataset.
+- [ ] Reserve rule enforced in code + tested (withdrawal blocked when breach).
+- [ ] Rate limits + WS auth + audit logging verified.
+- [ ] Backup restore drill succeeded within RTO.
+- [ ] Counsel written confirmation for target jurisdiction.
+- [ ] Runbook + on-call + rollback tested.
+- [ ] All Track A shortcuts have Track B tickets.
+
+### Industry-Grade Gate (L5 — must pass to claim industry-grade)
+
+- [ ] B1 validation suite green + calibration report signed.
+- [ ] B2 chaos tests green (10 kills, zero loss/double-settle) + reconciliation 30 days clean.
+- [ ] Third-party pentest: zero critical/high open + SOC 2 Type I issued.
+- [ ] License granted + KYC/AML provider live + RG suite verified + DPO appointed.
+- [ ] DR drill passed + 100k load test passed + 90-day SLOs met (99.9%).
+- [ ] Bug bounty live ≥ 90 days with triage SLA met.
+
+---
+
+## 13. Team, Budget, Ownership
+
+### Recommended staffing
+
+| Role | Track A | Track B add |
+|------|---------|-------------|
+| Full-stack (Next.js/Prisma) | 2-3 | — |
+| Backend (settlement/ledger) | 1 | +1 (jobs/infra) |
+| Frontend (trader UX) | 1 | — |
+| Quant | — | 1 contract (B1) |
+| Security | part-time review | 1 + external pentest |
+| Compliance/counsel | part-time | 1 officer + law firm |
+| DevOps/SRE | 1 part-time | 1 |
+| QA | 1 | + automation |
+
+### Budget
+
+| Item | Track A (8 mo) | Track B (to mo 18) |
+|------|----------------|---------------------|
+| Engineering | $150k-200k | $80k-120k |
+| Quant + data | — | $50k-100k |
+| Security + SOC 2 | $5k-10k | $30k-50k |
+| License + counsel | $10k-20k (filing) | $100k-300k |
+| Infra | $5k-15k | $30k-80k |
+| **Total** | **$200k-300k** | **+$250k-400k → $450k-700k combined** |
+
+Fund Track B from Track A revenue: at 100 active users the desk model projects ~$430k/week net of processing (see `OTC-PAIR-MANAGEMENT-PLAN.md` with cost corrections in team discussion 2026-09-04). Even at 10% of projection, payback is within one quarter post-launch.
+
+### RACI (abridged)
+
+| Decision | Responsible | Accountable | Consulted | Informed |
+|----------|-------------|-------------|-----------|----------|
+| Launch go/no-go | Eng lead | Founder | Counsel | All |
+| Payout param change | Risk | Founder | Quant (B) | Support |
+| License jurisdiction | Counsel | Founder | Finance | All |
+| Security exception | Security | Founder | Eng | All |
+| L5 claim | Eng + Compliance | Founder | Auditor | Investors |
+
+---
+
+## 14. Success Metrics
+
+Track A (L3) targets at 90 days post-launch: uptime ≥ 99.5%, p95 API <300ms, settlement lag p95 <2s, zero lost trades, error rate <0.5%, test coverage ≥ 60% critical paths, withdrawal SLA <24h, support <20 tickets/day @1k users.
+
+L5 targets: uptime 99.9%, p95 API <200ms, WS tick <50ms, settlement lag p95 <1s, error rate <0.1%, coverage ≥ 80% unit / 70% integration + critical E2E, zero critical/high pentest findings, 100% RG/KYC feature checklist, NPS > 4.5.
+
+Business/compliance metrics unchanged from v1.0 except margins: report **60-80% net of processing/chargebacks/compliance**, not 86.8% gross.
+
+---
+
+## 15. Risk Management
+
+Top risks added for two-track:
+
+| Risk | Track | Mitigation |
+|------|-------|------------|
+| Track A shortcuts become permanent | Both | `TRACK-B` code tags + gate item + monthly debt review |
+| Quant data delayed | B1 | Start procurement week 1; hand-tuned fallback documented |
+| License delayed | B4 | File early; St. Vincent fallback; geo-fence unlicensed traffic |
+| Settlement loss before BullMQ | A2/B2 | Startup reconciliation + backlog alert + pause switch; prioritize B2 |
+| VIP drain before exposure caps tuned | A2/A3 | Conservative per-pair exposure + daily volume caps at launch |
+| Key-person dependency | Both | Docs + cross-training + onboarding checklist (Section 10 of v1.0 retained in team handbook) |
+
+Technical/business/operational risk tables from v1.0 remain valid and are not duplicated here.
+
+---
+
+## 16. Decision Log
+
+| Date | Decision | Rationale | Owner |
+|------|----------|-----------|-------|
+| 2026-09-04 | Adopt two-track (v2.0 supersedes v1.0) | v1.0 overstated readiness; need honest L3→L5 path | Founder |
+| 2026-09-04 | Launch OTC-only, platform as counterparty | P2P/order book deferred; exposure caps contain risk | Founder |
+| 2026-09-04 | Vanuatu first, CySEC later | Speed to revenue + EU optionality | Counsel |
+| 2026-09-04 | Report 60-80% net margins, not 86.8% | v1.0 model omitted processing/chargebacks/compliance | Finance |
+| 2026-09-04 | Pairs are admin-created, no auto-seed | Owner directive; seed keeps category defaults only | Eng |
+| TBD | Quant vendor selection | — | Quant |
+| TBD | KYC provider (Sumsub vs Jumio) | — | Compliance |
+| TBD | Launch go/no-go | Requires Launch Gate pass | Founder |
+
+---
+
+## Appendix — Retained from v1.0
+
+File structure, API endpoint inventory, key Prisma models, code-quality/testing/performance standards, team workflow/communication/docs/onboarding from v1.0 remain in force except where this document overrides timeline, staffing, or scope. Do not re-introduce removed scope (P2P, tournaments, social) as launch blockers without a new decision-log entry.
+
+---
+
+**Document History**
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2026-09-03 | Initial 34-week single-track plan |
+| 2.0 | 2026-09-04 | Honest reassessment; L1-L5 maturity model; two-track A (L3 launch, 8mo) + B (L5 harden, 18mo); gates; corrected margins; RACI; decision log |
+
+**Single source of truth for Nextorx execution. All members read before starting work. Review weekly.**
