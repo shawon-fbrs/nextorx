@@ -28,8 +28,14 @@ export async function requireUser(): Promise<ApiSessionUser> {
   if (!user) {
     throw new ApiError(401, "Unauthorized");
   }
-  const { isExcluded } = await import("@/lib/self-exclusion");
-  if (await isExcluded(user.id)) {
+  const [ban, exclusion] = await Promise.all([
+    prisma.user.findUnique({ where: { id: user.id }, select: { banned: true, banExpires: true } }),
+    import("@/lib/self-exclusion").then((m) => m.isExcluded(user.id)),
+  ]);
+  if (ban?.banned && (!ban.banExpires || ban.banExpires.getTime() > Date.now())) {
+    throw new ApiError(403, "Account has been banned. Contact support.");
+  }
+  if (exclusion) {
     throw new ApiError(403, "Account is self-excluded. Contact support when the exclusion period ends.");
   }
   return user;

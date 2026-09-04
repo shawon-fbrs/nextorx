@@ -70,7 +70,11 @@ export default function LoginPage() {
         const emailVerified = user?.emailVerified as boolean;
 
         if (role === 'super_admin' || role === 'finance' || role === 'support' || role === 'risk') {
-          router.push('/console-panel');
+          if (!twoFactorEnabled) {
+            router.push('/setup-2fa');
+          } else {
+            router.push('/console-panel');
+          }
         } else if (!emailVerified) {
           router.push(`/verify-email?email=${encodeURIComponent(email)}`);
         } else if (!twoFactorEnabled) {

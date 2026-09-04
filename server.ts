@@ -54,10 +54,10 @@ async function authorizeWs(req: IncomingMessage): Promise<{ userId: string; role
     if (candidates.length === 0) return null;
     const session = await prisma.session.findFirst({
       where: { token: { in: candidates }, expiresAt: { gt: new Date() } },
-      include: { user: { select: { id: true, role: true, banned: true } } },
+      include: { user: { select: { id: true, role: true, banned: true, banExpires: true } } },
     });
     if (!session) return null;
-    if (session.user.banned) return null;
+    if (session.user.banned && (!session.user.banExpires || session.user.banExpires.getTime() > Date.now())) return null;
     const ban = await prisma.bannedUser.findUnique({ where: { userId: session.user.id } });
     if (ban) return null;
     return { userId: session.user.id, role: session.user.role };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/admin/ui/badge';
 import { Button } from '@/components/admin/ui/button';
@@ -9,6 +9,7 @@ import { StatsCard } from '@/components/admin/ui/stats-card';
 import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/admin/ui/dialog';
 import { Textarea } from '@/components/admin/ui/textarea';
 import { Input } from '@/components/admin/ui/input';
+import { Select } from '@/components/admin/ui/select';
 import { Skeleton } from '@/components/admin/ui/skeleton';
 
 type UserData = {
@@ -16,11 +17,14 @@ type UserData = {
   uid: string | null;
   name: string;
   email: string;
+  emailVerified: boolean;
   role: string;
   balance: number;
   bonusBalance: number;
   kycStatus: string;
   banned: boolean | null;
+  banReason: string | null;
+  twoFactorEnabled: boolean;
   referralCode: string | null;
   phone: string | null;
   country: string | null;
@@ -38,8 +42,17 @@ type Trade = {
   pair: { name: string };
 };
 
-export default function UserDetailPage({ params }: { params: { id: string } }) {
+const ROLES = [
+  { value: 'player', label: 'Player' },
+  { value: 'finance', label: 'Finance' },
+  { value: 'support', label: 'Support' },
+  { value: 'risk', label: 'Risk' },
+  { value: 'super_admin', label: 'Super Admin' },
+];
+
+export default function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const [userId, setUserId] = useState<string | null>(null);
   const [user, setUser] = useState<UserData | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,41 +60,84 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
   const [adjustmentAmount, setAdjustmentAmount] = useState('');
   const [adjustmentNote, setAdjustmentNote] = useState('');
   const [adjustmentType, setAdjustmentType] = useState<'add' | 'subtract'>('add');
+  const [banOpen, setBanOpen] = useState(false);
+  const [banReason, setBanReason] = useState('');
+  const [role, setRole] = useState('');
+  const [acting, setActing] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/admin/users?limit=200`).then(r => { if (!r.ok) throw new Error(); return r.json(); }),
-      fetch(`/api/admin/trades?limit=200`).then(r => { if (!r.ok) throw new Error(); return r.json(); }),
-    ]).then(([userData, tradeData]) => {
-      const found = userData.users?.find((u: UserData) => u.id === params.id);
-      setUser(found || null);
-      if (tradeData.trades) {
-        setTrades(tradeData.trades.filter((t: Trade) => t.id && userData.users?.find((u: UserData) => u.id === params.id)));
-      }
-    }).catch(() => {}).finally(() => setIsLoading(false));
-  }, [params.id]);
+    params.then((p) => setUserId(p.id));
+  }, [params]);
+
+  const fetchDetail = useCallback(async () => {
+    if (!userId) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setUser(data.user);
+      setTrades(data.trades ?? []);
+      setRole(data.user.role);
+    } catch {
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchDetail();
+  }, [fetchDetail]);
+
+  const postAction = async (body: Record<string, unknown>) => {
+    setActing(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) fetchDetail();
+    } catch {
+    } finally {
+      setActing(false);
+    }
+  };
 
   const handleAdjustBalance = async () => {
     const amount = parseFloat(adjustmentAmount);
     if (isNaN(amount) || amount <= 0) return;
     if (!adjustmentNote.trim()) return;
+    if (!userId) return;
 
-    try {
-      await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'adjust-balance',
-          userId: params.id,
-          amountUsd: adjustmentType === 'add' ? amount : -amount,
-          note: adjustmentNote,
-        }),
-      });
-      setAdjustBalanceOpen(false);
-      setAdjustmentAmount('');
-      setAdjustmentNote('');
-      window.location.reload();
-    } catch {}
+    await postAction({
+      action: 'adjust-balance',
+      userId,
+      amountUsd: adjustmentType === 'add' ? amount : -amount,
+      note: adjustmentNote,
+    });
+    setAdjustBalanceOpen(false);
+    setAdjustmentAmount('');
+    setAdjustmentNote('');
+  };
+
+  const handleBanToggle = async () => {
+    if (!userId || !user) return;
+    if (user.banned) {
+      await postAction({ action: 'unban', userId });
+    } else {
+      if (banReason.trim().length < 3) return;
+      await postAction({ action: 'ban', userId, reason: banReason.trim() });
+    }
+    setBanOpen(false);
+    setBanReason('');
+  };
+
+  const handleRoleChange = async (next: string) => {
+    if (!userId || next === user?.role) return;
+    setRole(next);
+    await postAction({ action: 'set-role', userId, role: next });
   };
 
   if (isLoading) {
@@ -122,11 +178,15 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
               <p className="text-sm text-textDark">{user.email}</p>
             </div>
             <Badge variant={user.banned ? 'danger' : 'success'}>{user.banned ? 'blocked' : 'active'}</Badge>
+            {!user.emailVerified && <Badge variant="warning">unverified</Badge>}
+            {user.twoFactorEnabled && <Badge variant="info">2fa</Badge>}
           </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setAdjustBalanceOpen(true)}>Adjust Balance</Button>
-          <Button variant="danger" size="sm">Ban User</Button>
+          <Button variant={user.banned ? 'secondary' : 'danger'} size="sm" onClick={() => setBanOpen(true)}>
+            {user.banned ? 'Unban User' : 'Ban User'}
+          </Button>
         </div>
       </div>
 
@@ -142,11 +202,40 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
         <CardContent>
           <div className="grid grid-cols-2 gap-4">
             <div><p className="text-[11px] text-textDark uppercase">UID</p><p className="text-sm text-white font-mono">{user.uid}</p></div>
-            <div><p className="text-[11px] text-textDark uppercase">Role</p><p className="text-sm text-white capitalize">{user.role}</p></div>
-            <div><p className="text-[11px] text-textDark uppercase">KYC</p><Badge variant={user.kycStatus === 'APPROVED' ? 'success' : 'warning'}>{user.kycStatus.toLowerCase()}</Badge></div>
+            <div>
+              <p className="text-[11px] text-textDark uppercase mb-1">Role</p>
+              <Select value={role} onChange={(e) => handleRoleChange(e.target.value)} options={ROLES} />
+            </div>
+            <div><p className="text-[11px] text-textDark uppercase">KYC</p><Badge variant={user.kycStatus === 'TIER_1' ? 'success' : 'warning'}>{user.kycStatus.toLowerCase()}</Badge></div>
             <div><p className="text-[11px] text-textDark uppercase">Referral Code</p><p className="text-sm text-white font-mono">{user.referralCode}</p></div>
+            <div><p className="text-[11px] text-textDark uppercase">Phone</p><p className="text-sm text-white">{user.phone ?? '—'}</p></div>
+            <div><p className="text-[11px] text-textDark uppercase">Country</p><p className="text-sm text-white">{user.country ?? '—'}</p></div>
             <div><p className="text-[11px] text-textDark uppercase">Joined</p><p className="text-sm text-white">{new Date(user.createdAt).toLocaleDateString()}</p></div>
+            {user.banned && user.banReason && (
+              <div><p className="text-[11px] text-textDark uppercase">Ban Reason</p><p className="text-sm text-red">{user.banReason}</p></div>
+            )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Recent Trades ({trades.length})</CardTitle></CardHeader>
+        <CardContent>
+          {trades.length === 0 ? (
+            <p className="text-sm text-textDark text-center py-6">No trades yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {trades.map((t) => (
+                <div key={t.id} className="flex items-center gap-4 p-2.5 bg-background rounded-lg border border-border text-sm">
+                  <span className="text-white font-semibold">{t.pair.name}</span>
+                  <Badge variant={t.direction === 'UP' ? 'success' : 'danger'}>{t.direction}</Badge>
+                  <span className="text-textDark">${(t.amount / 100).toFixed(2)}</span>
+                  <span className="ml-auto text-textDark text-xs">{new Date(t.createdAt).toLocaleString()}</span>
+                  <Badge variant={t.status === 'WON' ? 'success' : t.status === 'LOST' ? 'danger' : 'warning'}>{t.status}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -166,6 +255,25 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
         <DialogFooter>
           <Button variant="secondary" onClick={() => setAdjustBalanceOpen(false)}>Cancel</Button>
           <Button onClick={handleAdjustBalance}>Confirm</Button>
+        </DialogFooter>
+      </Dialog>
+
+      <Dialog open={banOpen} onClose={() => { setBanOpen(false); setBanReason(''); }}>
+        <DialogHeader onClose={() => { setBanOpen(false); setBanReason(''); }}>
+          <h2 className="text-lg font-bold text-white">{user.banned ? 'Unban User' : 'Ban User'}</h2>
+        </DialogHeader>
+        <DialogContent className="space-y-4">
+          {user.banned ? (
+            <p className="text-sm text-textDark">This will restore {user.email} to full access immediately.</p>
+          ) : (
+            <Textarea label="Ban reason (required)" value={banReason} onChange={(e) => setBanReason(e.target.value)} rows={3} placeholder="Fraud, abuse, chargeback..." />
+          )}
+        </DialogContent>
+        <DialogFooter>
+          <Button variant="secondary" onClick={() => { setBanOpen(false); setBanReason(''); }}>Cancel</Button>
+          <Button variant="danger" isLoading={acting} onClick={handleBanToggle}>
+            {user.banned ? 'Confirm Unban' : 'Confirm Ban'}
+          </Button>
         </DialogFooter>
       </Dialog>
     </div>

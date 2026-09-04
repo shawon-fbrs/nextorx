@@ -34,6 +34,7 @@ export default function AccountPage() {
 
   const [deleteModal, setDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
+  const [deleteCode, setDeleteCode] = useState('');
   const [deleteMsg, setDeleteMsg] = useState('');
   const [deleting, setDeleting] = useState(false);
 
@@ -105,14 +106,23 @@ export default function AccountPage() {
 
     setPasswordSaving(true);
     try {
-      const res = await fetch('/api/auth/change-password', {
+      const isSet = !hasPassword;
+      const res = await fetch(isSet ? '/api/auth/set-password' : '/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword, newPassword }),
+        body: isSet
+          ? JSON.stringify({ newPassword })
+          : JSON.stringify({ currentPassword, newPassword }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setPasswordMsg(data.error || 'Failed to change password');
+        setPasswordMsg(data.error || 'Failed to save password');
+      } else if (isSet) {
+        setPasswordMsg('Password set successfully.');
+        setHasPassword(true);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
       } else {
         setPasswordMsg('Password changed successfully. Please log in again.');
         setCurrentPassword('');
@@ -123,7 +133,7 @@ export default function AccountPage() {
         }, 2000);
       }
     } catch {
-      setPasswordMsg('Failed to change password');
+      setPasswordMsg('Failed to save password');
     } finally {
       setPasswordSaving(false);
     }
@@ -172,7 +182,9 @@ export default function AccountPage() {
       const res = await fetch('/api/auth/delete-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: deletePassword }),
+        body: hasPassword
+          ? JSON.stringify({ password: deletePassword })
+          : JSON.stringify({ code: deleteCode }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -417,21 +429,23 @@ export default function AccountPage() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white">Change Password</h2>
-                <p className="text-[11px] text-text-dark">Update your password regularly</p>
+                <h2 className="text-sm font-bold text-white">{hasPassword ? 'Change Password' : 'Set Password'}</h2>
+                <p className="text-[11px] text-text-dark">{hasPassword ? 'Update your password regularly' : 'Add a password to secure your account'}</p>
               </div>
             </div>
             <form onSubmit={handleChangePassword} className="space-y-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1">Current Password</label>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
-                />
-              </div>
+              {hasPassword && (
+                <div>
+                  <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1">Current Password</label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    required
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1">New Password</label>
                 <input
@@ -473,10 +487,10 @@ export default function AccountPage() {
               )}
               <button
                 type="submit"
-                disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword || !newPassStrength.isValid}
+                disabled={passwordSaving || (hasPassword && !currentPassword) || !newPassword || !confirmPassword || newPassword !== confirmPassword || !newPassStrength.isValid}
                 className="w-full bg-blue hover:bg-blue-hover text-white text-xs font-bold py-2.5 rounded-lg transition-colors disabled:opacity-50"
               >
-                {passwordSaving ? 'Changing...' : 'Change Password'}
+                {passwordSaving ? 'Saving...' : hasPassword ? 'Change Password' : 'Set Password'}
               </button>
             </form>
           </div>
@@ -601,20 +615,36 @@ export default function AccountPage() {
             <form onSubmit={handleDeleteAccount} className="px-6 py-5 space-y-4">
               <div className="bg-red/5 border border-red/10 rounded-lg p-3.5">
                 <p className="text-[11px] text-red leading-relaxed">
-                  Enter your password to confirm. All data, balance, and trade history will be permanently deleted.
+                  {hasPassword ? 'Enter your password to confirm.' : 'Enter your authenticator code to confirm.'} All data, balance, and trade history will be permanently deleted.
                   Financial records are retained for 7 years to meet legal obligations.
                 </p>
               </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">Password</label>
-                <input
-                  type="password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  required
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
-                />
-              </div>
+              {hasPassword ? (
+                <div>
+                  <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">Password</label>
+                  <input
+                    type="password"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    required
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-1.5">TOTP Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={deleteCode}
+                    onChange={(e) => setDeleteCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="000000"
+                    required
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white text-center tracking-widest font-mono focus:outline-none focus:border-blue transition-colors"
+                  />
+                </div>
+              )}
               {deleteMsg && <p className="text-[11px] font-semibold text-red">{deleteMsg}</p>}
               <div className="flex gap-3">
                 <button
@@ -626,7 +656,7 @@ export default function AccountPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={deleting || !deletePassword}
+                  disabled={deleting || (hasPassword ? !deletePassword : deleteCode.length !== 6)}
                   className="flex-1 bg-red hover:bg-red/80 text-white text-xs font-bold py-2.5 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {deleting ? 'Deleting...' : 'Delete Account'}

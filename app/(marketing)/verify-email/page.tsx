@@ -43,7 +43,7 @@ function VerifyEmailForm() {
       }
 
       setSuccess(true);
-      setTimeout(() => router.push('/trade/demo'), 2000);
+      setTimeout(() => router.push('/auth/post-login'), 1500);
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
@@ -119,7 +119,7 @@ function VerifyEmailForm() {
                 </svg>
               </div>
               <p className="text-white font-semibold">Email verified!</p>
-              <p className="text-text-dark text-sm mt-2">Redirecting to trading...</p>
+              <p className="text-text-dark text-sm mt-2">Securing your account...</p>
             </div>
           ) : (
             <>

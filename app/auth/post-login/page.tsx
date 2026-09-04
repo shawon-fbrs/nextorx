@@ -39,15 +39,29 @@ export default function PostLoginPage() {
             body: JSON.stringify({ email: user.email, success: true }),
           }).catch(() => {});
         }
-        if (user.role && ADMIN_ROLES.has(user.role)) {
-          router.replace('/console-panel');
-        } else if (!user.emailVerified) {
+
+        const isAdmin = Boolean(user.role && ADMIN_ROLES.has(user.role));
+
+        if (!user.emailVerified) {
           router.replace(`/verify-email?email=${encodeURIComponent(user.email ?? '')}`);
-        } else if (!user.twoFactorEnabled) {
-          router.replace('/setup-2fa');
-        } else {
-          router.replace('/trade/demo');
+          router.refresh();
+          return;
         }
+
+        const pw = await fetch('/api/auth/has-password').then((r) => r.json()).catch(() => ({ hasPassword: true }));
+        if (!pw.hasPassword && !user.twoFactorEnabled) {
+          router.replace('/set-password');
+          router.refresh();
+          return;
+        }
+
+        if (!user.twoFactorEnabled) {
+          router.replace('/setup-2fa');
+          router.refresh();
+          return;
+        }
+
+        router.replace(isAdmin ? '/console-panel' : '/trade/demo');
         router.refresh();
       } catch {
         if (!cancelled) setError('Something went wrong. Please try again.');

@@ -12,7 +12,6 @@ export default function RegisterPage() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [currency, setCurrency] = useState('USD');
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,7 +39,9 @@ export default function RegisterPage() {
         email,
         password,
         name: `${firstName} ${lastName}`.trim() || email.split('@')[0],
-      });
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+      } as Parameters<typeof authClient.signUp.email>[0]);
 
       if (authError) {
         setError(authError.message || 'Registration failed');
@@ -171,19 +172,6 @@ export default function RegisterPage() {
               )}
             </div>
             <div>
-              <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Currency</label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue transition-colors appearance-none cursor-pointer"
-              >
-                <option value="USD">USD — US Dollar</option>
-                <option value="EUR">EUR — Euro</option>
-                <option value="GBP">GBP — British Pound</option>
-                <option value="BTC">BTC — Bitcoin</option>
-              </select>
-            </div>
-            <div>
               <label className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -192,7 +180,7 @@ export default function RegisterPage() {
                   className="w-4 h-4 mt-0.5 rounded border-border bg-background accent-green"
                 />
                 <span className="text-[11px] text-text-dark leading-relaxed">
-                  I agree to the <a href="#" className="text-blue hover:text-blue-hover">Terms of Service</a> and <a href="#" className="text-blue hover:text-blue-hover">Privacy Policy</a>. I confirm I am at least 18 years old.
+                  I agree to the <Link href="/terms" className="text-blue hover:text-blue-hover">Terms of Service</Link> and <Link href="/privacy" className="text-blue hover:text-blue-hover">Privacy Policy</Link>. I confirm I am at least 18 years old.
                 </span>
               </label>
             </div>

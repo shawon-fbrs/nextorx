@@ -7,14 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     const sessionUser = await requireUser();
     const body = await req.json();
-    const { password } = body;
-
-    if (!password) {
-      return NextResponse.json(
-        { error: 'Password is required to delete account' },
-        { status: 400 }
-      );
-    }
+    const { password, code } = body as { password?: string; code?: string };
 
     const account = await prisma.account.findFirst({
       where: {
@@ -22,24 +15,49 @@ export async function POST(req: NextRequest) {
         providerId: 'credential',
       },
     });
+    const hasPassword = Boolean(account?.password);
 
-    if (!account || !account.password) {
-      return NextResponse.json(
-        { error: 'No password set for this account' },
-        { status: 400 }
-      );
-    }
+    if (hasPassword) {
+      if (!password) {
+        return NextResponse.json(
+          { error: 'Password is required to delete account' },
+          { status: 400 }
+        );
+      }
+      const valid = await verifyPassword({
+        password: password as string,
+        hash: (account?.password ?? "") as string,
+      });
 
-    const valid = await verifyPassword({
-      password,
-      hash: account.password,
-    });
-
-    if (!valid) {
-      return NextResponse.json(
-        { error: 'Incorrect password' },
-        { status: 400 }
-      );
+      if (!valid) {
+        return NextResponse.json(
+          { error: 'Incorrect password' },
+          { status: 400 }
+        );
+      }
+    } else {
+      const twoFactor = await prisma.twoFactor.findUnique({
+        where: { userId: sessionUser.id },
+      });
+      if (!twoFactor) {
+        return NextResponse.json(
+          { error: 'Set a password in Account settings before deleting your account' },
+          { status: 400 }
+        );
+      }
+      if (!code) {
+        return NextResponse.json(
+          { error: 'TOTP code is required to delete account' },
+          { status: 400 }
+        );
+      }
+      const { verifyTOTP } = await import('@/lib/totp');
+      if (!verifyTOTP(twoFactor.secret, code)) {
+        return NextResponse.json(
+          { error: 'Invalid TOTP code' },
+          { status: 400 }
+        );
+      }
     }
 
     const activeTrades = await prisma.trade.count({

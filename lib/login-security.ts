@@ -17,15 +17,15 @@ export async function checkLoginAllowed(
 ): Promise<LoginAttemptResult> {
   const user = await prisma.user.findUnique({
     where: { email },
-    include: {
-      accounts: {
-        where: { providerId: 'credential' },
-      },
-    },
+    select: { id: true, banned: true, banExpires: true },
   });
 
   if (!user) {
     return { allowed: true };
+  }
+
+  if (user.banned && (!user.banExpires || user.banExpires.getTime() > Date.now())) {
+    return { allowed: false, error: 'This account has been banned. Contact support.' };
   }
 
   const { isExcluded } = await import("@/lib/self-exclusion");
