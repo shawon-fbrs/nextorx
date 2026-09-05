@@ -100,6 +100,47 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   onOverlaySelectedRef.current = onOverlaySelected;
   const subscribeBarCallbackRef = useRef<((data: KLineData) => void) | null>(null);
 
+  const loadBars = async (type: string, timestamp: number | undefined, callback: (bars: KLineData[], more: boolean) => void) => {
+    const pid = pairIdRef.current;
+    if (!pid) {
+      callback([], false);
+      return;
+    }
+    if (type === 'init') {
+      try {
+        const res = await fetch(`/api/market/pairs/${pid}/candles?limit=300`);
+        const data = await res.json();
+        const bars: KLineData[] = (data.candles || []).map((c: any) => ({
+          timestamp: c.timestamp,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: Number(c.volume) || 0,
+        })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
+        callback(bars, false);
+      } catch {
+        callback([], false);
+      }
+    } else if (type === 'backward' && timestamp) {
+      try {
+        const res = await fetch(`/api/market/pairs/${pid}/candles?limit=100&before=${timestamp}`);
+        const data = await res.json();
+        const bars: KLineData[] = (data.candles || []).map((c: any) => ({
+          timestamp: c.timestamp,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: Number(c.volume) || 0,
+        })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
+        callback(bars, bars.length < 100);
+      } catch {
+        callback([], true);
+      }
+    }
+  };
+
   useImperativeHandle(ref, () => ({
     createOverlay: (name: string, onSelected?: (id: string) => void, onDeselected?: () => void) => {
       chartRef.current?.createOverlay({
@@ -175,42 +216,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
 
       chart.setDataLoader({
         getBars: async ({ type, timestamp, callback }) => {
-          const pid = pairIdRef.current;
-          if (!pid) { callback([], false); return; }
-
-          if (type === 'init') {
-            try {
-              const res = await fetch(`/api/market/pairs/${pid}/candles?limit=300`);
-              const data = await res.json();
-              const bars: KLineData[] = (data.candles || []).map((c: any) => ({
-                timestamp: c.timestamp,
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
-                volume: Number(c.volume) || 0,
-              })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
-              callback(bars, false);
-            } catch {
-              callback([], false);
-            }
-          } else if (type === 'backward' && timestamp) {
-            try {
-              const res = await fetch(`/api/market/pairs/${pid}/candles?limit=100&before=${timestamp}`);
-              const data = await res.json();
-              const bars: KLineData[] = (data.candles || []).map((c: any) => ({
-                timestamp: c.timestamp,
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
-                volume: Number(c.volume) || 0,
-              })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
-              callback(bars, bars.length < 100);
-            } catch {
-              callback([], true);
-            }
-          }
+          await loadBars(type, timestamp, callback);
         },
         subscribeBar: ({ callback }) => {
           subscribeBarCallbackRef.current = callback;
@@ -254,39 +260,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
           chart.setPeriod({ span: 1, type: 'minute' });
           chart.setDataLoader({
             getBars: async ({ type, timestamp, callback }) => {
-              if (type === 'init') {
-                try {
-                  const res = await fetch(`/api/pairs/${pairId}/candles?limit=300`);
-                  const data = await res.json();
-                  const bars: KLineData[] = (data.candles || []).map((c: any) => ({
-                    timestamp: c.timestamp,
-                    open: c.open,
-                    high: c.high,
-                    low: c.low,
-                    close: c.close,
-                    volume: Number(c.volume) || 0,
-                  })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
-                  callback(bars, false);
-                } catch {
-                  callback([], false);
-                }
-              } else if (type === 'backward' && timestamp) {
-                try {
-                  const res = await fetch(`/api/pairs/${pairId}/candles?limit=100&before=${timestamp}`);
-                  const data = await res.json();
-                  const bars: KLineData[] = (data.candles || []).map((c: any) => ({
-                    timestamp: c.timestamp,
-                    open: c.open,
-                    high: c.high,
-                    low: c.low,
-                    close: c.close,
-                    volume: Number(c.volume) || 0,
-                  })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
-                  callback(bars, bars.length < 100);
-                } catch {
-                  callback([], true);
-                }
-              }
+              await loadBars(type, timestamp, callback);
             },
             subscribeBar: ({ callback }) => {
               subscribeBarCallbackRef.current = callback;
