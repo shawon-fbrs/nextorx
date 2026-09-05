@@ -100,7 +100,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   onOverlaySelectedRef.current = onOverlaySelected;
   const subscribeBarCallbackRef = useRef<((data: KLineData) => void) | null>(null);
 
-  const loadBars = async (type: string, timestamp: number | undefined, callback: (bars: KLineData[], more: boolean) => void) => {
+  const loadBars = async (type: string, timestamp: number | null | undefined, callback: (bars: KLineData[], more: boolean) => void) => {
     const pid = pairIdRef.current;
     if (!pid) {
       callback([], false);
