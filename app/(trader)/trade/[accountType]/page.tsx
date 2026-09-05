@@ -325,7 +325,18 @@ export default function TradingPage() {
   const [indOpen, setIndOpen] = useState(false);
   const [pairs, setPairs] = useState<PairDef[]>([]);
   const [activePair, setActivePair] = useState<PairDef | null>(null);
-  const [visibleIds, setVisibleIds] = useState<string[]>([]);
+  const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
+
+  const readStoredTabs = (): string[] | null => {
+    try {
+      const raw = localStorage.getItem('nextorx-visible-pairs');
+      const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+      if (!Array.isArray(parsed)) return null;
+      return parsed.filter((v): v is string => typeof v === 'string');
+    } catch {
+      return null;
+    }
+  };
   const [investment, setInvestment] = useState(1);
   const [timeMinutes, setTimeMinutes] = useState(1);
   const [timeSeconds, setTimeSeconds] = useState(0);
@@ -354,7 +365,12 @@ export default function TradingPage() {
         })) as PairDef[];
         setPairs(normalized);
         if (normalized.length > 0) {
-          setVisibleIds(normalized.map((p) => p.id));
+          setVisibleIds((prev) => {
+            if (prev !== null) return prev.filter((id) => normalized.some((p) => p.id === id));
+            const stored = readStoredTabs();
+            if (stored) return stored.filter((id) => normalized.some((p) => p.id === id));
+            return normalized.map((p) => p.id);
+          });
           setActivePair((cur) => cur ?? normalized[0]);
         }
       })
@@ -363,12 +379,23 @@ export default function TradingPage() {
   }, []);
 
   const handleSelectPair = useCallback((p: PairDef) => {
-    setVisibleIds((prev) => (prev.includes(p.id) ? prev : [...prev, p.id]));
+    setVisibleIds((prev) => {
+      const cur = prev ?? [];
+      const next = cur.includes(p.id) ? cur : [...cur, p.id];
+      try {
+        localStorage.setItem('nextorx-visible-pairs', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     setActivePair(p);
   }, []);
 
   const handleClosePair = useCallback((id: string) => {
-    const next = visibleIds.filter((v) => v !== id);
+    const cur = visibleIds ?? [];
+    const next = cur.filter((v) => v !== id);
+    try {
+      localStorage.setItem('nextorx-visible-pairs', JSON.stringify(next));
+    } catch {}
     setVisibleIds(next);
     if (activePair?.id === id) {
       setActivePair(pairs.find((p) => next.includes(p.id)) ?? null);
@@ -549,7 +576,7 @@ export default function TradingPage() {
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <TopBar pairs={pairs} visibleIds={visibleIds} activePair={activePair} onSelect={handleSelectPair} onClose={handleClosePair} />
+            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} onSelect={handleSelectPair} onClose={handleClosePair} />
             {!activePair ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
                 <div className="w-14 h-14 rounded-2xl bg-blue/10 border border-blue/20 flex items-center justify-center">
