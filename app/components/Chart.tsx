@@ -17,6 +17,7 @@ interface ChartProps {
   pairName: string | null;
   currentPrice: number | null;
   currentCandle: CandleData | null;
+  seed: { pairId: string; bars: CandleData[] } | null;
   onOverlaySelected?: (overlay: { id: string; name: string } | null) => void;
 }
 
@@ -91,7 +92,7 @@ const CUSTOM_OVERLAYS: Array<{
 
 CUSTOM_OVERLAYS.forEach(o => registerOverlay(o));
 
-export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, onOverlaySelected }, ref) {
+export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, seed, onOverlaySelected }, ref) {
   const chartIdRef = useRef(`kline-${Math.random().toString(36).slice(2)}`);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<KLineChart | null>(null);
@@ -99,6 +100,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   const onOverlaySelectedRef = useRef(onOverlaySelected);
   onOverlaySelectedRef.current = onOverlaySelected;
   const subscribeBarCallbackRef = useRef<((data: KLineData) => void) | null>(null);
+  const barsCacheRef = useRef<Map<string, KLineData[]>>(new Map());
 
   const loadBars = async (type: string, timestamp: number | null | undefined, callback: (bars: KLineData[], more: boolean) => void) => {
     const pid = pairIdRef.current;
@@ -107,6 +109,11 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       return;
     }
     if (type === 'init') {
+      const cached = barsCacheRef.current.get(pid);
+      if (cached && cached.length > 0) {
+        callback(cached, false);
+        return;
+      }
       try {
         const res = await fetch(`/api/market/pairs/${pid}/candles?limit=300`);
         const data = await res.json();
@@ -249,11 +256,24 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       if (chart && chartContainerRef.current) {
         const pricePrec = pairId.includes('JPY') ? 3 : 5;
         chart.setSymbol({ ticker: pairId, pricePrecision: pricePrec, volumePrecision: 0 });
+        if (seed && seed.pairId === pairId && seed.bars.length > 0) {
+          barsCacheRef.current.set(
+            pairId,
+            seed.bars.map((c) => ({
+              timestamp: c.timestamp,
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+              volume: Number(c.volume) || 0,
+            })),
+          );
+        }
         chart.resetData();
         chart.scrollToRealTime(0);
       }
     }
-  }, [pairId]);
+  }, [pairId, seed]);
 
   useEffect(() => {
     if (!currentCandle) return;

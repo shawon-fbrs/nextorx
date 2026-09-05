@@ -326,6 +326,28 @@ export default function TradingPage() {
   const [pairs, setPairs] = useState<PairDef[]>([]);
   const [activePair, setActivePair] = useState<PairDef | null>(null);
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
+  const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
+
+  useEffect(() => {
+    if (!activePair) {
+      setSeed(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/market/pairs/${activePair.id}/candles?limit=300`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const bars = ((data.candles ?? []) as CandleData[]).sort((a, b) => a.timestamp - b.timestamp);
+        setSeed({ pairId: activePair.id, bars });
+      })
+      .catch(() => {
+        if (!cancelled) setSeed(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePair]);
 
   const readStoredTabs = (): string[] | null => {
     try {
@@ -591,7 +613,7 @@ export default function TradingPage() {
             <div className="flex-1 flex min-w-0 overflow-hidden">
               <SideToolbar onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
-                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} onOverlaySelected={setSelectedOverlay} />
+                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} onOverlaySelected={setSelectedOverlay} />
 
                 {isComingSoon && (
                   <div className="absolute inset-0 z-[70] bg-background/80 backdrop-blur-sm flex items-center justify-center">
