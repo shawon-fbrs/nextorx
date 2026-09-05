@@ -1,8 +1,62 @@
 import { prisma } from "@/lib/db";
 import { postEntryInTx } from "@/lib/ledger";
 import { createNotification } from "@/lib/notify";
+import { getSetting } from "@/lib/settings";
 
 export class DepositError extends Error {}
+
+type DepositTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+async function awardReferralBonus(tx: DepositTx, userId: string): Promise<void> {
+  const me = await tx.user.findUnique({
+    where: { id: userId },
+    select: { referredBy: true },
+  });
+  if (!me?.referredBy) return;
+  const referrer = await tx.user.findUnique({
+    where: { referralCode: me.referredBy },
+    select: { id: true },
+  });
+  if (!referrer || referrer.id === userId) return;
+  const existing = await tx.referral.findUnique({ where: { referredId: userId } });
+  if (existing?.bonusPaid) return;
+  const [bonusAmount, turnoverMult, validityDays] = await Promise.all([
+    getSetting("referralBonusAmount").catch(() => 2000),
+    getSetting("bonusTurnoverMultiplier").catch(() => 30),
+    getSetting("bonusValidityDays").catch(() => 30),
+  ]);
+  if (bonusAmount <= 0) return;
+  await tx.referral.upsert({
+    where: { referredId: userId },
+    create: { referrerId: referrer.id, referredId: userId, bonusPaid: bonusAmount },
+    update: { bonusPaid: bonusAmount },
+  });
+  await postEntryInTx(tx, {
+    userId: referrer.id,
+    type: "BONUS_CREDIT",
+    amount: 0,
+    bonusAmount,
+    referenceId: `referral:${userId}`,
+    description: "Referral bonus — friend's first deposit",
+  });
+  const referrerProfile = await tx.user.findUnique({
+    where: { id: referrer.id },
+    select: { bonusTurnoverRequired: true },
+  });
+  await tx.user.update({
+    where: { id: referrer.id },
+    data: {
+      bonusTurnoverRequired: (referrerProfile?.bonusTurnoverRequired ?? 0) + bonusAmount * turnoverMult,
+      bonusExpiresAt: new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000),
+    },
+  });
+  await createNotification(
+    referrer.id,
+    "REFERRAL",
+    "Referral bonus earned",
+    `Your friend made a first deposit. $${(bonusAmount / 100).toFixed(2)} bonus credited.`,
+  );
+}
 
 export async function createDepositRequest(
   userId: string,
@@ -121,6 +175,13 @@ export async function verifyDeposit(depositId: string, reviewedById: string) {
       },
     });
 
+    const priorVerified = await tx.depositRequest.count({
+      where: { userId: deposit.userId, status: "VERIFIED", id: { not: depositId } },
+    });
+    if (priorVerified === 0) {
+      await awardReferralBonus(tx, deposit.userId);
+    }
+
     if (deposit.promoCode && deposit.promoPercent) {
       const bonus = Math.floor((deposit.amount * deposit.promoPercent) / 100);
       const cappedBonus = deposit.promoMaxBonusInt && deposit.promoMaxBonusInt > 0
@@ -142,6 +203,31 @@ export async function verifyDeposit(depositId: string, reviewedById: string) {
                 userId: deposit.userId,
                 depositId,
                 bonusAmount: cappedBonus,
+              },
+            });
+            const [turnoverMult, validityDays] = await Promise.all([
+              getSetting("bonusTurnoverMultiplier").catch(() => 30),
+              getSetting("bonusValidityDays").catch(() => 30),
+            ]);
+            const user = await tx.user.findUnique({
+              where: { id: deposit.userId },
+              select: { bonusTurnoverRequired: true, bonusTurnoverDone: true },
+            });
+            const done = user?.bonusTurnoverDone ?? 0;
+            await postEntryInTx(tx, {
+              userId: deposit.userId,
+              type: "BONUS_CREDIT",
+              amount: 0,
+              bonusAmount: cappedBonus,
+              referenceId: `bonus:${depositId}`,
+              description: `Promo bonus ${deposit.promoCode} (${deposit.promoPercent}%)`,
+            });
+            await tx.user.update({
+              where: { id: deposit.userId },
+              data: {
+                bonusTurnoverRequired: (user?.bonusTurnoverRequired ?? 0) + (deposit.amount + cappedBonus) * turnoverMult - done,
+                bonusTurnoverDone: 0,
+                bonusExpiresAt: new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000),
               },
             });
           }

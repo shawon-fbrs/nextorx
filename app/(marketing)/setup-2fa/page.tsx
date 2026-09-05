@@ -84,8 +84,7 @@ export default function Setup2FAPage() {
           setBackupCodes(codes);
           setStep('backup');
         } else {
-          router.push('/trade/demo');
-          router.refresh();
+          await routeAfterSetup();
         }
       }
     } catch {
@@ -93,6 +92,17 @@ export default function Setup2FAPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const routeAfterSetup = async () => {
+    const profile = await fetch('/api/account/profile').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const role = profile?.user?.role as string | undefined;
+    if (role === 'super_admin' || role === 'finance' || role === 'support' || role === 'risk') {
+      router.push('/console-panel');
+    } else {
+      router.push('/trade/demo');
+    }
+    router.refresh();
   };
 
   return (
@@ -234,7 +244,7 @@ export default function Setup2FAPage() {
                 <span className="text-[11px] text-text-dark leading-relaxed">I have saved these codes</span>
               </label>
               <button
-                onClick={() => { router.push('/trade/demo'); router.refresh(); }}
+                onClick={() => routeAfterSetup()}
                 disabled={!backupSaved}
                 className="w-full bg-green hover:bg-green-hover text-white font-bold text-sm py-3 rounded-xl transition-colors shadow-lg shadow-green/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               >

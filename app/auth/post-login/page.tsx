@@ -38,6 +38,17 @@ export default function PostLoginPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: user.email, success: true }),
           }).catch(() => {});
+          try {
+            const ref = localStorage.getItem('nextorx-ref');
+            if (ref) {
+              localStorage.removeItem('nextorx-ref');
+              await fetch('/api/account/apply-ref', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: ref }),
+              }).catch(() => {});
+            }
+          } catch {}
         }
 
         const isAdmin = Boolean(user.role && ADMIN_ROLES.has(user.role));

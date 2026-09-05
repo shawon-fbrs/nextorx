@@ -48,12 +48,21 @@ export default function RegisterPage() {
         return;
       }
 
+      const ref = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('ref')?.trim().toUpperCase() || undefined
+        : undefined;
+      if (ref) {
+        try {
+          localStorage.setItem('nextorx-ref', ref);
+        } catch {}
+      }
       const { data, error: authError } = await authClient.signUp.email({
         email,
         password,
         name: `${firstName} ${lastName}`.trim() || email.split('@')[0],
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
+        ...(ref ? { referredBy: ref } : {}),
       } as Parameters<typeof authClient.signUp.email>[0]);
 
       if (authError) {

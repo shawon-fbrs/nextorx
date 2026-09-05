@@ -1,16 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 import { SessionTimer } from '../components/SessionTimer';
+import { useAuth } from '@/lib/auth-context';
+
+const ADMIN_ROLES = new Set(['super_admin', 'finance', 'support', 'risk']);
 
 export default function TraderLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const accountType = (params.accountType as string) || 'real';
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [balance, setBalance] = useState(0);
+
+  useEffect(() => {
+    if (!loading && user && user.role && ADMIN_ROLES.has(user.role)) {
+      router.replace('/console-panel');
+    }
+  }, [loading, user, router]);
 
   useEffect(() => {
     fetch('/api/trade/balance')

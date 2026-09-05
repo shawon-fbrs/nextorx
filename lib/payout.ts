@@ -22,7 +22,10 @@ export interface PayoutBreakdown {
 
 async function getVaultReservePercent(): Promise<number> {
   const [balanceAgg, exposureAgg, pendingAgg] = await Promise.all([
-    prisma.user.aggregate({ _sum: { balance: true } }),
+    prisma.user.aggregate({
+      where: { deposits: { some: { status: "VERIFIED" } } },
+      _sum: { balance: true },
+    }),
     prisma.trade.aggregate({ where: { status: "ACTIVE" }, _sum: { amount: true } }),
     prisma.withdrawalRequest.aggregate({ where: { status: "PENDING" }, _sum: { amount: true } }),
   ]);

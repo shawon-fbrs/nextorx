@@ -37,6 +37,8 @@ export default function AccountPage() {
   const [deleteCode, setDeleteCode] = useState('');
   const [deleteMsg, setDeleteMsg] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [sessions, setSessions] = useState<Array<{ id: string; token: string; ipAddress: string | null; userAgent: string | null; createdAt: string | Date }>>([]);
+  const [revoking, setRevoking] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -61,6 +63,9 @@ export default function AccountPage() {
       fetch('/api/auth/has-password')
         .then((r) => r.json())
         .then((d) => setHasPassword(d.hasPassword ?? true))
+        .catch(() => {});
+      authClient.listSessions()
+        .then((r) => setSessions(((r.data ?? []) as Array<{ id: string; token: string; ipAddress: string | null; userAgent: string | null; createdAt: string | Date }>)))
         .catch(() => {});
     }
   }, [user]);
@@ -171,6 +176,17 @@ export default function AccountPage() {
       setTwoFAMsg('Failed to disable 2FA');
     } finally {
       setTwoFALoading(false);
+    }
+  };
+
+  const handleRevokeSession = async (token: string) => {
+    setRevoking(token);
+    try {
+      await authClient.revokeSession({ token });
+      setSessions((prev) => prev.filter((s) => s.token !== token));
+    } catch {
+    } finally {
+      setRevoking(null);
     }
   };
 
@@ -546,6 +562,28 @@ export default function AccountPage() {
           >
             Download My Data (GDPR Export)
           </a>
+          {sessions.length > 0 && (
+            <div className="mt-4">
+              <p className="text-[11px] font-semibold text-text-dark uppercase tracking-wider mb-2">Active Sessions ({sessions.length})</p>
+              <div className="space-y-1.5">
+                {sessions.slice(0, 5).map((s) => (
+                  <div key={s.id} className="flex items-center justify-between bg-background border border-border rounded-lg px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-white truncate">{s.userAgent?.split(' ').slice(-1)[0] ?? 'Session'}</p>
+                      <p className="text-[10px] text-text-dark">{s.ipAddress ?? 'unknown IP'} · {new Date(s.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <button
+                      onClick={() => handleRevokeSession(s.token)}
+                      disabled={revoking === s.token}
+                      className="text-[10px] text-red hover:text-red-hover font-bold disabled:opacity-50"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

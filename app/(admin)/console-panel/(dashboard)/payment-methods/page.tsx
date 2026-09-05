@@ -36,6 +36,7 @@ export default function PaymentMethodsPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [picker, setPicker] = useState<{ methodId: string; field: 'logoUrl' | 'networkLogoUrl' | 'accountQrUrl'; label: string } | null>(null);
 
   const fetchMethods = useCallback(async () => {
     setIsLoading(true);
@@ -115,6 +116,20 @@ export default function PaymentMethodsPage() {
     }
   };
 
+  const handleMedia = async (url: string | null) => {
+    if (!picker) return;
+    try {
+      await fetch('/api/admin/payment-methods', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: picker.methodId, [picker.field]: url ?? '' }),
+      });
+      setPicker(null);
+      fetchMethods();
+    } catch {
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -148,12 +163,24 @@ export default function PaymentMethodsPage() {
                     <Badge variant={m.active ? 'success' : 'neutral'}>{m.active ? 'active' : 'off'}</Badge>
                   </div>
                   <AddressEditor method={m} onSave={handleAddress} />
+                  <MediaRow
+                    method={m}
+                    onPick={(field, label) => setPicker({ methodId: m.id, field, label })}
+                  />
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {picker && (
+        <ResourcePicker
+          title={picker.label}
+          onClose={() => setPicker(null)}
+          onPick={handleMedia}
+        />
+      )}
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)}>
         <DialogHeader onClose={() => setDialogOpen(false)}>
@@ -182,8 +209,110 @@ export default function PaymentMethodsPage() {
   );
 }
 
-function AddressEditor({ method, onSave }: { method: Method; onSave: (m: Method, address: string) => void }) {
-  const [value, setValue] = useState(method.accountAddress ?? '');
+type FullMethod = Method & {
+  logoUrl?: string | null;
+  networkLogoUrl?: string | null;
+  accountQrUrl?: string | null;
+};
+
+function MediaRow({
+  method,
+  onPick,
+}: {
+  method: FullMethod;
+  onPick: (field: 'logoUrl' | 'networkLogoUrl' | 'accountQrUrl', label: string) => void;
+}) {
+  const items: Array<{ field: 'logoUrl' | 'networkLogoUrl' | 'accountQrUrl'; label: string; value?: string | null }> = [
+    { field: 'logoUrl', label: 'Logo', value: method.logoUrl },
+    { field: 'networkLogoUrl', label: 'Network logo', value: method.networkLogoUrl },
+    { field: 'accountQrUrl', label: 'Deposit QR', value: method.accountQrUrl },
+  ];
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {items.map((item) => (
+        <button
+          key={item.field}
+          onClick={() => onPick(item.field, `${method.label} — ${item.label}`)}
+          className="flex items-center gap-2 border border-border rounded-lg px-2 py-1.5 hover:border-blue/50 transition-colors"
+          title="Pick from media library"
+        >
+          {item.value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.value} alt={item.label} className="w-8 h-8 object-contain bg-black/40 rounded" />
+          ) : (
+            <span className="w-8 h-8 rounded bg-surface border border-dashed border-border flex items-center justify-center text-textDark text-sm">+</span>
+          )}
+          <span className="text-[10px] text-textDark font-semibold">{item.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ResourcePicker({
+  title,
+  onClose,
+  onPick,
+}: {
+  title: string;
+  onClose: () => void;
+  onPick: (url: string | null) => void;
+}) {
+  const [cats, setCats] = useState<Array<{ id: string; name: string; assets: Array<{ id: string; url: string; filename: string }> }>>([]);
+  const [catId, setCatId] = useState<string>('');
+
+  useEffect(() => {
+    fetch('/api/admin/resources')
+      .then((r) => r.json())
+      .then((d) => {
+        const list = d.categories ?? [];
+        setCats(list);
+        if (list.length > 0) setCatId(list[0].id);
+      })
+      .catch(() => {});
+  }, []);
+
+  const assets = cats.find((c) => c.id === catId)?.assets ?? [];
+
+  return (
+    <Dialog open onClose={onClose}>
+      <DialogHeader onClose={onClose}>
+        <h2 className="text-lg font-bold text-white">{title}</h2>
+      </DialogHeader>
+      <DialogContent className="space-y-3">
+        <div className="flex gap-2 flex-wrap">
+          {cats.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCatId(c.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${catId === c.id ? 'border-blue/50 bg-blue/10 text-white' : 'border-border text-textDark'}`}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+        {assets.length === 0 ? (
+          <p className="text-xs text-textDark text-center py-6">No images. Upload some under Resources first.</p>
+        ) : (
+          <div className="grid grid-cols-4 gap-2 max-h-72 overflow-y-auto">
+            {assets.map((a) => (
+              <button key={a.id} onClick={() => onPick(a.url)} className="border border-border rounded-lg overflow-hidden hover:border-blue/50 bg-black/40" title={a.filename}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={a.url} alt={a.filename} className="w-full h-16 object-contain" />
+              </button>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+      <DialogFooter>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="ghost" onClick={() => onPick(null)}>Clear</Button>
+      </DialogFooter>
+    </Dialog>
+  );
+}
+
+function AddressEditor({ method, onSave }: { method: Method; onSave: (m: Method, address: string) => void }) {  const [value, setValue] = useState(method.accountAddress ?? '');
   const [saved, setSaved] = useState(false);
   return (
     <div className="flex gap-2">

@@ -7,6 +7,11 @@ export const VAULT_ACCOUNT_ID = PLATFORM_ACCOUNT_ID;
 
 const SYSTEM_USER_IDS = [VAULT_ACCOUNT_ID];
 
+const REAL_USER_FILTER = {
+  id: { notIn: SYSTEM_USER_IDS },
+  deposits: { some: { status: "VERIFIED" as const } },
+};
+
 export interface VaultStats {
   treasury: number;
   owed: number;
@@ -25,11 +30,11 @@ export async function getVaultStats(): Promise<VaultStats> {
       _sum: { amount: true },
     }),
     prisma.user.aggregate({
-      where: { id: { notIn: SYSTEM_USER_IDS } },
+      where: REAL_USER_FILTER,
       _sum: { balance: true },
     }),
     prisma.user.aggregate({
-      where: { id: { notIn: SYSTEM_USER_IDS } },
+      where: REAL_USER_FILTER,
       _sum: { bonusBalance: true },
     }),
   ]);
@@ -62,7 +67,7 @@ export interface VaultSnapshot {
 export async function getVaultSnapshot(): Promise<VaultSnapshot> {
   const [balanceAgg, exposureAgg, pendingAgg, recentPaid] = await Promise.all([
     prisma.user.aggregate({
-      where: { id: { notIn: SYSTEM_USER_IDS } },
+      where: REAL_USER_FILTER,
       _sum: { balance: true },
     }),
     prisma.trade.aggregate({ where: { status: "ACTIVE" }, _sum: { amount: true } }),

@@ -7,6 +7,7 @@ export const SETTING_DEFAULTS: Record<string, { value: number; label: string }> 
   defaultPayoutPercent: { value: 80, label: "Default payout percent" },
   minTradeAmount: { value: 100, label: "Min trade amount (cents)" },
   maxTradeAmount: { value: 500000, label: "Max trade amount (cents)" },
+  referralBonusAmount: { value: 2000, label: "Referral bonus on first deposit (cents)" },
   balanceMultiplierDay1: { value: 150, label: "Balance multiplier day 1 (x100)" },
   balanceMultiplierDay30: { value: 200, label: "Balance multiplier day 30 (x100)" },
   balanceMultiplierDay90: { value: 300, label: "Balance multiplier day 90 (x100)" },

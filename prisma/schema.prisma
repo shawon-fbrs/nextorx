@@ -296,6 +296,16 @@ model PromoCodeUse {
   @@index([userId])
 }
 
+model Referral {
+  id         String   @id @default(uuid())
+  referrerId String
+  referredId String   @unique
+  bonusPaid  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([referrerId, createdAt(sort: Desc)])
+}
+
 // ─────────────────────────── OTC trading ───────────────────────────
 
 model Pair {
@@ -454,6 +464,28 @@ model SecondCandle {
 
   @@unique([pairId, timestamp])
   @@index([pairId, timestamp(sort: Desc)])
+}
+
+// ─────────────────────────── media library ───────────────────────────
+
+model ResourceCategory {
+  id        String          @id @default(uuid())
+  name      String          @unique
+  createdAt DateTime        @default(now())
+  assets    ResourceAsset[]
+}
+
+model ResourceAsset {
+  id         String           @id @default(uuid())
+  categoryId String
+  category   ResourceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  filename   String
+  mime       String
+  size       Int
+  data       Bytes
+  createdAt  DateTime         @default(now())
+
+  @@index([categoryId, createdAt(sort: Desc)])
 }
 
 // ─────────────────────────── compliance ───────────────────────────

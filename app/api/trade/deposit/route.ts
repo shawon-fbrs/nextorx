@@ -1,7 +1,27 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { requireUser, toJsonError } from "@/lib/api";
+import { requireUser, toJsonError, parseListQuery } from "@/lib/api";
 import { createDepositRequest } from "@/lib/services/deposits";
+import { prisma } from "@/lib/db";
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await requireUser();
+    const { limit } = parseListQuery(request.nextUrl, undefined, 50);
+    const deposits = await prisma.depositRequest.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: {
+        id: true, amount: true, method: true, network: true,
+        status: true, note: true, createdAt: true, reviewedAt: true,
+      },
+    });
+    return Response.json({ deposits });
+  } catch (e) {
+    return toJsonError(e);
+  }
+}
 
 const depositSchema = z.object({
   amount: z.number().int().min(100),

@@ -68,6 +68,40 @@ export async function settleTradeById(tradeId: string): Promise<boolean> {
           },
         });
       }
+      const bonusUser = await tx.user.findUnique({
+        where: { id: trade.userId },
+        select: { bonusBalance: true, bonusTurnoverRequired: true, bonusTurnoverDone: true },
+      });
+      if (bonusUser && bonusUser.bonusTurnoverRequired > 0) {
+        const done = bonusUser.bonusTurnoverDone + trade.amount;
+        if (done >= bonusUser.bonusTurnoverRequired && bonusUser.bonusBalance > 0) {
+          const convertible = bonusUser.bonusBalance;
+          await postEntryInTx(tx, {
+            userId: trade.userId,
+            type: "BONUS_CONVERT",
+            amount: convertible,
+            referenceId: `bonus-convert:${trade.userId}:${trade.id}`,
+            description: "Bonus wagering complete — converted to real balance",
+          });
+          await postEntryInTx(tx, {
+            userId: trade.userId,
+            type: "BONUS_CONVERT",
+            amount: 0,
+            bonusAmount: -convertible,
+            referenceId: `bonus-convert-b:${trade.userId}:${trade.id}`,
+            description: "Bonus wagering complete — bonus cleared",
+          });
+          await tx.user.update({
+            where: { id: trade.userId },
+            data: { bonusTurnoverRequired: 0, bonusTurnoverDone: 0, bonusExpiresAt: null },
+          });
+        } else {
+          await tx.user.update({
+            where: { id: trade.userId },
+            data: { bonusTurnoverDone: done },
+          });
+        }
+      }
     });
 
     return true;

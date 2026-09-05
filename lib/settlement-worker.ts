@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { settleTradeById } from "@/lib/settle-trade";
+import { postEntryInTx } from "@/lib/ledger";
 
 const POLL_INTERVAL_MS = 1000;
 const BATCH_SIZE = 100;
@@ -72,7 +73,44 @@ async function tick(): Promise<void> {
 export function startSettlementWorker(): void {
   if (timer) return;
   timer = setInterval(() => void tick(), POLL_INTERVAL_MS);
+  setInterval(() => void expireBonuses(), 60 * 60 * 1000);
   console.log("[Settlement] Worker started (1s poll, batch 100)");
+}
+
+async function expireBonuses(): Promise<void> {
+  try {
+    const expired = await prisma.user.findMany({
+      where: {
+        bonusBalance: { gt: 0 },
+        bonusExpiresAt: { lt: new Date() },
+      },
+      select: { id: true, bonusBalance: true },
+      take: 500,
+    });
+    for (const u of expired) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          await postEntryInTx(tx, {
+            userId: u.id,
+            type: "BONUS_EXPIRE",
+            amount: 0,
+            bonusAmount: -u.bonusBalance,
+            referenceId: `bonus-expire:${u.id}:${Date.now()}`,
+            description: "Bonus expired",
+          });
+          await tx.user.update({
+            where: { id: u.id },
+            data: { bonusTurnoverRequired: 0, bonusTurnoverDone: 0, bonusExpiresAt: null },
+          });
+        });
+      } catch (e) {
+        console.error("[Settlement] Bonus expiry failed for", u.id, e);
+      }
+    }
+    if (expired.length > 0) console.log(`[Settlement] Expired bonuses for ${expired.length} users`);
+  } catch (e) {
+    console.error("[Settlement] Bonus expiry sweep error:", e);
+  }
 }
 
 export function stopSettlementWorker(): void {

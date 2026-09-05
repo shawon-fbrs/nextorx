@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, ReactNode } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -58,6 +58,33 @@ export function Header({ balance }: HeaderProps) {
   const [expanded, setExpanded] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [notifications, setNotifications] = useState<Array<{ id: string; type: string; title: string; body: string; readAt: string | null; createdAt: string }>>([]);
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch('/api/notifications?limit=10')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) {
+          setNotifications(d.notifications ?? []);
+          setUnread(d.unread ?? 0);
+        }
+      })
+      .catch(() => {});
+  }, [user]);
+
+  const markAllRead = async () => {
+    try {
+      await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      });
+      setUnread(0);
+      setNotifications((prev) => prev.map((n) => ({ ...n, readAt: new Date().toISOString() })));
+    } catch {}
+  };
   const [editingDemo, setEditingDemo] = useState(false);
   const [demoValue, setDemoValue] = useState('');
   const active = accountData[accountType];
@@ -111,50 +138,33 @@ export function Header({ balance }: HeaderProps) {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
             </svg>
-            <span className="absolute top-1 right-1 flex h-4 w-4">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red opacity-75" />
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-red text-[9px] font-bold text-white items-center justify-center">3</span>
-            </span>
+            {unread > 0 && (
+              <span className="absolute top-1 right-1 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red opacity-75" />
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-red text-[9px] font-bold text-white items-center justify-center">{unread > 9 ? '9+' : unread}</span>
+              </span>
+            )}
           </button>
 
           <div className={`absolute top-full right-0 mt-2 w-80 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-[200] ${notifOpen ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
             <div className="px-4 pt-4 pb-2 flex items-center justify-between">
               <span className="text-sm text-white font-bold">Notifications</span>
-              <button className="text-[11px] text-blue hover:text-blue-hover transition-colors font-semibold">Mark all read</button>
+              <button onClick={markAllRead} className="text-[11px] text-blue hover:text-blue-hover transition-colors font-semibold">Mark all read</button>
             </div>
             <div className="max-h-64 overflow-y-auto">
-              <div className="px-4 py-3 hover:bg-surface-hover transition-colors cursor-pointer border-l-2 border-l-blue bg-blue/5">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-green/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <svg className="w-4 h-4 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
+              {notifications.length === 0 ? (
+                <p className="text-[11px] text-text-dark text-center py-6">No notifications yet.</p>
+              ) : (
+                notifications.map((n) => (
+                  <div key={n.id} className={`px-4 py-3 hover:bg-surface-hover transition-colors border-l-2 ${n.readAt ? 'border-l-transparent opacity-60' : 'border-l-blue bg-blue/5'}`}>
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[11px] font-bold text-white">Trade Won</span>
-                      <span className="text-[10px] text-text-dark">2m ago</span>
+                      <span className="text-[11px] font-bold text-white">{n.title}</span>
+                      <span className="text-[10px] text-text-dark">{new Date(n.createdAt).toLocaleString()}</span>
                     </div>
-                    <p className="text-[11px] text-text leading-relaxed">EUR/USD trade closed in profit. <span className="text-green font-bold">+$8.50</span></p>
+                    <p className="text-[11px] text-text leading-relaxed">{n.body}</p>
                   </div>
-                </div>
-              </div>
-              <div className="px-4 py-3 hover:bg-surface-hover transition-colors cursor-pointer border-l-2 border-l-transparent opacity-60">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <svg className="w-4 h-4 text-text-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[11px] font-bold text-text">Account Verified</span>
-                      <span className="text-[10px] text-text-dark">3h ago</span>
-                    </div>
-                    <p className="text-[11px] text-text-dark leading-relaxed">Your account has been verified.</p>
-                  </div>
-                </div>
-              </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -307,13 +317,22 @@ export function Header({ balance }: HeaderProps) {
         <div className="w-px h-8 bg-border" />
 
         <Link
-          href={`/trade/${accountType}`}
+          href="/more/deposit"
           className="bg-green hover:bg-green-hover text-white font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-green/20"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
           </svg>
           Deposit
+        </Link>
+        <Link
+          href="/more/withdraw"
+          className="border border-border hover:bg-surface-hover text-text hover:text-white font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
+          </svg>
+          Withdraw
         </Link>
       </div>
     </header>

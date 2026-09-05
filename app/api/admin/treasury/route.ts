@@ -14,6 +14,7 @@ export async function GET() {
 
     const [
       balanceAgg,
+      demoAgg,
       pendingWithdrawals,
       todayDeposits,
       todayWithdrawals,
@@ -21,6 +22,12 @@ export async function GET() {
       vault,
     ] = await Promise.all([
       prisma.user.aggregate({
+        where: { deposits: { some: { status: "VERIFIED" } } },
+        _sum: { balance: true },
+      }),
+
+      prisma.user.aggregate({
+        where: { deposits: { none: { status: "VERIFIED" } } },
         _sum: { balance: true },
       }),
 
@@ -74,6 +81,7 @@ export async function GET() {
     ]);
 
     const totalBalance = Number(balanceAgg._sum.balance ?? 0);
+    const demoBalance = Number(demoAgg._sum.balance ?? 0);
     const pendingCount = pendingWithdrawals._count;
     const pendingAmount = Number(pendingWithdrawals._sum.amount ?? 0);
 
@@ -99,6 +107,7 @@ export async function GET() {
     return Response.json({
       snapshot: {
         totalBalance,
+        demoBalance,
         userLiabilities: totalBalance,
         pendingWithdrawals: pendingCount,
         pendingWithdrawalAmount: pendingAmount,
