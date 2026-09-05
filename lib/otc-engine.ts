@@ -1,240 +1,329 @@
-import { WebSocket } from 'ws';
-import { prisma } from './db';
+import { createHash, randomBytes } from "crypto";
+import { prisma } from "./db";
+import {
+  computeSecond,
+  dayStringUTC,
+  secondOfDayUTC,
+  secondStartMs,
+  SECONDS_PER_DAY,
+  TICKS_PER_SECOND,
+} from "./pf-math";
+import type { PairState, CandleData, TickMessage, CandleCloseMessage } from "./otc-types";
+import { WebSocket } from "ws";
 
-export interface PairState {
-  pairId: string;
-  name: string;
-  basePrice: number;
-  volatility: number;
-  payoutPercent: number;
-  spread: number;
-  currentPrice: number;
-  candle: CandleData;
-  subscribers: Set<WebSocket>;
-}
+export type { PairState, CandleData, TickMessage, CandleCloseMessage };
 
-export interface CandleData {
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
-
-export interface TickMessage {
-  type: 'tick';
-  pairId: string;
-  price: number;
-  timestamp: number;
-  candle: CandleData;
-}
-
-export interface CandleCloseMessage {
-  type: 'candle:close';
-  pairId: string;
-  candle: CandleData;
-}
-
-const TICK_INTERVAL_MS = 200;
+const TICK_INTERVAL_MS = 100;
 const CANDLE_INTERVAL_MS = 60_000;
+const BACKFILL_15M_SECONDS = 900;
+
+export interface SeedInfo {
+  day: string;
+  seedHash: string;
+  revealed: boolean;
+}
+
+export async function ensureSeedForDay(day: string): Promise<SeedInfo> {
+  const existing = await prisma.serverSeed.findUnique({ where: { day } });
+  if (existing) {
+    return { day, seedHash: existing.seedHash, revealed: existing.revealed };
+  }
+  const seed = randomBytes(32).toString("hex");
+  const seedHash = createHash("sha256").update(seed, "utf8").digest("hex");
+  const created = await prisma.serverSeed.create({
+    data: { day, seedHash, seed, revealed: false },
+  });
+  return { day, seedHash: created.seedHash, revealed: false };
+}
+
+async function getSeedValue(day: string): Promise<string> {
+  const info = await ensureSeedForDay(day);
+  if (!info) throw new Error("Seed unavailable");
+  const row = await prisma.serverSeed.findUnique({ where: { day } });
+  if (!row?.seed) throw new Error("Seed unavailable");
+  return row.seed;
+}
+
+export async function revealDueSeeds(now = new Date()): Promise<string[]> {
+  const today = dayStringUTC(now);
+  const revealed: string[] = [];
+  const pending = await prisma.serverSeed.findMany({ where: { revealed: false } });
+  for (const row of pending) {
+    if (row.day < today) {
+      await prisma.serverSeed.update({
+        where: { id: row.id },
+        data: { revealed: true, revealedAt: now },
+      });
+      revealed.push(row.day);
+    }
+  }
+  return revealed;
+}
+
+export async function getSeedHash(day: string): Promise<SeedInfo> {
+  return ensureSeedForDay(day);
+}
+
+export async function getSeedReveal(day: string): Promise<{ day: string; seed: string } | null> {
+  const row = await prisma.serverSeed.findUnique({ where: { day } });
+  if (!row || !row.revealed || !row.seed) return null;
+  return { day, seed: row.seed };
+}
 
 export class OTCEngine {
   private pairs = new Map<string, PairState>();
   private tickTimer: ReturnType<typeof setInterval> | null = null;
   private candleTimer: ReturnType<typeof setInterval> | null = null;
+  private persistTimer: ReturnType<typeof setInterval> | null = null;
+  private seedTimer: ReturnType<typeof setInterval> | null = null;
   private broadcast: ((msg: TickMessage | CandleCloseMessage) => void) | null = null;
+  private onSeedRevealed: ((day: string, seed: string) => void) | null = null;
+  private currentDay = "";
+  private currentSeed = "";
+  private secondCloses = new Map<string, number>();
+  private lastPersistedSecond = 0;
 
   async init() {
     let retries = 10;
     while (retries > 0) {
       try {
-        const dbPairs = await prisma.pair.findMany({ where: { isActive: true } });
-        if (dbPairs.length === 0) {
-          console.log('[OTC] No active pairs. Engine running empty — pairs are admin-created.');
-        }
+        const now = new Date();
+        this.currentDay = dayStringUTC(now);
+        this.currentSeed = await getSeedValue(this.currentDay);
+
         const pairs = await prisma.pair.findMany({ where: { isActive: true } });
+        if (pairs.length === 0) {
+          console.log("[OTC] No active pairs. Engine running empty — pairs are admin-created.");
+        }
         for (const p of pairs) {
-      const basePrice = Number(p.basePrice);
-      const volatility = Number(p.volatility);
-      const now = Date.now();
-      const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
-
-      const state: PairState = {
-        pairId: p.id,
-        name: p.name,
-        basePrice,
-        volatility,
-        payoutPercent: Number(p.payoutPercent),
-        spread: Number(p.spread),
-        currentPrice: basePrice,
-        candle: {
-          timestamp: candleStart,
-          open: basePrice,
-          high: basePrice,
-          low: basePrice,
-          close: basePrice,
-          volume: 0,
-        },
-        subscribers: new Set(),
-      };
-
-      this.pairs.set(p.id, state);
-    }
-
-    await this.seedHistoricalCandles();
-
-    for (const state of Array.from(this.pairs.values())) {
-      const lastCandle = await prisma.candle.findFirst({
-        where: { pairId: state.pairId },
-        orderBy: { timestamp: 'desc' },
-      });
-      if (lastCandle) {
-        const closePrice = Number(lastCandle.close);
-        state.currentPrice = closePrice;
-        state.candle = {
-          timestamp: Number(lastCandle.timestamp),
-          open: closePrice,
-          high: closePrice,
-          low: closePrice,
-          close: closePrice,
-          volume: 0,
-        };
-      }
-    }
+          await this.loadPairState(p.id);
+        }
+        await this.backfillRecentSeconds();
         return;
       } catch (e) {
         retries--;
         if (retries <= 0) {
-          console.error('[OTC] Failed to init after retries:', e);
+          console.error("[OTC] Failed to init after retries:", e);
           return;
         }
         console.log(`[OTC] DB not ready, retrying in 3s... (${retries} left)`);
-        await new Promise(r => setTimeout(r, 3000));
+        await new Promise((r) => setTimeout(r, 3000));
       }
     }
   }
 
-  private async runSeed() {
-    console.log('[OTC] Auto-seed disabled. Pairs are admin-created only.');
+  private async loadPairState(pairId: string) {
+    const p = await prisma.pair.findUnique({ where: { id: pairId } });
+    if (!p || !p.isActive) return;
+    const basePrice = Number(p.basePrice);
+    const now = Date.now();
+    const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
+    const state: PairState = {
+      pairId: p.id,
+      name: p.name,
+      category: p.category,
+      basePrice,
+      volatility: Number(p.volatility),
+      payoutPercent: Number(p.payoutPercent),
+      spread: Number(p.spread),
+      currentPrice: basePrice,
+      candle: {
+        timestamp: candleStart,
+        open: basePrice,
+        high: basePrice,
+        low: basePrice,
+        close: basePrice,
+        volume: 0,
+      },
+      subscribers: new Set(),
+    };
+
+    this.pairs.set(p.id, state);
+    this.secondCloses.set(p.id, basePrice);
   }
 
-  private async seedHistoricalCandles() {
+  private async backfillRecentSeconds() {
+    const now = Date.now();
+    const currentSecond = Math.floor(now / 1000);
+    const fromSecond = currentSecond - BACKFILL_15M_SECONDS;
+    const day = dayStringUTC(new Date(now));
     for (const state of Array.from(this.pairs.values())) {
-      const existingCount = await prisma.candle.count({
-        where: { pairId: state.pairId },
-      });
-
-      if (existingCount >= 200) continue;
-
-      const candles: Array<{
+      let prevClose = state.basePrice;
+      const rows: Array<{
         pairId: string;
         timestamp: bigint;
         open: number;
         high: number;
         low: number;
         close: number;
-        volume: number;
+        ticks: number;
       }> = [];
-
-      let price = state.basePrice;
-      const now = Date.now();
-      const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
-
-      for (let i = 499; i >= 0; i--) {
-        const ts = candleStart - i * CANDLE_INTERVAL_MS;
-        const r = (v: number) => Math.round(v * 1e8) / 1e8;
-        const open = Math.max(0.00000001, r(price));
-
-        const vol = state.volatility;
-        const bodySize = open * (Math.random() * 0.6 + 0.1) * vol * 0.002;
-        const isBullish = Math.random() > 0.48;
-        const bodyDir = isBullish ? 1 : -1;
-        const close = Math.max(0.00000001, r(open + bodyDir * bodySize));
-        const maxWick = open * vol * 0.0016;
-        const wickUp = Math.random() * maxWick * (isBullish ? 0.6 : 1.0);
-        const wickDown = Math.random() * maxWick * (isBullish ? 1.0 : 0.6);
-        const high = r(Math.max(open, close) + wickUp);
-        const low = Math.max(0.00000001, r(Math.min(open, close) - wickDown));
-        const volume = Math.floor(Math.random() * 10000) + 100;
-
-        candles.push({
+      const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
+      for (let s = Math.max(fromSecond, startOfDay); s < currentSecond; s++) {
+        const secondOfDay = s % SECONDS_PER_DAY;
+        const utcHour = new Date(s * 1000).getUTCHours();
+        const r = computeSecond(
+          this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+          state.basePrice, state.volatility, this.categoryOf(state.pairId), utcHour,
+        );
+        const open = prevClose;
+        rows.push({
           pairId: state.pairId,
-          timestamp: BigInt(ts),
-          open,
-          high,
-          low,
-          close,
-          volume,
+          timestamp: BigInt(s * 1000),
+          open, high: r.high, low: r.low, close: r.close, ticks: TICKS_PER_SECOND,
         });
-
-        const drift = close * (Math.random() - 0.5) * vol * 0.0003;
-        price = Math.max(state.basePrice * 0.5, Math.min(state.basePrice * 2, r(close + drift)));
+        prevClose = r.close;
       }
-
-      await prisma.candle.createMany({ data: candles, skipDuplicates: true });
+      for (let i = 0; i < rows.length; i += 500) {
+        const batch = rows.slice(i, i + 500);
+        await prisma.secondCandle.createMany({ data: batch, skipDuplicates: true });
+      }
+      this.secondCloses.set(state.pairId, prevClose);
+      state.currentPrice = prevClose;
     }
+    if (this.pairs.size > 0) console.log("[OTC] Backfilled last 15m of 1s candles");
+  }
+
+  private categoryOf(pairId: string): string {
+    return this.pairs.get(pairId)?.category ?? "forex";
   }
 
   setBroadcast(fn: (msg: TickMessage | CandleCloseMessage) => void) {
     this.broadcast = fn;
   }
 
+  setSeedRevealedListener(fn: (day: string, seed: string) => void) {
+    this.onSeedRevealed = fn;
+  }
+
   start() {
     if (this.tickTimer) return;
-
-    this.tickTimer = setInterval(() => this.generateTicks(), TICK_INTERVAL_MS);
-    this.candleTimer = setInterval(() => this.closeCandles(), CANDLE_INTERVAL_MS);
+    this.tickTimer = setInterval(() => void this.generateTicks(), TICK_INTERVAL_MS);
+    this.candleTimer = setInterval(() => void this.closeCandles(), CANDLE_INTERVAL_MS);
+    this.seedTimer = setInterval(() => void this.checkSeeds(), 30_000);
+    console.log("[OTC] PF engine started (100ms deterministic ticks)");
   }
 
   stop() {
-    if (this.tickTimer) { clearInterval(this.tickTimer); this.tickTimer = null; }
-    if (this.candleTimer) { clearInterval(this.candleTimer); this.candleTimer = null; }
+    for (const timer of [this.tickTimer, this.candleTimer, this.persistTimer, this.seedTimer]) {
+      if (timer) clearInterval(timer);
+    }
+    this.tickTimer = this.candleTimer = this.persistTimer = this.seedTimer = null;
   }
 
-  private generateTicks() {
+  private tickIndexInSecond(now: number): number {
+    return Math.floor((now % 1000) / TICK_INTERVAL_MS);
+  }
+
+  private async generateTicks() {
     const now = Date.now();
+    const day = dayStringUTC(new Date(now));
+    if (day !== this.currentDay) {
+      await this.rolloverDay(day);
+    }
+    const secondOfDay = secondOfDayUTC(now);
+    const idx = this.tickIndexInSecond(now);
+    const utcHour = new Date(now).getUTCHours();
 
     for (const state of Array.from(this.pairs.values())) {
-      const tick = this.generateTick(state, now);
+      const prevClose = this.secondCloses.get(state.pairId) ?? state.currentPrice;
+      const r = computeSecond(
+        this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+        state.basePrice, state.volatility, this.categoryOf(state.pairId), utcHour,
+      );
+      const price = r.ticks[Math.min(idx, r.ticks.length - 1)];
+      state.currentPrice = Number(price.toFixed(8));
 
-      if (tick) {
-        this.broadcastTick(state, tick);
+      const candle = state.candle;
+      candle.close = state.currentPrice;
+      if (state.currentPrice > candle.high) candle.high = state.currentPrice;
+      if (state.currentPrice < candle.low) candle.low = state.currentPrice;
+      candle.volume += 1;
+
+      const secStart = Math.floor(now / 1000) * 1000;
+      if (secStart !== this.lastPersistedSecond && this.lastPersistedSecond !== 0) {
+        await this.persistSecond(this.lastPersistedSecond, day);
       }
+      if (secStart !== this.lastPersistedSecond) {
+        this.lastPersistedSecond = secStart;
+      }
+      if (idx === TICKS_PER_SECOND - 1) {
+        this.secondCloses.set(state.pairId, r.close);
+      }
+
+      const msg: TickMessage = {
+        type: "tick",
+        pairId: state.pairId,
+        price: state.currentPrice,
+        timestamp: now,
+        candle: { ...candle },
+      };
+      if (this.broadcast) this.broadcast(msg);
     }
   }
 
-  private generateTick(state: PairState, now: number): TickMessage | null {
-    // TRACK-B B1: UNCALIBRATED hand-tuned random walk. Quant calibration
-    // (O-U + GARCH fitted to real tick data) replaces this before L5.
-    const relativeChange = (Math.random() - 0.5) * state.volatility * 0.0006;
-    const newPrice = Math.max(
-      state.basePrice * 0.5,
-      Math.min(state.basePrice * 2, state.currentPrice * (1 + relativeChange))
-    );
-
-    state.currentPrice = Number(newPrice.toFixed(8));
-
-    const candle = state.candle;
-    candle.close = state.currentPrice;
-    candle.high = Math.max(candle.high, state.currentPrice);
-    candle.low = Math.min(candle.low, state.currentPrice);
-    candle.volume += Math.floor(Math.random() * 50) + 1;
-
-    const msg: TickMessage = {
-      type: 'tick',
-      pairId: state.pairId,
-      price: state.currentPrice,
-      timestamp: now,
-      candle: { ...candle },
-    };
-
-    return msg;
+  private async persistSecond(secondStartMs: number, day: string) {
+    const secondOfDay = Math.floor(secondStartMs / 1000) % SECONDS_PER_DAY;
+    const utcHour = new Date(secondStartMs).getUTCHours();
+    const rows = [];
+    for (const state of Array.from(this.pairs.values())) {
+      const prevClose = this.secondCloses.get(state.pairId) ?? state.basePrice;
+      const r = computeSecond(
+        this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+        state.basePrice, state.volatility, state.category, utcHour,
+      );
+      rows.push({
+        pairId: state.pairId,
+        timestamp: BigInt(secondStartMs),
+        open: prevClose,
+        high: r.high,
+        low: r.low,
+        close: r.close,
+        ticks: TICKS_PER_SECOND,
+      });
+      this.secondCloses.set(state.pairId, r.close);
+    }
+    if (rows.length > 0) {
+      await prisma.secondCandle.createMany({ data: rows, skipDuplicates: true }).catch(() => {});
+    }
   }
 
-  private broadcastTick(state: PairState, tick: TickMessage) {
-    if (this.broadcast) {
-      this.broadcast(tick);
+  private async rolloverDay(day: string) {
+    console.log(`[OTC] Rolling to new trading day ${day}`);
+    this.currentDay = day;
+    this.currentSeed = await getSeedValue(day);
+    this.secondCloses.clear();
+    for (const state of Array.from(this.pairs.values())) {
+      this.secondCloses.set(state.pairId, state.basePrice);
+    }
+    const revealed = await revealDueSeeds(new Date());
+    for (const revealedDay of revealed) {
+      const row = await prisma.serverSeed.findUnique({ where: { day: revealedDay } });
+      if (row?.seed && this.onSeedRevealed) this.onSeedRevealed(revealedDay, row.seed);
+    }
+  }
+
+  private async checkSeeds() {
+    try {
+      const now = new Date();
+      const day = dayStringUTC(now);
+      if (day !== this.currentDay) {
+        await this.rolloverDay(day);
+        return;
+      }
+      const revealed = await revealDueSeeds(now);
+      for (const revealedDay of revealed) {
+        const row = await prisma.serverSeed.findUnique({ where: { day: revealedDay } });
+        if (row?.seed && this.onSeedRevealed) this.onSeedRevealed(revealedDay, row.seed);
+      }
+      await prisma.secondCandle.deleteMany({
+        where: { timestamp: { lt: BigInt(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },
+      }).catch(() => {});
+      await prisma.candle.deleteMany({
+        where: { timestamp: { lt: BigInt(now.getTime() - 30 * 24 * 60 * 60 * 1000) } },
+      }).catch(() => {});
+    } catch (e) {
+      console.error("[OTC] Seed check error:", e);
     }
   }
 
@@ -256,7 +345,7 @@ export class OTCEngine {
       };
 
       const closeMsg: CandleCloseMessage = {
-        type: 'candle:close',
+        type: "candle:close",
         pairId: state.pairId,
         candle: oldCandle,
       };
@@ -279,18 +368,26 @@ export class OTCEngine {
     }
   }
 
+  private async runSeed() {
+    console.log("[OTC] Auto-seed disabled. Pairs are admin-created only.");
+  }
+
+  private async seedHistoricalCandles() {
+    for (const state of Array.from(this.pairs.values())) {
+      const existingCount = await prisma.candle.count({ where: { pairId: state.pairId } });
+      if (existingCount >= 200) continue;
+      await this.seedHistoricalCandlesForPair(state);
+    }
+  }
+
   subscribe(pairId: string, ws: WebSocket) {
     const state = this.pairs.get(pairId);
-    if (state) {
-      state.subscribers.add(ws);
-    }
+    if (state) state.subscribers.add(ws);
   }
 
   unsubscribe(pairId: string, ws: WebSocket) {
     const state = this.pairs.get(pairId);
-    if (state) {
-      state.subscribers.delete(ws);
-    }
+    if (state) state.subscribers.delete(ws);
   }
 
   unsubscribeAll(ws: WebSocket) {
@@ -300,7 +397,7 @@ export class OTCEngine {
   }
 
   getPairs() {
-    return Array.from(this.pairs.values()).map(s => ({
+    return Array.from(this.pairs.values()).map((s) => ({
       pairId: s.pairId,
       name: s.name,
       basePrice: s.basePrice,
@@ -321,36 +418,21 @@ export class OTCEngine {
     return this.pairs.get(pairId)?.subscribers;
   }
 
+  getSeedInfo(): SeedInfo | null {
+    if (!this.currentDay) return null;
+    return { day: this.currentDay, seedHash: "", revealed: false };
+  }
+
+  async getSeedHash(): Promise<SeedInfo> {
+    const info = await getSeedHash(this.currentDay || dayStringUTC(new Date()));
+    return info;
+  }
+
   async addPair(pairId: string): Promise<void> {
     if (this.pairs.has(pairId)) return;
-
-    const p = await prisma.pair.findUnique({ where: { id: pairId } });
-    if (!p || !p.isActive) return;
-
-    const basePrice = Number(p.basePrice);
-    const now = Date.now();
-    const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
-
-    const state: PairState = {
-      pairId: p.id,
-      name: p.name,
-      basePrice,
-      volatility: Number(p.volatility),
-      payoutPercent: Number(p.payoutPercent),
-      spread: Number(p.spread),
-      currentPrice: basePrice,
-      candle: {
-        timestamp: candleStart,
-        open: basePrice,
-        high: basePrice,
-        low: basePrice,
-        close: basePrice,
-        volume: 0,
-      },
-      subscribers: new Set(),
-    };
-
-    this.pairs.set(p.id, state);
+    await this.loadPairState(pairId);
+    const state = this.pairs.get(pairId);
+    if (!state) return;
 
     const existingCount = await prisma.candle.count({ where: { pairId } });
     if (existingCount < 200) {
@@ -359,7 +441,7 @@ export class OTCEngine {
 
     const lastCandle = await prisma.candle.findFirst({
       where: { pairId },
-      orderBy: { timestamp: 'desc' },
+      orderBy: { timestamp: "desc" },
     });
     if (lastCandle) {
       const closePrice = Number(lastCandle.close);
@@ -372,51 +454,53 @@ export class OTCEngine {
         close: closePrice,
         volume: 0,
       };
+      this.secondCloses.set(pairId, closePrice);
     }
-
     console.log(`[OTC] Added pair: ${pairId}`);
   }
 
   async removePair(pairId: string): Promise<void> {
     const state = this.pairs.get(pairId);
     if (!state) return;
-
     for (const ws of state.subscribers) {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'pair:removed', pairId }));
+        ws.send(JSON.stringify({ type: "pair:removed", pairId }));
       }
     }
-
     this.pairs.delete(pairId);
+    this.secondCloses.delete(pairId);
     console.log(`[OTC] Removed pair: ${pairId}`);
   }
 
-  async updatePair(pairId: string, changes: Partial<Pick<PairState, 'volatility' | 'payoutPercent' | 'spread' | 'basePrice'>> & { isActive?: boolean }): Promise<void> {
+  async updatePair(
+    pairId: string,
+    changes: Partial<Pick<PairState, "volatility" | "payoutPercent" | "spread" | "basePrice">> & { isActive?: boolean },
+  ): Promise<void> {
     if (changes.isActive === false) {
       await this.removePair(pairId);
       return;
     }
-
     const state = this.pairs.get(pairId);
     if (!state) return;
-
     if (changes.volatility !== undefined) state.volatility = changes.volatility;
     if (changes.payoutPercent !== undefined) state.payoutPercent = changes.payoutPercent;
     if (changes.spread !== undefined) state.spread = changes.spread;
     if (changes.basePrice !== undefined) {
       state.basePrice = changes.basePrice;
       state.currentPrice = changes.basePrice;
+      this.secondCloses.set(pairId, changes.basePrice);
     }
-
     for (const ws of state.subscribers) {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'pair:updated', pairId, changes }));
+        ws.send(JSON.stringify({ type: "pair:updated", pairId, changes }));
       }
     }
   }
 
-  private async seedHistoricalCandlesForPair(state: PairState) {
-    const candles: Array<{
+  async seedHistoricalCandlesForPair(state: PairState) {
+    const now = Date.now();
+    const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
+    const rows: Array<{
       pairId: string;
       timestamp: bigint;
       open: number;
@@ -425,47 +509,44 @@ export class OTCEngine {
       close: number;
       volume: number;
     }> = [];
-
-    let price = state.basePrice;
-    const now = Date.now();
-    const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
-
+    const day = dayStringUTC(new Date(now));
+    const category = this.categoryOf(state.pairId);
+    let prevClose = state.basePrice;
     for (let i = 499; i >= 0; i--) {
-      const ts = candleStart - i * CANDLE_INTERVAL_MS;
-      const r = (v: number) => Math.round(v * 1e8) / 1e8;
-      const open = Math.max(0.00000001, r(price));
-
-      const vol = state.volatility;
-      const bodySize = (Math.random() * 0.6 + 0.1) * vol;
-      const isBullish = Math.random() > 0.48;
-      const bodyDir = isBullish ? 1 : -1;
-      const close = Math.max(0.00000001, r(open + bodyDir * bodySize));
-      const maxWick = vol * 0.8;
-      const wickUp = Math.random() * maxWick * (isBullish ? 0.6 : 1.0);
-      const wickDown = Math.random() * maxWick * (isBullish ? 1.0 : 0.6);
-      const high = r(Math.max(open, close) + wickUp);
-      const low = Math.max(0.00000001, r(Math.min(open, close) - wickDown));
-      const volume = Math.floor(Math.random() * 10000) + 100;
-
-      candles.push({
+      const minuteStart = candleStart - i * CANDLE_INTERVAL_MS;
+      const lastSecond = Math.floor(minuteStart / 1000) + 59;
+      const secondOfDay = lastSecond % SECONDS_PER_DAY;
+      const utcHour = new Date(minuteStart).getUTCHours();
+      const r = computeSecond(
+        this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+        state.basePrice, state.volatility, category, utcHour,
+      );
+      const open = prevClose;
+      rows.push({
         pairId: state.pairId,
-        timestamp: BigInt(ts),
+        timestamp: BigInt(minuteStart),
         open,
-        high,
-        low,
-        close,
-        volume,
+        high: Math.max(open, r.close),
+        low: Math.min(open, r.close),
+        close: r.close,
+        volume: 100,
       });
-
-      const drift = (Math.random() - 0.5) * vol * 0.15;
-      price = Math.max(state.basePrice * 0.5, Math.min(state.basePrice * 2, r(close + drift)));
+      prevClose = r.close;
     }
-
-    await prisma.candle.createMany({ data: candles, skipDuplicates: true });
+    await prisma.candle.createMany({ data: rows, skipDuplicates: true });
   }
 
   async ensureHistoricalCandles() {
     await this.seedHistoricalCandles();
+  }
+
+  async getLastCommittedSecondClose(pairId: string): Promise<number | null> {
+    const row = await prisma.secondCandle.findFirst({
+      where: { pairId },
+      orderBy: { timestamp: "desc" },
+      select: { close: true },
+    });
+    return row ? Number(row.close) : null;
   }
 }
 

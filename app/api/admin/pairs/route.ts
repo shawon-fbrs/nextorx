@@ -9,13 +9,14 @@ const CATEGORY_DEFAULTS: Record<string, { volatility: number; spread: number; pa
   crypto:      { volatility: 2.0,  spread: 0.001,  payoutPercent: 85 },
   commodities: { volatility: 1.0,  spread: 0.0005, payoutPercent: 78 },
   indices:     { volatility: 0.8,  spread: 0.0003, payoutPercent: 82 },
+  stocks:      { volatility: 1.2,  spread: 0.0008, payoutPercent: 82 },
 };
 
 const createPairSchema = z.object({
   id: z.string().min(1).max(20).regex(/^[A-Z0-9]+$/, "ID must be uppercase alphanumeric"),
   name: z.string().min(1).max(50),
   symbol: z.string().max(20).optional(),
-  category: z.enum(["forex", "crypto", "commodities", "indices"]),
+  category: z.enum(["forex", "crypto", "commodities", "indices", "stocks"]),
   basePrice: z.number().positive(),
   volatility: z.number().positive().optional(),
   payoutPercent: z.number().min(50).max(95).optional(),

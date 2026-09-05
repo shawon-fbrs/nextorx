@@ -41,6 +41,7 @@ const CATEGORY_DEFAULTS: Record<string, { volatility: number; spread: number; pa
   crypto:      { volatility: 2.0,  spread: 0.001,  payoutPercent: 85, minTrade: 1,   maxTrade: 5000 },
   commodities: { volatility: 1.0,  spread: 0.0005, payoutPercent: 78, minTrade: 1,   maxTrade: 5000 },
   indices:     { volatility: 0.8,  spread: 0.0003, payoutPercent: 82, minTrade: 1,   maxTrade: 5000 },
+  stocks:      { volatility: 1.2,  spread: 0.0008, payoutPercent: 82, minTrade: 1,   maxTrade: 5000 },
 };
 
 const CATEGORY_OPTIONS = [
@@ -48,6 +49,7 @@ const CATEGORY_OPTIONS = [
   { value: 'crypto', label: 'Crypto' },
   { value: 'commodities', label: 'Commodities' },
   { value: 'indices', label: 'Indices' },
+  { value: 'stocks', label: 'Stocks' },
 ];
 
 type PairForm = {

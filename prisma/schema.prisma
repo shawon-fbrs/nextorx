@@ -23,40 +23,40 @@ model User {
   banExpires    DateTime?
 
   // Platform fields
-  role                String              @default("player")
-  phone               String?
-  nickname            String?
-  firstName           String?
-  lastName            String?
-  country             String?
-  currencyPref        String              @default("USD")
-  balance             Int                 @default(0)
-  bonusBalance        Int                 @default(0)
-  bonusTurnoverRequired Int              @default(0)
-  bonusTurnoverDone   Int                 @default(0)
-  bonusExpiresAt      DateTime?
-  referralCode  String?         @unique
-  referredBy    String?
-  kycStatus     String          @default("NOT_SUBMITTED")
-  twoFactorEnabled Boolean     @default(false)
-  depositLimitDaily Int?
+  role                  String    @default("player")
+  phone                 String?
+  nickname              String?
+  firstName             String?
+  lastName              String?
+  country               String?
+  currencyPref          String    @default("USD")
+  balance               Int       @default(0)
+  bonusBalance          Int       @default(0)
+  bonusTurnoverRequired Int       @default(0)
+  bonusTurnoverDone     Int       @default(0)
+  bonusExpiresAt        DateTime?
+  referralCode          String?   @unique
+  referredBy            String?
+  kycStatus             String    @default("NOT_SUBMITTED")
+  twoFactorEnabled      Boolean   @default(false)
+  depositLimitDaily     Int?
 
-  sessions      Session[]
-  accounts      Account[]
-  twoFactor     TwoFactor?
-  failedLogins  FailedLoginAttempt[]
-  bannedRecord  BannedUser?
-  ledgerEntries LedgerEntry[]
-  deposits      DepositRequest[]
-  withdrawals   WithdrawalRequest[]
-  holds         WalletHold[]
-  trades        Trade[]
-  riskProfile   UserRiskProfile?
-  notifications Notification[]
-  auditLogs     AuditLog[]
-  promoUses     PromoCodeUse[]
-  reviewedDeposits    DepositRequest[]    @relation("DepositReviewer")
-  reviewedWithdrawals WithdrawalRequest[] @relation("WithdrawalReviewer")
+  sessions            Session[]
+  accounts            Account[]
+  twoFactor           TwoFactor?
+  failedLogins        FailedLoginAttempt[]
+  bannedRecord        BannedUser?
+  ledgerEntries       LedgerEntry[]
+  deposits            DepositRequest[]
+  withdrawals         WithdrawalRequest[]
+  holds               WalletHold[]
+  trades              Trade[]
+  riskProfile         UserRiskProfile?
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  promoUses           PromoCodeUse[]
+  reviewedDeposits    DepositRequest[]     @relation("DepositReviewer")
+  reviewedWithdrawals WithdrawalRequest[]  @relation("WithdrawalReviewer")
 
   @@index([role])
   @@index([referredBy])
@@ -97,16 +97,16 @@ model Account {
 }
 
 model TwoFactor {
-  id                     String    @id @default(uuid())
-  secret                 String
-  backupCodes            String
-  userId                 String    @unique
-  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  verified               Boolean   @default(true)
-  failedVerificationCount Int      @default(0)
-  lockedUntil            DateTime?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  id                      String    @id @default(uuid())
+  secret                  String
+  backupCodes             String
+  userId                  String    @unique
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 }
 
 model FailedLoginAttempt {
@@ -120,12 +120,12 @@ model FailedLoginAttempt {
 }
 
 model BannedUser {
-  id        String    @id @default(uuid())
-  userId    String    @unique
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reason    String?
-  bannedAt  DateTime  @default(now())
-  bannedBy  String?
+  id       String   @id @default(uuid())
+  userId   String   @unique
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason   String?
+  bannedAt DateTime @default(now())
+  bannedBy String?
 }
 
 model Verification {
@@ -168,9 +168,9 @@ enum LedgerType {
 }
 
 model LedgerEntry {
-  id                String    @id @default(uuid())
+  id                String     @id @default(uuid())
   userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user              User       @relation(fields: [userId], references: [id], onDelete: Restrict)
   type              LedgerType
   amount            Int
   balanceAfter      Int
@@ -179,11 +179,11 @@ model LedgerEntry {
   description       String?
   checksum          String?
   reversalOfId      String?
-  createdAt         DateTime  @default(now())
+  createdAt         DateTime   @default(now())
 
+  @@unique([userId, type, referenceId])
   @@index([userId, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])
-  @@unique([userId, type, referenceId])
 }
 
 // ─────────────────────────── deposits & withdrawals ───────────────────────────
@@ -195,19 +195,19 @@ enum DepositStatus {
 }
 
 model DepositRequest {
-  id           String        @id @default(uuid())
-  userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  amount       Int
-  method       String
-  network      String?
-  txHash       String?
-  walletAddress String?
-  status       DepositStatus @default(PENDING)
-  reviewedById String?
-  reviewedBy   User?         @relation("DepositReviewer", fields: [reviewedById], references: [id])
-  reviewedAt   DateTime?
-  note         String?
+  id               String        @id @default(uuid())
+  userId           String
+  user             User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  amount           Int
+  method           String
+  network          String?
+  txHash           String?
+  walletAddress    String?
+  status           DepositStatus @default(PENDING)
+  reviewedById     String?
+  reviewedBy       User?         @relation("DepositReviewer", fields: [reviewedById], references: [id])
+  reviewedAt       DateTime?
+  note             String?
   promoCode        String?
   promoPercent     Int?
   promoMaxBonusInt Int?
@@ -224,21 +224,21 @@ enum WithdrawalStatus {
 }
 
 model WithdrawalRequest {
-  id           String           @id @default(uuid())
-  userId       String
-  user         User             @relation(fields: [userId], references: [id], onDelete: Restrict)
-  amount       Int
-  method       String
-  network      String?
+  id            String           @id @default(uuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  amount        Int
+  method        String
+  network       String?
   walletAddress String
-  status       WithdrawalStatus @default(PENDING)
-  reviewedById String?
-  reviewedBy   User?            @relation("WithdrawalReviewer", fields: [reviewedById], references: [id])
-  reviewedAt   DateTime?
-  note         String?
-  tier         Int              @default(1)
-  createdAt    DateTime         @default(now())
-  hold         WalletHold?
+  status        WithdrawalStatus @default(PENDING)
+  reviewedById  String?
+  reviewedBy    User?            @relation("WithdrawalReviewer", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  note          String?
+  tier          Int              @default(1)
+  createdAt     DateTime         @default(now())
+  hold          WalletHold?
 
   @@index([status, createdAt(sort: Desc)])
 }
@@ -250,15 +250,15 @@ enum HoldStatus {
 }
 
 model WalletHold {
-  id             String     @id @default(uuid())
-  userId         String
-  user           User       @relation(fields: [userId], references: [id], onDelete: Restrict)
-  withdrawalId   String     @unique
-  withdrawal     WithdrawalRequest @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
-  amount         Int
-  status         HoldStatus @default(HELD)
-  createdAt      DateTime   @default(now())
-  releasedAt     DateTime?
+  id           String            @id @default(uuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  withdrawalId String            @unique
+  withdrawal   WithdrawalRequest @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+  amount       Int
+  status       HoldStatus        @default(HELD)
+  createdAt    DateTime          @default(now())
+  releasedAt   DateTime?
 
   @@index([userId])
 }
@@ -266,31 +266,31 @@ model WalletHold {
 // ─────────────────────────── promo codes ───────────────────────────
 
 model PromoCode {
-  id              String         @id @default(uuid())
-  code            String         @unique
-  label           String?
-  percent         Int
-  maxBonus        Int
-  minDeposit      Int
-  maxUses         Int
-  usesPerUser     Int
-  validUntil      DateTime?
-  active          Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  uses            PromoCodeUse[]
+  id          String         @id @default(uuid())
+  code        String         @unique
+  label       String?
+  percent     Int
+  maxBonus    Int
+  minDeposit  Int
+  maxUses     Int
+  usesPerUser Int
+  validUntil  DateTime?
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  uses        PromoCodeUse[]
 
   @@index([active])
 }
 
 model PromoCodeUse {
-  id         String    @id @default(uuid())
-  promoId    String
-  promo      PromoCode @relation(fields: [promoId], references: [id], onDelete: Cascade)
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  depositId  String    @unique
+  id          String    @id @default(uuid())
+  promoId     String
+  promo       PromoCode @relation(fields: [promoId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  depositId   String    @unique
   bonusAmount Int
-  createdAt  DateTime  @default(now())
+  createdAt   DateTime  @default(now())
 
   @@index([promoId])
   @@index([userId])
@@ -299,44 +299,44 @@ model PromoCodeUse {
 // ─────────────────────────── OTC trading ───────────────────────────
 
 model Pair {
-  id              String   @id
-  name            String
-  symbol          String?
-  category        String
-  basePrice       Decimal  @db.Decimal(16, 8)
-  volatility      Decimal  @db.Decimal(12, 6)
-  payoutPercent   Decimal  @db.Decimal(5, 2)   @default(80)
-  weekendPayout   Decimal? @db.Decimal(5, 2)
-  spread          Decimal  @db.Decimal(8, 6)   @default(0.0002)
-  isActive        Boolean  @default(true)
-  isFeatured      Boolean  @default(false)
-  minTrade        Decimal  @db.Decimal(10, 2)  @default(1)
-  maxTrade        Decimal  @db.Decimal(10, 2)  @default(5000)
-  maxPayout       Decimal? @db.Decimal(5, 2)   @default(95)
-  sortOrder       Int      @default(0)
-  description     String?
-  tradingHours    String?  @default("24/7")
-  tags            String[]                       @default([])
-  maxDailyVolume  Int?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  candles         Candle[]
-  trades          Trade[]
+  id             String   @id
+  name           String
+  symbol         String?
+  category       String
+  basePrice      Decimal  @db.Decimal(16, 8)
+  volatility     Decimal  @db.Decimal(12, 6)
+  payoutPercent  Decimal  @default(80) @db.Decimal(5, 2)
+  weekendPayout  Decimal? @db.Decimal(5, 2)
+  spread         Decimal  @default(0.0002) @db.Decimal(8, 6)
+  isActive       Boolean  @default(true)
+  isFeatured     Boolean  @default(false)
+  minTrade       Decimal  @default(1) @db.Decimal(10, 2)
+  maxTrade       Decimal  @default(5000) @db.Decimal(10, 2)
+  maxPayout      Decimal? @default(95) @db.Decimal(5, 2)
+  sortOrder      Int      @default(0)
+  description    String?
+  tradingHours   String?  @default("24/7")
+  tags           String[] @default([])
+  maxDailyVolume Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  candles        Candle[]
+  trades         Trade[]
 
   @@index([isActive, sortOrder])
   @@index([category])
 }
 
 model Candle {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   pairId    String
-  pair      Pair     @relation(fields: [pairId], references: [id], onDelete: Cascade)
+  pair      Pair    @relation(fields: [pairId], references: [id], onDelete: Cascade)
   timestamp BigInt
-  open      Decimal  @db.Decimal(16, 8)
-  high      Decimal  @db.Decimal(16, 8)
-  low       Decimal  @db.Decimal(16, 8)
-  close     Decimal  @db.Decimal(16, 8)
-  volume    BigInt   @default(0)
+  open      Decimal @db.Decimal(16, 8)
+  high      Decimal @db.Decimal(16, 8)
+  low       Decimal @db.Decimal(16, 8)
+  close     Decimal @db.Decimal(16, 8)
+  volume    BigInt  @default(0)
 
   @@unique([pairId, timestamp])
   @@index([pairId, timestamp(sort: Desc)])
@@ -356,21 +356,21 @@ enum TradeStatus {
 }
 
 model Trade {
-  id             String        @id @default(uuid())
-  userId         String
-  user           User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  pairId         String
-  pair           Pair          @relation(fields: [pairId], references: [id], onDelete: Restrict)
-  direction      TradeDirection
-  amount         Int
-  payoutPercent  Decimal       @db.Decimal(5, 2)
+  id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  pairId          String
+  pair            Pair           @relation(fields: [pairId], references: [id], onDelete: Restrict)
+  direction       TradeDirection
+  amount          Int
+  payoutPercent   Decimal        @db.Decimal(5, 2)
   durationSeconds Int
-  openPrice      Decimal       @db.Decimal(16, 8)
-  closePrice     Decimal?      @db.Decimal(16, 8)
-  status         TradeStatus   @default(PENDING)
-  profit         Int?
-  settledAt      DateTime?
-  createdAt      DateTime      @default(now())
+  openPrice       Decimal        @db.Decimal(16, 8)
+  closePrice      Decimal?       @db.Decimal(16, 8)
+  status          TradeStatus    @default(PENDING)
+  profit          Int?
+  settledAt       DateTime?
+  createdAt       DateTime       @default(now())
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
@@ -380,19 +380,19 @@ model Trade {
 // ─────────────────────────── user risk ───────────────────────────
 
 model UserRiskProfile {
-  id                String    @id @default(uuid())
-  userId            String    @unique
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  effectiveWinRate  Decimal   @db.Decimal(5, 4) @default(0.48)
-  balanceMultiplier Decimal   @db.Decimal(5, 2) @default(1.5)
-  betLimitDaily     Int       @default(50000)
-  riskScore         Int       @default(0)
-  currentLossStreak Int       @default(0)
-  maxLossStreak     Int       @default(0)
-  totalTrades       Int       @default(0)
-  totalWins         Int       @default(0)
-  flags             Json      @default("[]")
-  updatedAt         DateTime  @updatedAt
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  effectiveWinRate  Decimal  @default(0.48) @db.Decimal(5, 4)
+  balanceMultiplier Decimal  @default(1.5) @db.Decimal(5, 2)
+  betLimitDaily     Int      @default(50000)
+  riskScore         Int      @default(0)
+  currentLossStreak Int      @default(0)
+  maxLossStreak     Int      @default(0)
+  totalTrades       Int      @default(0)
+  totalWins         Int      @default(0)
+  flags             Json     @default("[]")
+  updatedAt         DateTime @updatedAt
 
   @@index([userId])
 }
@@ -426,6 +426,34 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, createdAt(sort: Desc)])
+}
+
+// ─────────────────────────── provably-fair engine ───────────────────────────
+
+model ServerSeed {
+  id         String    @id @default(uuid())
+  day        String    @unique
+  seedHash   String
+  seed       String?
+  revealed   Boolean   @default(false)
+  revealedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([day])
+}
+
+model SecondCandle {
+  id        String  @id @default(uuid())
+  pairId    String
+  timestamp BigInt
+  open      Decimal @db.Decimal(16, 8)
+  high      Decimal @db.Decimal(16, 8)
+  low       Decimal @db.Decimal(16, 8)
+  close     Decimal @db.Decimal(16, 8)
+  ticks     Int     @default(0)
+
+  @@unique([pairId, timestamp])
+  @@index([pairId, timestamp(sort: Desc)])
 }
 
 // ─────────────────────────── compliance ───────────────────────────
@@ -464,22 +492,22 @@ model SelfExclusion {
 }
 
 model PaymentMethod {
-  id              String   @id @default(uuid())
-  name            String
-  label           String
-  active          Boolean  @default(true)
-  sortOrder       Int      @default(0)
-  logoUrl         String?
-  networkName     String   @default("")
-  networkLogoUrl  String?
-  region          String   @default("International")
-  minDeposit      Int      @default(1000)
-  maxDeposit      Int      @default(10000000)
-  minWithdraw     Int      @default(500)
-  maxWithdraw     Int      @default(10000000)
-  accountAddress  String?
-  accountQrUrl    String?
-  createdAt       DateTime @default(now())
+  id             String   @id @default(uuid())
+  name           String
+  label          String
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  logoUrl        String?
+  networkName    String   @default("")
+  networkLogoUrl String?
+  region         String   @default("International")
+  minDeposit     Int      @default(1000)
+  maxDeposit     Int      @default(10000000)
+  minWithdraw    Int      @default(500)
+  maxWithdraw    Int      @default(10000000)
+  accountAddress String?
+  accountQrUrl   String?
+  createdAt      DateTime @default(now())
 
   @@unique([name, networkName])
 }

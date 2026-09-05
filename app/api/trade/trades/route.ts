@@ -6,6 +6,7 @@ import { requireUser, toJsonError, parseListQuery } from "@/lib/api";
 import { postEntryInTx } from "@/lib/ledger";
 import { getSnapshotPrice } from "@/lib/settle-trade";
 import { getPayoutForPair } from "@/lib/payout";
+import { getSetting } from "@/lib/settings";
 
 const MIN_DURATION_SECONDS = 30;
 const MAX_DURATION_SECONDS = 3600;
@@ -64,6 +65,20 @@ export async function POST(request: NextRequest) {
     }
 
     const payoutPercent = await getPayoutForPair(pairId);
+
+    const trader = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { bonusBalance: true },
+    });
+    if ((trader?.bonusBalance ?? 0) > 0) {
+      const maxBonusBet = await getSetting("maxBonusBet");
+      if (amountCents > maxBonusBet) {
+        return Response.json(
+          { error: `Max stake while bonus is active is $${(maxBonusBet / 100).toFixed(2)}` },
+          { status: 400 },
+        );
+      }
+    }
 
     const profile = await prisma.userRiskProfile.findUnique({ where: { userId: user.id } });
 

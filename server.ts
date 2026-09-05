@@ -85,6 +85,15 @@ async function authorizeWs(req: IncomingMessage): Promise<{ userId: string; role
     }
   });
 
+  engine.setSeedRevealedListener((day: string, seed: string) => {
+    const data = JSON.stringify({ type: "seed-revealed", day, seed });
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(data);
+      }
+    });
+  });
+
   engine.start();
 
   // Durable polling settlement (survives restarts via startup reconciliation above).

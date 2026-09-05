@@ -5,6 +5,8 @@ export async function getSnapshotPrice(pairId: string, fallbackBase: number): Pr
   try {
     const { getOTCEngine } = await import("@/lib/otc-engine");
     const engine = await getOTCEngine();
+    const committed = await engine.getLastCommittedSecondClose(pairId);
+    if (committed != null && Number.isFinite(committed) && committed > 0) return committed;
     const live = engine.getCurrentPrice(pairId);
     if (live != null && Number.isFinite(live) && live > 0) return live;
   } catch {}
