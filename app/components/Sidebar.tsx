@@ -68,8 +68,9 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
               <Link
                 key={item.label}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-xl transition-colors relative ${
-                  expanded ? 'px-4 py-2' : 'flex-col py-2 px-0 w-14'
+                title={expanded ? undefined : item.label}
+                className={`flex items-center gap-3 rounded-xl transition-colors relative group ${
+                  expanded ? 'px-4 py-2' : 'justify-center py-2.5 px-0 w-12'
                 } ${
                   isActive
                     ? 'bg-blue/15 text-blue'
@@ -79,13 +80,15 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                 {isActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue rounded-r-md" />
                 )}
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                 </svg>
                 {expanded ? (
                   <span className="text-sm font-medium">{item.label}</span>
                 ) : (
-                  <span className="text-[10px] font-medium uppercase leading-tight text-center">{item.label}</span>
+                  <span className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 whitespace-nowrap bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                    {item.label}
+                  </span>
                 )}
               </Link>
             );
@@ -99,8 +102,9 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
               <Link
                 key={item.label}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-xl transition-colors relative ${
-                  expanded ? 'px-4 py-2' : 'flex-col py-2 px-0 w-14'
+                title={expanded ? undefined : item.label}
+                className={`flex items-center gap-3 rounded-xl transition-colors relative group ${
+                  expanded ? 'px-4 py-2' : 'justify-center py-2.5 px-0 w-12'
                 } ${
                   isActive
                     ? 'bg-blue/15 text-blue'
@@ -110,13 +114,15 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                 {isActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue rounded-r-md" />
                 )}
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                 </svg>
                 {expanded ? (
                   <span className="text-sm font-medium">{item.label}</span>
                 ) : (
-                  <span className="text-[10px] font-medium uppercase leading-tight text-center">{item.label}</span>
+                  <span className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 whitespace-nowrap bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                    {item.label}
+                  </span>
                 )}
               </Link>
             );
