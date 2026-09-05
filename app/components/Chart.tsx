@@ -245,34 +245,12 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   useEffect(() => {
     if (pairId) {
       pairIdRef.current = pairId;
-      if (chartRef.current) {
-        dispose(chartIdRef.current);
-        chartRef.current = null;
-        subscribeBarCallbackRef.current = null;
-      }
-      if (chartContainerRef.current) {
-        const chart = init(chartIdRef.current, { styles: 'dark' });
-        chartRef.current = chart;
-
-        if (chart) {
-          const pricePrec = pairId?.includes('JPY') ? 3 : 5;
-          chart.setSymbol({ ticker: pairId || 'OTC', pricePrecision: pricePrec, volumePrecision: 0 });
-          chart.setPeriod({ span: 1, type: 'minute' });
-          chart.setDataLoader({
-            getBars: async ({ type, timestamp, callback }) => {
-              await loadBars(type, timestamp, callback);
-            },
-            subscribeBar: ({ callback }) => {
-              subscribeBarCallbackRef.current = callback;
-            },
-            unsubscribeBar: () => {
-              subscribeBarCallbackRef.current = null;
-            },
-          });
-          chart.resetData();
-          chart.setBarSpace(8);
-          chart.scrollToRealTime(0);
-        }
+      const chart = chartRef.current;
+      if (chart && chartContainerRef.current) {
+        const pricePrec = pairId.includes('JPY') ? 3 : 5;
+        chart.setSymbol({ ticker: pairId, pricePrecision: pricePrec, volumePrecision: 0 });
+        chart.resetData();
+        chart.scrollToRealTime(0);
       }
     }
   }, [pairId]);

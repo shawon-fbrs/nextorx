@@ -135,6 +135,23 @@ export class OTCEngine {
     const basePrice = Number(p.basePrice);
     const now = Date.now();
     const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
+    const lastSecond = await prisma.secondCandle.findFirst({
+      where: { pairId },
+      orderBy: { timestamp: "desc" },
+      select: { close: true },
+    });
+    const lastMinute = lastSecond
+      ? null
+      : await prisma.candle.findFirst({
+          where: { pairId },
+          orderBy: { timestamp: "desc" },
+          select: { close: true },
+        });
+    const startPrice = lastSecond
+      ? Number(lastSecond.close)
+      : lastMinute
+        ? Number(lastMinute.close)
+        : basePrice;
     const state: PairState = {
       pairId: p.id,
       name: p.name,
@@ -144,20 +161,19 @@ export class OTCEngine {
       volatility: Number(p.volatility),
       payoutPercent: Number(p.payoutPercent),
       spread: Number(p.spread),
-      currentPrice: basePrice,
+      currentPrice: startPrice,
       candle: {
         timestamp: candleStart,
-        open: basePrice,
-        high: basePrice,
-        low: basePrice,
-        close: basePrice,
+        open: startPrice,
+        high: startPrice,
+        low: startPrice,
+        close: startPrice,
         volume: 0,
       },
-      subscribers: new Set(),
+      subscribers: this.pairs.get(p.id)?.subscribers ?? new Set(),
     };
-
     this.pairs.set(p.id, state);
-    this.secondCloses.set(p.id, basePrice);
+    this.secondCloses.set(p.id, startPrice);
   }
 
   private async backfillRecentSeconds() {
@@ -167,7 +183,7 @@ export class OTCEngine {
     const day = dayStringUTC(new Date(now));
     for (const state of Array.from(this.pairs.values())) {
       if (state.feed === "mirror") continue;
-      let prevClose = state.basePrice;
+      let prevClose = this.secondCloses.get(state.pairId) ?? state.basePrice;
       const rows: Array<{
         pairId: string;
         timestamp: bigint;
@@ -500,15 +516,22 @@ export class OTCEngine {
       await this.seedHistoricalCandlesForPair(state);
     }
 
-    const lastCandle = await prisma.candle.findFirst({
+    const lastSecond = await prisma.secondCandle.findFirst({
       where: { pairId },
       orderBy: { timestamp: "desc" },
     });
-    if (lastCandle) {
-      const closePrice = Number(lastCandle.close);
+    const lastCandle = lastSecond
+      ? null
+      : await prisma.candle.findFirst({
+          where: { pairId },
+          orderBy: { timestamp: "desc" },
+        });
+    const anchorCandle = lastSecond ?? lastCandle;
+    if (anchorCandle) {
+      const closePrice = Number(anchorCandle.close);
       state.currentPrice = closePrice;
       state.candle = {
-        timestamp: Number(lastCandle.timestamp),
+        timestamp: Number(anchorCandle.timestamp),
         open: closePrice,
         high: closePrice,
         low: closePrice,
