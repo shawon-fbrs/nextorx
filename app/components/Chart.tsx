@@ -254,9 +254,9 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       pairIdRef.current = pairId;
       const chart = chartRef.current;
       if (chart && chartContainerRef.current) {
-        const pricePrec = pairId.includes('JPY') ? 3 : 5;
-        chart.setSymbol({ ticker: pairId, pricePrecision: pricePrec, volumePrecision: 0 });
         if (seed && seed.pairId === pairId && seed.bars.length > 0) {
+          const pricePrec = pairId.includes('JPY') ? 3 : 5;
+          chart.setSymbol({ ticker: pairId, pricePrecision: pricePrec, volumePrecision: 0 });
           barsCacheRef.current.set(
             pairId,
             seed.bars.map((c) => ({
@@ -268,9 +268,10 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
               volume: Number(c.volume) || 0,
             })),
           );
+          subscribeBarCallbackRef.current = null;
+          chart.resetData();
+          chart.scrollToRealTime(0);
         }
-        chart.resetData();
-        chart.scrollToRealTime(0);
       }
     }
   }, [pairId, seed]);

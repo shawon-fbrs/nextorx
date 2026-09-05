@@ -51,17 +51,30 @@ function getSessionTokenCandidates(req: IncomingMessage): string[] {
 async function authorizeWs(req: IncomingMessage): Promise<{ userId: string; role: string } | null> {
   try {
     const candidates = getSessionTokenCandidates(req);
-    if (candidates.length === 0) return null;
+    if (candidates.length === 0) {
+      console.log("[WS] reject: no session cookie");
+      return null;
+    }
     const session = await prisma.session.findFirst({
       where: { token: { in: candidates }, expiresAt: { gt: new Date() } },
       include: { user: { select: { id: true, role: true, banned: true, banExpires: true } } },
     });
-    if (!session) return null;
-    if (session.user.banned && (!session.user.banExpires || session.user.banExpires.getTime() > Date.now())) return null;
+    if (!session) {
+      console.log(`[WS] reject: session not found (candidates=${candidates.length}, lens=${candidates.map((c) => c.length).join(",")})`);
+      return null;
+    }
+    if (session.user.banned && (!session.user.banExpires || session.user.banExpires.getTime() > Date.now())) {
+      console.log(`[WS] reject: banned user ${session.user.id}`);
+      return null;
+    }
     const ban = await prisma.bannedUser.findUnique({ where: { userId: session.user.id } });
-    if (ban) return null;
+    if (ban) {
+      console.log(`[WS] reject: ban table user ${session.user.id}`);
+      return null;
+    }
     return { userId: session.user.id, role: session.user.role };
-  } catch {
+  } catch (e) {
+    console.log("[WS] reject: authorize error", e instanceof Error ? e.message : e);
     return null;
   }
 }

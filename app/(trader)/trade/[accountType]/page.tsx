@@ -393,7 +393,15 @@ export default function TradingPage() {
             if (stored) return stored.filter((id) => normalized.some((p) => p.id === id));
             return normalized.map((p) => p.id);
           });
-          setActivePair((cur) => cur ?? normalized[0]);
+          setActivePair((cur) => {
+            if (cur && normalized.some((p) => p.id === cur.id)) return cur;
+            try {
+              const last = localStorage.getItem('nextorx-active-pair');
+              const found = last ? normalized.find((p) => p.id === last) : undefined;
+              if (found) return found;
+            } catch {}
+            return normalized[0];
+          });
         }
       })
       .catch(() => {});
@@ -406,6 +414,7 @@ export default function TradingPage() {
       const next = cur.includes(p.id) ? cur : [...cur, p.id];
       try {
         localStorage.setItem('nextorx-visible-pairs', JSON.stringify(next));
+        localStorage.setItem('nextorx-active-pair', p.id);
       } catch {}
       return next;
     });

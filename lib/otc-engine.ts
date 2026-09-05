@@ -585,6 +585,35 @@ export class OTCEngine {
   async seedHistoricalCandlesForPair(state: PairState) {
     const now = Date.now();
     const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
+    const day = dayStringUTC(new Date(now));
+    const category = state.category;
+    const targetEnd = state.currentPrice;
+
+    const runChain = (start: number) => {
+      let prevClose = start;
+      let end = start;
+      for (let i = 499; i >= 0; i--) {
+        const minuteStart = candleStart - i * CANDLE_INTERVAL_MS;
+        const lastSecond = Math.floor(minuteStart / 1000) + 59;
+        const secondOfDay = lastSecond % SECONDS_PER_DAY;
+        const utcHour = new Date(minuteStart).getUTCHours();
+        const r = computeSecond(
+          this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+          state.basePrice, state.volatility, category, utcHour,
+          state.feed === "mirror"
+            ? { anchor: this.anchors.get(state.pairId)?.price }
+            : undefined,
+        );
+        prevClose = r.close;
+        end = r.close;
+      }
+      return end;
+    };
+
+    const trialEnd = runChain(state.basePrice);
+    const factor = trialEnd / state.basePrice;
+    const adjustedStart = trialEnd === 0 ? targetEnd : targetEnd / factor;
+
     const rows: Array<{
       pairId: string;
       timestamp: bigint;
@@ -594,9 +623,7 @@ export class OTCEngine {
       close: number;
       volume: number;
     }> = [];
-    const day = dayStringUTC(new Date(now));
-    const category = this.categoryOf(state.pairId);
-    let prevClose = state.basePrice;
+    let prevClose = adjustedStart;
     for (let i = 499; i >= 0; i--) {
       const minuteStart = candleStart - i * CANDLE_INTERVAL_MS;
       const lastSecond = Math.floor(minuteStart / 1000) + 59;
@@ -605,6 +632,9 @@ export class OTCEngine {
       const r = computeSecond(
         this.currentSeed, state.pairId, day, secondOfDay, prevClose,
         state.basePrice, state.volatility, category, utcHour,
+        state.feed === "mirror"
+          ? { anchor: this.anchors.get(state.pairId)?.price }
+          : undefined,
       );
       const open = prevClose;
       rows.push({
