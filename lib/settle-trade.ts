@@ -41,6 +41,8 @@ export async function settleTradeById(tradeId: string): Promise<boolean> {
 
     const payout = Math.round(trade.amount * (Number(trade.payoutPercent) / 100));
     const profit = won ? payout : -trade.amount;
+    const wallet = (trade.wallet as "real" | "demo") ?? "real";
+    const isDemo = wallet === "demo";
 
     await prisma.$transaction(async (tx) => {
       const updated = await tx.trade.updateMany({
@@ -53,11 +55,12 @@ export async function settleTradeById(tradeId: string): Promise<boolean> {
           userId: trade.userId,
           type: "TRADE_WIN",
           amount: trade.amount + payout,
+          wallet,
           referenceId: trade.id,
           description: `Trade won: ${trade.pair.name} ${trade.direction}`,
         });
       }
-      if (profile) {
+      if (profile && !isDemo) {
         await tx.userRiskProfile.update({
           where: { userId: trade.userId },
           data: {
@@ -72,7 +75,7 @@ export async function settleTradeById(tradeId: string): Promise<boolean> {
         where: { id: trade.userId },
         select: { bonusBalance: true, bonusTurnoverRequired: true, bonusTurnoverDone: true },
       });
-      if (bonusUser && bonusUser.bonusTurnoverRequired > 0) {
+      if (!isDemo && bonusUser && bonusUser.bonusTurnoverRequired > 0) {
         const done = bonusUser.bonusTurnoverDone + trade.amount;
         if (done >= bonusUser.bonusTurnoverRequired && bonusUser.bonusBalance > 0) {
           const convertible = bonusUser.bonusBalance;

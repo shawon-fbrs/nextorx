@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { credit } from "@/lib/ledger";
+import { settleTradeById } from "@/lib/settle-trade";
 
 export async function reconcileExpiredTrades(): Promise<number> {
   console.log("[Reconciliation] Checking for expired active trades...");
@@ -19,61 +19,11 @@ export async function reconcileExpiredTrades(): Promise<number> {
 
     if (now.getTime() > expiredAt) {
       try {
-        const lastCandle = await prisma.candle.findFirst({
-          where: { pairId: trade.pairId },
-          orderBy: { timestamp: "desc" },
-        });
-        const closePrice = lastCandle ? Number(lastCandle.close) : Number(trade.openPrice);
-        const openPrice = Number(trade.openPrice);
-        const priceMovedUp = closePrice > openPrice;
-        const directionCorrect =
-          (trade.direction === "UP" && priceMovedUp) ||
-          (trade.direction === "DOWN" && !priceMovedUp);
-
-        const profile = await prisma.userRiskProfile.findUnique({
-          where: { userId: trade.userId },
-        });
-        const effectiveWinRate = profile ? Number(profile.effectiveWinRate) : 0.48;
-        const won = directionCorrect && Math.random() < effectiveWinRate;
-
-        const payout = Math.round(trade.amount * (Number(trade.payoutPercent) / 100));
-        const profit = won ? payout : -trade.amount;
-
-        await prisma.$transaction(async (tx) => {
-          await tx.trade.update({
-            where: { id: trade.id },
-            data: {
-              closePrice,
-              status: won ? "WON" : "LOST",
-              profit,
-              settledAt: now,
-            },
-          });
-          if (profile) {
-            await tx.userRiskProfile.update({
-              where: { userId: trade.userId },
-              data: {
-                totalTrades: { increment: 1 },
-                ...(won
-                  ? { totalWins: { increment: 1 }, currentLossStreak: 0 }
-                  : { currentLossStreak: { increment: 1 } }),
-              },
-            });
-          }
-        });
-
-        if (won) {
-          await credit({
-            userId: trade.userId,
-            type: "TRADE_WIN",
-            amount: trade.amount + payout,
-            referenceId: trade.id,
-            description: `Trade won (reconciled): ${trade.pair.name} ${trade.direction}`,
-          });
+        const ok = await settleTradeById(trade.id);
+        if (ok) {
+          settledCount++;
+          console.log(`[Reconciliation] Settled trade ${trade.id}`);
         }
-
-        settledCount++;
-        console.log(`[Reconciliation] Settled trade ${trade.id} - ${won ? "WON" : "LOST"}`);
       } catch (error) {
         console.error(`[Reconciliation] Failed to settle trade ${trade.id}:`, error);
       }

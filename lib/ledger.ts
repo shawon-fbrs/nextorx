@@ -17,11 +17,14 @@ export class LedgerError extends Error {
   }
 }
 
+export type Wallet = "real" | "demo";
+
 export interface LedgerInput {
   userId: string;
   type: LedgerType;
   amount: number;
   debit?: boolean;
+  wallet?: Wallet;
   bonusAmount?: number;
   allowNegative?: boolean;
   referenceId?: string;
@@ -41,18 +44,20 @@ export function computeChecksum(
 }
 
 async function postEntry(tx: LedgerTx, input: LedgerInput) {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.userId}))`;
+  const wallet: Wallet = input.wallet ?? "real";
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.userId + ":" + wallet}))`;
 
   const signed = input.debit ? -Math.abs(input.amount) : Math.abs(input.amount);
   const bonusSigned = input.bonusAmount ?? 0;
 
   const user = await tx.user.findUnique({
     where: { id: input.userId },
-    select: { balance: true, bonusBalance: true },
+    select: { balance: true, demoBalance: true, bonusBalance: true },
   });
   if (!user) throw new LedgerError("User not found", "NOT_FOUND");
 
-  const newBalance = user.balance + signed;
+  const currentWallet = wallet === "demo" ? user.demoBalance : user.balance;
+  const newBalance = currentWallet + signed;
   if (newBalance < 0 && !input.allowNegative) {
     throw new LedgerError("Insufficient balance", "INSUFFICIENT_BALANCE");
   }
@@ -62,7 +67,7 @@ async function postEntry(tx: LedgerTx, input: LedgerInput) {
   }
 
   const previous = await tx.ledgerEntry.findFirst({
-    where: { userId: input.userId, checksum: { not: null } },
+    where: { userId: input.userId, wallet, checksum: { not: null } },
     orderBy: { createdAt: "desc" },
     select: { checksum: true },
   });
@@ -75,6 +80,7 @@ async function postEntry(tx: LedgerTx, input: LedgerInput) {
           userId: input.userId,
           type: input.type,
           amount: signed,
+          wallet,
           balanceAfter: newBalance,
           bonusBalanceAfter: newBonusBalance,
           referenceId: input.referenceId,
@@ -85,7 +91,9 @@ async function postEntry(tx: LedgerTx, input: LedgerInput) {
       }),
       tx.user.update({
         where: { id: input.userId },
-        data: { balance: newBalance, bonusBalance: newBonusBalance },
+        data: wallet === "demo"
+          ? { demoBalance: newBalance, bonusBalance: newBonusBalance }
+          : { balance: newBalance, bonusBalance: newBonusBalance },
       }),
     ]);
     return entry;
@@ -136,16 +144,16 @@ export async function runLedgerBatch(
   });
 }
 
-export async function recomputeBalance(userId: string): Promise<number> {
+export async function recomputeBalance(userId: string, wallet: Wallet = "real"): Promise<number> {
   return prisma.$transaction(async (tx) => {
     const agg = await tx.ledgerEntry.aggregate({
-      where: { userId },
+      where: { userId, wallet },
       _sum: { amount: true },
     });
     const balance = agg._sum.amount ?? 0;
     await tx.user.update({
       where: { id: userId },
-      data: { balance },
+      data: wallet === "demo" ? { demoBalance: balance } : { balance },
     });
     return balance;
   });
@@ -154,9 +162,10 @@ export async function recomputeBalance(userId: string): Promise<number> {
 export async function getLedgerHistory(
   userId: string,
   limit = 100,
+  wallet?: Wallet,
 ) {
   return prisma.ledgerEntry.findMany({
-    where: { userId },
+    where: { userId, ...(wallet ? { wallet } : {}) },
     orderBy: { createdAt: "desc" },
     take: limit,
   });
@@ -178,6 +187,7 @@ export async function reverseEntry(input: {
     userId: input.userId,
     type: input.type,
     amount: Math.abs(original.amount),
+    wallet: (original.wallet as Wallet) ?? "real",
     referenceId: `reversal:${original.id}`,
     description: `Reversal of ${original.id}: ${input.reason}`,
     reversalOfId: original.id,
@@ -192,9 +202,9 @@ export interface IntegrityResult {
   failedId?: string;
 }
 
-export async function verifyLedgerIntegrity(userId: string): Promise<IntegrityResult> {
+export async function verifyLedgerIntegrity(userId: string, wallet?: Wallet): Promise<IntegrityResult> {
   const entries = await prisma.ledgerEntry.findMany({
-    where: { userId },
+    where: { userId, ...(wallet ? { wallet } : {}) },
     orderBy: { createdAt: "asc" },
   });
   let previousChecksum: string | null = null;

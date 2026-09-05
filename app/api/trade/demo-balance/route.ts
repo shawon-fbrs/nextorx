@@ -2,30 +2,37 @@ import { prisma } from "@/lib/db";
 import { requireUser, toJsonError } from "@/lib/api";
 import { credit, debit, LedgerError } from "@/lib/ledger";
 
-const DEMO_STARTING_BALANCE = 10_000_00; // $10,000 in cents
-const DEMO_MIN_BALANCE = 100_00; // $100 minimum
-const DEMO_MAX_BALANCE = 100_000_00; // $100,000 maximum
+const DEMO_STARTING_BALANCE = 10_000_00;
+const DEMO_MIN_BALANCE = 100_00;
+const DEMO_MAX_BALANCE = 100_000_00;
 
 export async function POST() {
   try {
     const user = await requireUser();
-
-    const [depositCount, currentBalance] = await Promise.all([
-      prisma.depositRequest.count({ where: { userId: user.id, status: "VERIFIED" } }),
-      prisma.user.findUnique({ where: { id: user.id }, select: { balance: true } }),
-    ]);
-
-    if ((currentBalance?.balance ?? 0) > 0 || depositCount > 0) {
-      return Response.json({ balance: currentBalance?.balance ?? 0 });
-    }
-
-    await credit({ userId: user.id, type: "PROMO_CREDIT", amount: DEMO_STARTING_BALANCE, referenceId: "demo-start", description: "Demo starting balance" }).catch((e: unknown) => {
-      if (e instanceof LedgerError && e.code === "ALREADY_PROCESSED") return null;
-      throw e;
+    const current = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { demoBalance: true },
     });
-
-    const updated = await prisma.user.findUnique({ where: { id: user.id }, select: { balance: true } });
-    return Response.json({ balance: updated?.balance ?? DEMO_STARTING_BALANCE });
+    if ((current?.demoBalance ?? 0) > 0) {
+      return Response.json({ balance: current?.demoBalance ?? 0 });
+    }
+    try {
+      await credit({
+        userId: user.id,
+        type: "PROMO_CREDIT",
+        amount: DEMO_STARTING_BALANCE,
+        wallet: "demo",
+        referenceId: "demo-start",
+        description: "Demo starting balance",
+      });
+    } catch (e) {
+      if (!(e instanceof LedgerError && e.code === "ALREADY_PROCESSED")) throw e;
+    }
+    const updated = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { demoBalance: true },
+    });
+    return Response.json({ balance: updated?.demoBalance ?? DEMO_STARTING_BALANCE });
   } catch (e) {
     return toJsonError(e);
   }
@@ -51,28 +58,21 @@ export async function PATCH(request: Request) {
       return Response.json({ error: `Maximum balance is $${DEMO_MAX_BALANCE / 100}` }, { status: 400 });
     }
 
-    const depositCount = await prisma.depositRequest.count({
-      where: { userId: user.id, status: "VERIFIED" },
-    });
-
-    if (depositCount > 0) {
-      return Response.json({ error: "Cannot adjust balance on real account" }, { status: 400 });
-    }
-
     const current = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { balance: true },
+      select: { demoBalance: true },
     });
-    const currentCents = current?.balance ?? 0;
+    const currentCents = current?.demoBalance ?? 0;
     const diff = cents - currentCents;
 
     if (diff !== 0) {
-      const referenceId = `demo-adjust:${user.id}:${Date.now()}`;
+      const referenceId = `demo-adjust:${Date.now()}`;
       if (diff > 0) {
         await credit({
           userId: user.id,
           type: "PROMO_CREDIT",
           amount: diff,
+          wallet: "demo",
           referenceId,
           description: "Demo balance top-up",
         });
@@ -81,6 +81,7 @@ export async function PATCH(request: Request) {
           userId: user.id,
           type: "ADMIN_ADJUSTMENT",
           amount: -diff,
+          wallet: "demo",
           referenceId,
           description: "Demo balance reset",
         });

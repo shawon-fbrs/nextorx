@@ -16,6 +16,8 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
   const accountType = (params.accountType as string) || 'real';
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [balance, setBalance] = useState(0);
+  const [demoBalance, setDemoBalance] = useState(0);
+  const shownBalance = accountType === 'demo' ? demoBalance : balance;
 
   useEffect(() => {
     if (!loading && user && user.role && ADMIN_ROLES.has(user.role)) {
@@ -29,14 +31,16 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
       try {
         const data = await fetch('/api/trade/balance').then((r) => r.json());
         if (cancelled) return;
-        let bal = data.wallet?.balance ?? 0;
-        if (accountType === 'demo' && bal === 0) {
+        const real = data.available ?? data.wallet?.balance ?? 0;
+        let demo = data.demoAvailable ?? data.wallet?.demoBalance ?? 0;
+        if (demo === 0) {
           const res = await fetch('/api/trade/demo-balance', { method: 'POST' });
-          const demo = await res.json();
+          const demoRes = await res.json();
           if (cancelled) return;
-          bal = demo.balance ?? bal;
+          demo = demoRes.balance ?? demo;
         }
-        setBalance(bal / 100);
+        setBalance(real / 100);
+        setDemoBalance(demo / 100);
       } catch {}
     };
     load();
@@ -57,7 +61,7 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
         onToggle={() => setSidebarExpanded(!sidebarExpanded)}
       />
       <div className="flex-1 flex flex-col min-w-0">
-        <Header balance={balance} />
+        <Header balance={shownBalance} />
         <div className="flex-1 min-h-0 overflow-hidden">
           {children}
         </div>

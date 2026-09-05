@@ -426,7 +426,8 @@ export default function TradingPage() {
 
   const refreshTrades = useCallback(async () => {
     try {
-      const res = await fetch('/api/trade/trades?limit=20');
+      const wallet = accountType === 'demo' ? 'demo' : 'real';
+      const res = await fetch(`/api/trade/trades?limit=20&wallet=${wallet}`);
       if (!res.ok) return;
       const data = await res.json();
       const mapped: Trade[] = ((data.trades ?? []) as Array<Record<string, unknown>>).map((t) => {
@@ -450,7 +451,7 @@ export default function TradingPage() {
       });
       setTrades(mapped);
     } catch {}
-  }, []);
+  }, [accountType]);
 
   useEffect(() => {
     refreshTrades();
@@ -471,6 +472,7 @@ export default function TradingPage() {
           direction: type.toUpperCase(),
           amount: investment,
           durationSeconds: timeMinutes * 60 + timeSeconds,
+          wallet: accountType === 'demo' ? 'demo' : 'real',
         }),
       });
 
@@ -487,7 +489,7 @@ export default function TradingPage() {
     } catch {
       setTradeError('Trade failed. Please try again.');
     }
-  }, [activePair, investment, timeMinutes, timeSeconds, refreshTrades]);
+  }, [activePair, investment, timeMinutes, timeSeconds, accountType, refreshTrades]);
 
   const handleTimeChange = (delta: number) => {
     setTimeSeconds(prev => {

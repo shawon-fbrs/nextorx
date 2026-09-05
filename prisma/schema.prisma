@@ -30,8 +30,9 @@ model User {
   lastName              String?
   country               String?
   currencyPref          String    @default("USD")
-  balance               Int       @default(0)
-  bonusBalance          Int       @default(0)
+  balance             Int                 @default(0)
+  bonusBalance        Int                 @default(0)
+  demoBalance         Int                 @default(0)
   bonusTurnoverRequired Int       @default(0)
   bonusTurnoverDone     Int       @default(0)
   bonusExpiresAt        DateTime?
@@ -173,6 +174,7 @@ model LedgerEntry {
   user              User       @relation(fields: [userId], references: [id], onDelete: Restrict)
   type              LedgerType
   amount            Int
+  wallet            String     @default("real")
   balanceAfter      Int
   bonusBalanceAfter Int?
   referenceId       String?
@@ -373,6 +375,7 @@ model Trade {
   pair            Pair           @relation(fields: [pairId], references: [id], onDelete: Restrict)
   direction       TradeDirection
   amount          Int
+  wallet          String         @default("real")
   payoutPercent   Decimal        @db.Decimal(5, 2)
   durationSeconds Int
   openPrice       Decimal        @db.Decimal(16, 8)

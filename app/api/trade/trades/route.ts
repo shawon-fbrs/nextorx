@@ -17,17 +17,21 @@ const tradeSchema = z.object({
   direction: z.enum(["UP", "DOWN"]),
   amount: z.number().positive().max(1000000),
   durationSeconds: z.number().int().min(MIN_DURATION_SECONDS).max(MAX_DURATION_SECONDS),
+  wallet: z.enum(["real", "demo"]).default("real"),
 });
 
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUser();
     const { status, limit } = parseListQuery(request.nextUrl, ["PENDING", "ACTIVE", "WON", "LOST", "CANCELLED"]);
+    const walletParam = request.nextUrl.searchParams.get("wallet");
+    const wallet = walletParam === "demo" ? "demo" : walletParam === "real" ? "real" : undefined;
 
     const trades = await prisma.trade.findMany({
       where: {
         userId: user.id,
         ...(status ? { status: status as TradeStatus } : {}),
+        ...(wallet ? { wallet } : {}),
       },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -47,7 +51,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return Response.json({ error: "Invalid input" }, { status: 400 });
     }
-    const { pairId, direction, durationSeconds } = parsed.data;
+    const { pairId, direction, durationSeconds, wallet } = parsed.data;
     const amountCents = Math.round(parsed.data.amount * 100);
 
     const pair = await prisma.pair.findUnique({ where: { id: pairId } });
@@ -65,12 +69,13 @@ export async function POST(request: NextRequest) {
     }
 
     const payoutPercent = await getPayoutForPair(pairId);
+    const isDemo = wallet === "demo";
 
     const trader = await prisma.user.findUnique({
       where: { id: user.id },
       select: { bonusBalance: true },
     });
-    if ((trader?.bonusBalance ?? 0) > 0) {
+    if (!isDemo && (trader?.bonusBalance ?? 0) > 0) {
       const maxBonusBet = await getSetting("maxBonusBet");
       if (amountCents > maxBonusBet) {
         return Response.json(
@@ -82,11 +87,11 @@ export async function POST(request: NextRequest) {
 
     const profile = await prisma.userRiskProfile.findUnique({ where: { userId: user.id } });
 
-    if (profile) {
+    if (!isDemo && profile) {
       const dayStart = new Date();
       dayStart.setHours(0, 0, 0, 0);
       const todayAgg = await prisma.trade.aggregate({
-        where: { userId: user.id, createdAt: { gte: dayStart } },
+        where: { userId: user.id, wallet: "real", createdAt: { gte: dayStart } },
         _sum: { amount: true },
       });
       const todayVolume = todayAgg._sum.amount ?? 0;
@@ -101,6 +106,7 @@ export async function POST(request: NextRequest) {
         pairId,
         direction,
         amount: amountCents,
+        wallet,
         createdAt: { gte: new Date(Date.now() - DUPLICATE_WINDOW_MS) },
       },
       select: { id: true },
@@ -118,6 +124,7 @@ export async function POST(request: NextRequest) {
           pairId,
           direction: direction as TradeDirection,
           amount: amountCents,
+          wallet,
           payoutPercent,
           durationSeconds,
           openPrice,
@@ -129,6 +136,7 @@ export async function POST(request: NextRequest) {
         type: "TRADE_HOLD",
         amount: amountCents,
         debit: true,
+        wallet,
         referenceId: created.id,
         description: `Trade placed (${pair.name} ${direction} @ ${openPrice})`,
       });
