@@ -7,6 +7,18 @@ import { prisma } from "@/lib/db";
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUser();
+    const id = request.nextUrl.searchParams.get("id");
+    if (id) {
+      const deposit = await prisma.depositRequest.findFirst({
+        where: { id, userId: user.id },
+        select: {
+          id: true, amount: true, method: true, network: true,
+          status: true, note: true, createdAt: true, reviewedAt: true,
+        },
+      });
+      if (!deposit) return Response.json({ error: "Not found" }, { status: 404 });
+      return Response.json({ deposit });
+    }
     const { limit } = parseListQuery(request.nextUrl, undefined, 50);
     const deposits = await prisma.depositRequest.findMany({
       where: { userId: user.id },
