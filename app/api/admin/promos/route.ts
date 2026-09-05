@@ -52,3 +52,28 @@ export async function POST(request: NextRequest) {
     return toJsonError(e);
   }
 }
+
+const toggleSchema = z.object({
+  id: z.string().min(1),
+  active: z.boolean(),
+});
+
+export async function PUT(request: NextRequest) {
+  try {
+    const admin = await requirePermission("promo", "manage");
+    const parsed = toggleSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return Response.json({ error: "Invalid input" }, { status: 400 });
+    }
+    const promo = await prisma.promoCode.update({
+      where: { id: parsed.data.id },
+      data: { active: parsed.data.active },
+    });
+    await logAudit(admin.id, "promo.toggle", "PromoCode", promo.id, {
+      active: parsed.data.active,
+    });
+    return Response.json({ promo });
+  } catch (e) {
+    return toJsonError(e);
+  }
+}

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 interface SymbolLike {
   name: string;
@@ -19,6 +20,14 @@ interface TradeLike {
   openPrice?: number;
   closePrice?: number;
   payoutPercent?: number;
+  expiresAt?: number;
+}
+
+function formatCountdown(expiresAt: number, now: number): string {
+  const ms = Math.max(0, expiresAt - now);
+  const s = Math.ceil(ms / 1000);
+  const m = Math.floor(s / 60);
+  return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
 interface TradingPanelProps {
@@ -43,6 +52,15 @@ export function TradingPanel({
   trades,
 }: TradingPanelProps) {
   const [expandedTrade, setExpandedTrade] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const activeTrades = trades.filter((t) => t.status === 'active');
+  const settledTrades = trades.filter((t) => t.status !== 'active');
 
   return (
     <aside className="w-[260px] bg-surface border-l border-border flex flex-col z-30 flex-shrink-0">
@@ -177,10 +195,41 @@ export function TradingPanel({
         {/* Recent Trades */}
         <div className="bg-background rounded-xl border border-border overflow-hidden flex flex-col flex-1 min-h-0">
           <div className="px-4 py-3 flex items-center justify-between border-b border-border flex-shrink-0">
-            <span className="text-[11px] text-textDark font-semibold uppercase tracking-wider">Recent Trades</span>
-            <span className="text-[10px] text-textDark">{trades.length} total</span>
+            <span className="text-[11px] text-textDark font-semibold uppercase tracking-wider">
+              Open Positions{activeTrades.length > 0 ? ` (${activeTrades.length})` : ''}
+            </span>
           </div>
-          {trades.length === 0 ? (
+          {activeTrades.length > 0 && (
+            <div className="flex-shrink-0 max-h-40 overflow-y-auto border-b border-border">
+              {activeTrades.map((t) => (
+                <div key={String(t.id)} className="px-4 py-2.5 flex items-center justify-between border-b border-border/50 last:border-b-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${t.type === 'up' ? 'bg-green/10' : 'bg-red/10'}`}>
+                      <svg className={`w-3.5 h-3.5 ${t.type === 'up' ? 'text-green' : 'text-red'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                        {t.type === 'up' ? (
+                          <path d="M5 10l7-7m0 0l7 7m-7-7v18" strokeLinecap="round" strokeLinejoin="round" />
+                        ) : (
+                          <path d="M19 14l-7 7m0 0l-7-7m7 7V3" strokeLinecap="round" strokeLinejoin="round" />
+                        )}
+                      </svg>
+                    </div>
+                    <div>
+                      <span className="text-white text-[11px] font-semibold block leading-tight">{t.symbol}</span>
+                      <span className="text-[9px] text-textDark">${t.amount} · {t.payoutPercent ?? payoutAmount}%</span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-blue">
+                    {t.expiresAt ? formatCountdown(t.expiresAt, now) : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="px-4 py-3 flex items-center justify-between border-b border-border flex-shrink-0">
+            <span className="text-[11px] text-textDark font-semibold uppercase tracking-wider">Recent Trades</span>
+            <span className="text-[10px] text-textDark">{settledTrades.length} total</span>
+          </div>
+          {settledTrades.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-textDark">
               <svg className="w-8 h-8 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                 <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" strokeLinecap="round" strokeLinejoin="round" />
@@ -189,7 +238,7 @@ export function TradingPanel({
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
-              {trades.map((t, i) => {
+              {settledTrades.map((t, i) => {
                 const isExpanded = expandedTrade === i;
                 return (
                   <div key={i} className={`border-b border-border/50 last:border-b-0 ${isExpanded ? 'bg-surface/50' : ''}`}>
@@ -275,9 +324,9 @@ export function TradingPanel({
           )}
           {/* View All button */}
           <div className="px-4 py-2.5 border-t border-border flex-shrink-0">
-            <button className="w-full text-center text-[11px] font-semibold text-blue hover:text-blue-hover transition-colors py-1">
+            <Link href="/more/history" className="block w-full text-center text-[11px] font-semibold text-blue hover:text-blue-hover transition-colors py-1">
               View All Trade History
-            </button>
+            </Link>
           </div>
         </div>
       </div>

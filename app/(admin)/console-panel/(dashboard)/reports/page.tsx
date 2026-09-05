@@ -23,12 +23,19 @@ type Stats = {
 
 export default function ReportsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [pnl, setPnl] = useState<{ totals: { gross: number; stakesKept: number; payouts: number; volume: number; trades: number }; byPair: { pairId: string; pairName: string; trades: number; volume: number; gross: number }[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/admin/stats')
-      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((d) => setStats(d))
+    Promise.all([
+      fetch('/api/admin/stats')
+        .then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
+      fetch('/api/admin/reports/pnl?days=30').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ])
+      .then(([s, p]) => {
+        setStats(s);
+        setPnl(p);
+      })
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
@@ -66,6 +73,47 @@ export default function ReportsPage() {
         <StatsCard title="Win Rate" value={`${stats.winRate}%`} />
         <StatsCard title="Total Users" value={stats.totalUsers.toLocaleString()} />
       </div>
+
+      {pnl && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatsCard title="Gross P&L (30d)" value={`$${(pnl.totals.gross / 100).toFixed(2)}`} />
+            <StatsCard title="Stakes Kept (30d)" value={`$${(pnl.totals.stakesKept / 100).toFixed(2)}`} />
+            <StatsCard title="Payouts Paid (30d)" value={`$${(pnl.totals.payouts / 100).toFixed(2)}`} />
+            <StatsCard title="Volume (30d)" value={`$${(pnl.totals.volume / 100).toFixed(2)}`} />
+          </div>
+
+          {pnl.byPair.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>P&L by Asset (30d)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="px-3 py-2 text-left text-[10px] font-semibold text-textDark uppercase">Asset</th>
+                        <th className="px-3 py-2 text-right text-[10px] font-semibold text-textDark uppercase">Trades</th>
+                        <th className="px-3 py-2 text-right text-[10px] font-semibold text-textDark uppercase">Volume</th>
+                        <th className="px-3 py-2 text-right text-[10px] font-semibold text-textDark uppercase">Gross</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pnl.byPair.map((a) => (
+                        <tr key={a.pairId} className="border-b border-border/50">
+                          <td className="px-3 py-2 text-sm font-medium text-white">{a.pairName}</td>
+                          <td className="px-3 py-2 text-sm text-text text-right">{a.trades}</td>
+                          <td className="px-3 py-2 text-sm text-text text-right">${(a.volume / 100).toFixed(2)}</td>
+                          <td className={`px-3 py-2 text-sm text-right font-semibold ${a.gross >= 0 ? 'text-green' : 'text-red'}`}>${(a.gross / 100).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>

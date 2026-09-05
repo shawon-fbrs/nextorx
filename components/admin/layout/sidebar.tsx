@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -58,9 +58,27 @@ const navItems: NavItem[] = [
       </svg>
     ),
     children: [
-      { label: 'Deposits', href: '/console-panel/finance/deposits' },
-      { label: 'Withdrawals', href: '/console-panel/finance/withdrawals' },
+      { label: 'Deposits', href: '/console-panel/finance' },
+      { label: 'Withdrawals', href: '/console-panel/finance' },
     ],
+  },
+  {
+    label: 'Promos',
+    href: '/console-panel/promos',
+    icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+        <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Pay Methods',
+    href: '/console-panel/payment-methods',
+    icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+        <path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
   },
   {
     label: 'OTC Pairs',
@@ -127,6 +145,20 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  const [adminName, setAdminName] = useState('Operator');
+  const [adminEmail, setAdminEmail] = useState('');
+
+  useEffect(() => {
+    fetch('/api/account/profile')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.user) {
+          setAdminName(d.user.name || 'Operator');
+          setAdminEmail(d.user.email || '');
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const isActive = (href: string) => {
     if (href === '/console-panel') {
@@ -241,11 +273,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="p-3 border-t border-border">
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center">
-              <span className="text-xs font-bold text-white">OP</span>
+              <span className="text-xs font-bold text-white">{adminName.charAt(0).toUpperCase()}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">Operator</p>
-              <p className="text-[10px] text-textDark truncate">admin@nextorx.com</p>
+              <p className="text-sm font-medium text-white truncate">{adminName}</p>
+              <p className="text-[10px] text-textDark truncate">{adminEmail}</p>
             </div>
           </div>
         </div>

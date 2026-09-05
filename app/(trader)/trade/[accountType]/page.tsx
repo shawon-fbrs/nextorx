@@ -34,10 +34,11 @@ interface Trade {
   profit: number;
   time: string;
   timestamp: number;
-  status: 'won' | 'lost';
+  status: 'active' | 'won' | 'lost';
   openPrice?: number;
   closePrice?: number;
   payoutPercent?: number;
+  expiresAt?: number;
 }
 
 const drawingGroups = [
@@ -313,6 +314,7 @@ export default function TradingPage() {
   const [timeMinutes, setTimeMinutes] = useState(1);
   const [timeSeconds, setTimeSeconds] = useState(0);
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [tradeError, setTradeError] = useState('');
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [panelPos, setPanelPos] = useState({ x: 0, y: 0 });
@@ -422,8 +424,43 @@ export default function TradingPage() {
   const payoutAmount = (investment * (1 + payout / 100)).toFixed(2);
   const timeStr = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}:00`;
 
+  const refreshTrades = useCallback(async () => {
+    try {
+      const res = await fetch('/api/trade/trades?limit=20');
+      if (!res.ok) return;
+      const data = await res.json();
+      const mapped: Trade[] = ((data.trades ?? []) as Array<Record<string, unknown>>).map((t) => {
+        const createdAt = new Date(t.createdAt as string).getTime();
+        const duration = Number(t.durationSeconds ?? 0);
+        return {
+          id: String(t.id),
+          symbol: ((t.pair as Record<string, unknown> | undefined)?.name as string) ?? '',
+          type: (String(t.direction).toLowerCase() === 'up' ? 'up' : 'down') as 'up' | 'down',
+          amount: Number(t.amount) / 100,
+          payout: Number(t.payoutPercent ?? 0),
+          profit: t.profit == null ? 0 : Number(t.profit) / 100,
+          time: new Date(createdAt).toLocaleTimeString(),
+          timestamp: createdAt,
+          status: String(t.status).toLowerCase() as 'active' | 'won' | 'lost',
+          openPrice: t.openPrice != null ? Number(t.openPrice) : undefined,
+          closePrice: t.closePrice != null ? Number(t.closePrice) : undefined,
+          payoutPercent: Number(t.payoutPercent ?? 0),
+          expiresAt: createdAt + duration * 1000,
+        };
+      });
+      setTrades(mapped);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    refreshTrades();
+    const timer = setInterval(refreshTrades, 5000);
+    return () => clearInterval(timer);
+  }, [refreshTrades]);
+
   const handleTrade = useCallback(async (type: 'up' | 'down') => {
     if (!activePair) return;
+    setTradeError('');
 
     try {
       const res = await fetch('/api/trade/trades', {
@@ -439,25 +476,18 @@ export default function TradingPage() {
 
       const data = await res.json();
 
-      if (data.trade) {
-        const t = data.trade;
-        const newTrade: Trade = {
-          id: t.id,
-          symbol: activePair.name,
-          type: type,
-          amount: investment,
-          payout: payout,
-          profit: 0,
-          time: timeStr,
-          timestamp: Date.now(),
-          status: 'won',
-          openPrice: price,
-          payoutPercent: payout,
-        };
-        setTrades(prev => [newTrade, ...prev]);
+      if (!res.ok) {
+        setTradeError(data.error || 'Trade failed. Please try again.');
+        return;
       }
-    } catch {}
-  }, [activePair, investment, timeMinutes, timeSeconds, timeStr, price, payout]);
+
+      if (data.trade) {
+        await refreshTrades();
+      }
+    } catch {
+      setTradeError('Trade failed. Please try again.');
+    }
+  }, [activePair, investment, timeMinutes, timeSeconds, refreshTrades]);
 
   const handleTimeChange = (delta: number) => {
     setTimeSeconds(prev => {
@@ -474,6 +504,12 @@ export default function TradingPage() {
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      {tradeError && (
+        <div className="mx-3 mt-2 px-4 py-2.5 bg-red/10 border border-red/30 rounded-xl text-red text-xs font-semibold flex items-center justify-between flex-shrink-0">
+          <span>{tradeError}</span>
+          <button onClick={() => setTradeError('')} className="ml-3 text-red/70 hover:text-red font-bold">✕</button>
+        </div>
+      )}
       <div className="flex-1 flex min-w-0 overflow-hidden">
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
