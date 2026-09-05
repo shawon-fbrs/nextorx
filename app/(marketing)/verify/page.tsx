@@ -6,14 +6,15 @@ import { MIRRORED_PAIR_IDS } from '@/lib/mirror-feed';
 
 const TICKS_PER_SECOND = 10;
 const SECONDS_PER_DAY = 86400;
-const SIGMA_PER_SECOND = 0.0002;
+// ENGINE PARAMS v2 — must match lib/pf-math.ts exactly, or verification fails.
+const SIGMA_PER_SECOND = 0.00008;
 
 const JUMPS: Record<string, { lambda: number; min: number; max: number }> = {
-  forex: { lambda: 0.005, min: 4, max: 8 },
-  crypto: { lambda: 0.02, min: 3, max: 7 },
-  commodities: { lambda: 0.008, min: 4, max: 8 },
-  indices: { lambda: 0.008, min: 4, max: 8 },
-  stocks: { lambda: 0.01, min: 4, max: 8 },
+  forex: { lambda: 0.002, min: 4, max: 8 },
+  crypto: { lambda: 0.008, min: 3, max: 7 },
+  commodities: { lambda: 0.003, min: 4, max: 8 },
+  indices: { lambda: 0.003, min: 4, max: 8 },
+  stocks: { lambda: 0.004, min: 4, max: 8 },
 };
 
 function sessionMult(category: string, utcHour: number): number {

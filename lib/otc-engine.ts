@@ -116,7 +116,9 @@ export class OTCEngine {
         for (const p of pairs) {
           await this.loadPairState(p.id);
         }
-        await this.backfillRecentSeconds();
+        void this.backfillRecentSeconds().then(() => {
+          console.log("[OTC] Full-day backfill complete");
+        });
         return;
       } catch (e) {
         retries--;
@@ -180,11 +182,12 @@ export class OTCEngine {
   private async backfillRecentSeconds() {
     const now = Date.now();
     const currentSecond = Math.floor(now / 1000);
-    const fromSecond = currentSecond - BACKFILL_15M_SECONDS;
     const day = dayStringUTC(new Date(now));
+    const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
+    const fromSecond = startOfDay;
     for (const state of Array.from(this.pairs.values())) {
       if (state.feed === "mirror") continue;
-      let prevClose = this.secondCloses.get(state.pairId) ?? state.basePrice;
+      let prevClose = state.basePrice;
       const rows: Array<{
         pairId: string;
         timestamp: bigint;
@@ -441,18 +444,51 @@ export class OTCEngine {
       if (this.broadcast) {
         this.broadcast(closeMsg);
       }
+    }
 
-      await prisma.candle.create({
-        data: {
-          pairId: state.pairId,
-          timestamp: BigInt(oldCandle.timestamp),
-          open: oldCandle.open,
-          high: oldCandle.high,
-          low: oldCandle.low,
-          close: oldCandle.close,
-          volume: BigInt(oldCandle.volume),
-        },
-      }).catch(() => {});
+    await this.rollupMinute(candleStart - CANDLE_INTERVAL_MS);
+  }
+
+  private async rollupMinute(minuteStart: number) {
+    for (const state of Array.from(this.pairs.values())) {
+      try {
+        const rows = await prisma.secondCandle.findMany({
+          where: {
+            pairId: state.pairId,
+            timestamp: { gte: BigInt(minuteStart), lt: BigInt(minuteStart + CANDLE_INTERVAL_MS) },
+          },
+          orderBy: { timestamp: "asc" },
+          select: { open: true, high: true, low: true, close: true },
+        });
+        if (rows.length === 0) continue;
+        let high = Number(rows[0].high);
+        let low = Number(rows[0].low);
+        for (const r of rows) {
+          const h = Number(r.high);
+          const l = Number(r.low);
+          if (h > high) high = h;
+          if (l < low) low = l;
+        }
+        await prisma.candle.upsert({
+          where: { pairId_timestamp: { pairId: state.pairId, timestamp: BigInt(minuteStart) } },
+          create: {
+            pairId: state.pairId,
+            timestamp: BigInt(minuteStart),
+            open: Number(rows[0].open),
+            high,
+            low,
+            close: Number(rows[rows.length - 1].close),
+            volume: BigInt(rows.length * 10),
+          },
+          update: {
+            open: Number(rows[0].open),
+            high,
+            low,
+            close: Number(rows[rows.length - 1].close),
+            volume: BigInt(rows.length * 10),
+          },
+        });
+      } catch {}
     }
   }
 

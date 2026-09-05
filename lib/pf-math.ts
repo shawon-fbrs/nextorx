@@ -9,15 +9,17 @@ export interface JumpParams {
   maxMultiple: number;
 }
 
+// ENGINE PARAMS v2 — changing any value below breaks verification of
+// already-persisted candles. Keep in sync with app/(marketing)/verify/page.tsx.
 export const CATEGORY_JUMPS: Record<string, JumpParams> = {
-  forex: { lambdaPerSecond: 0.005, minMultiple: 4, maxMultiple: 8 },
-  crypto: { lambdaPerSecond: 0.02, minMultiple: 3, maxMultiple: 7 },
-  commodities: { lambdaPerSecond: 0.008, minMultiple: 4, maxMultiple: 8 },
-  indices: { lambdaPerSecond: 0.008, minMultiple: 4, maxMultiple: 8 },
-  stocks: { lambdaPerSecond: 0.01, minMultiple: 4, maxMultiple: 8 },
+  forex: { lambdaPerSecond: 0.002, minMultiple: 4, maxMultiple: 8 },
+  crypto: { lambdaPerSecond: 0.008, minMultiple: 3, maxMultiple: 7 },
+  commodities: { lambdaPerSecond: 0.003, minMultiple: 4, maxMultiple: 8 },
+  indices: { lambdaPerSecond: 0.003, minMultiple: 4, maxMultiple: 8 },
+  stocks: { lambdaPerSecond: 0.004, minMultiple: 4, maxMultiple: 8 },
 };
 
-const SIGMA_PER_SECOND = 0.0002;
+const SIGMA_PER_SECOND = 0.00008;
 
 export function sessionMultiplier(category: string, utcHour: number): number {
   if (category === "stocks") {
