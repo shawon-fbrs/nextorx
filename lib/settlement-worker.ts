@@ -45,12 +45,23 @@ async function tick(): Promise<void> {
   if (running || paused) return;
   running = true;
   try {
-    const actives = await prisma.trade.findMany({
-      where: { status: "ACTIVE" },
-      orderBy: { createdAt: "asc" },
-      take: BATCH_SIZE,
-      select: { id: true, createdAt: true, durationSeconds: true },
-    });
+    let actives;
+    try {
+      actives = await prisma.trade.findMany({
+        where: { status: "ACTIVE" },
+        orderBy: { createdAt: "asc" },
+        take: BATCH_SIZE,
+        select: { id: true, createdAt: true, durationSeconds: true },
+      });
+    } catch {
+      await new Promise((r) => setTimeout(r, 500));
+      actives = await prisma.trade.findMany({
+        where: { status: "ACTIVE" },
+        orderBy: { createdAt: "asc" },
+        take: BATCH_SIZE,
+        select: { id: true, createdAt: true, durationSeconds: true },
+      });
+    }
     const now = Date.now();
     let settled = 0;
     for (const t of actives) {
