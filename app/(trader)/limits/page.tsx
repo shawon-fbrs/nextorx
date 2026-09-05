@@ -89,7 +89,7 @@ export default function LimitsPage() {
   return (
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6 max-w-xl mx-auto">
-        <Link href="/more" className="text-xs text-blue font-semibold">← Back</Link>
+        <Link href="/trade/demo" className="text-xs text-blue font-semibold">← Back</Link>
         <h1 className="text-xl font-bold text-white mt-2">Responsible Trading</h1>
         <p className="text-sm text-text-dark mt-1">Protect yourself with deposit limits and time-outs.</p>
         {message && <p className="text-xs text-orange mt-3">{message}</p>}

@@ -131,7 +131,7 @@ export default function DepositPage() {
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6">
         <div className="mb-6">
-          <Link href="/more" className="text-xs text-blue hover:text-blue-hover mb-2 inline-block">&larr; Back</Link>
+          <Link href="/trade/demo" className="text-xs text-blue hover:text-blue-hover mb-2 inline-block">&larr; Back</Link>
           <h1 className="text-xl font-bold text-white">Deposit</h1>
           <p className="text-sm text-text-dark mt-1">Add funds to your account</p>
         </div>
@@ -199,8 +199,17 @@ export default function DepositPage() {
               <p className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-3">2 · Send to this address</p>
               <div className="flex gap-4 items-start">
                 {selectedMethod.accountQrUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selectedMethod.accountQrUrl} alt="Deposit QR" className="w-32 h-32 rounded-xl bg-white p-1 flex-shrink-0" />
+                  <div className="flex-shrink-0 text-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={selectedMethod.accountQrUrl} alt="Deposit QR" className="w-32 h-32 rounded-xl bg-white p-1" />
+                    <a
+                      href={selectedMethod.accountQrUrl}
+                      download={`${selectedMethod.name}-deposit-qr`}
+                      className="text-[11px] font-bold text-blue hover:text-blue-hover mt-1 inline-block"
+                    >
+                      Download QR
+                    </a>
+                  </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="bg-surface rounded-lg p-3 mb-2">

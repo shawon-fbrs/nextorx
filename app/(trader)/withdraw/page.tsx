@@ -85,7 +85,7 @@ export default function WithdrawPage() {
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6">
         <div className="mb-6">
-          <Link href="/more" className="text-xs text-blue hover:text-blue-hover mb-2 inline-block">&larr; Back</Link>
+          <Link href="/trade/demo" className="text-xs text-blue hover:text-blue-hover mb-2 inline-block">&larr; Back</Link>
           <h1 className="text-xl font-bold text-white">Withdrawal</h1>
           <p className="text-sm text-text-dark mt-1">Withdraw your earnings</p>
         </div>

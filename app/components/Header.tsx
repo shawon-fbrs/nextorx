@@ -317,7 +317,7 @@ export function Header({ balance }: HeaderProps) {
         <div className="w-px h-8 bg-border" />
 
         <Link
-          href="/more/deposit"
+          href="/deposit"
           className="bg-green hover:bg-green-hover text-white font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-green/20"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -326,7 +326,7 @@ export function Header({ balance }: HeaderProps) {
           Deposit
         </Link>
         <Link
-          href="/more/withdraw"
+          href="/withdraw"
           className="border border-border hover:bg-surface-hover text-text hover:text-white font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

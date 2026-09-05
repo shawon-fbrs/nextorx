@@ -324,7 +324,7 @@ export function TradingPanel({
           )}
           {/* View All button */}
           <div className="px-4 py-2.5 border-t border-border flex-shrink-0">
-            <Link href="/more/history" className="block w-full text-center text-[11px] font-semibold text-blue hover:text-blue-hover transition-colors py-1">
+            <Link href="/transactions" className="block w-full text-center text-[11px] font-semibold text-blue hover:text-blue-hover transition-colors py-1">
               View All Trade History
             </Link>
           </div>

@@ -105,7 +105,7 @@ export default async function LeaderboardPage() {
   return (
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6 max-w-2xl mx-auto">
-        <Link href="/more" className="text-xs text-blue font-semibold">← Back</Link>
+        <Link href="/trade/demo" className="text-xs text-blue font-semibold">← Back</Link>
         <div className="flex items-end justify-between mt-2 mb-6">
           <div>
             <h1 className="text-xl font-bold text-white">Leaderboard</h1>
