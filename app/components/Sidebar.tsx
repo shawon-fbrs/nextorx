@@ -45,10 +45,10 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
         expanded ? 'w-52' : 'w-[72px]'
       }`}
     >
-      <div className="flex flex-col">
+      <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
         <button
           onClick={onToggle}
-          className="w-full h-16 flex items-center justify-center hover:bg-surface transition-colors border-b border-border"
+          className="w-full h-16 flex-shrink-0 flex items-center justify-center hover:bg-surface transition-colors border-b border-border"
         >
           {expanded ? (
             <svg className="w-6 h-6 text-text-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -61,7 +61,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
           )}
         </button>
 
-        <div className={`flex flex-col pt-4 gap-2 ${expanded ? 'px-3' : 'items-center px-2'}`}>
+        <div className={`flex flex-col pt-4 gap-2 overflow-y-auto flex-1 min-h-0 pb-4 ${expanded ? 'px-3' : 'items-center px-2'}`}>
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href === '/support' && pathname === '/support');
             return (

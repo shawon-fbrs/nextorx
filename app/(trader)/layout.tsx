@@ -24,19 +24,30 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
   }, [loading, user, router]);
 
   useEffect(() => {
-    fetch('/api/trade/balance')
-      .then(r => r.json())
-      .then(async (data) => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const data = await fetch('/api/trade/balance').then((r) => r.json());
+        if (cancelled) return;
         let bal = data.wallet?.balance ?? 0;
-        // Auto-credit demo balance for new users
         if (accountType === 'demo' && bal === 0) {
           const res = await fetch('/api/trade/demo-balance', { method: 'POST' });
           const demo = await res.json();
+          if (cancelled) return;
           bal = demo.balance ?? bal;
         }
         setBalance(bal / 100);
-      })
-      .catch(() => {});
+      } catch {}
+    };
+    load();
+    const timer = setInterval(load, 10000);
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [accountType]);
 
   return (
