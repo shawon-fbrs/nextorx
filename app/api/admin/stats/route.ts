@@ -21,10 +21,11 @@ export async function GET() {
         where: { createdAt: { gte: todayStart } },
       }),
 
-      prisma.trade.aggregate({
+      prisma.trade.groupBy({
+        by: ["status"],
         where: { status: { in: ["WON", "LOST"] } },
-        _sum: { amount: true, profit: true },
         _count: true,
+        _sum: { amount: true, profit: true },
       }),
 
       prisma.$queryRaw<
@@ -62,20 +63,23 @@ export async function GET() {
       `,
     ]);
 
-    const totalVolume = Number(tradeStats._sum.amount ?? 0);
-    const totalProfit = Number(tradeStats._sum.profit ?? 0);
-    const settledTrades = tradeStats._count;
-    const winCount = settledTrades > 0
-      ? Math.round((totalVolume - totalProfit) / 2 / (totalVolume / settledTrades || 1))
-      : 0;
+    const won = tradeStats.find((r) => r.status === "WON");
+    const lost = tradeStats.find((r) => r.status === "LOST");
+    const wonCount = won?._count ?? 0;
+    const lostCount = lost?._count ?? 0;
+    const settledTrades = wonCount + lostCount;
+    const stakesKept = Number(lost?._sum.amount ?? 0);
+    const payouts = Number(won?._sum.profit ?? 0);
+    const totalVolume = stakesKept + Number(won?._sum.amount ?? 0);
+    const gross = stakesKept - payouts;
 
     return Response.json({
       totalUsers,
       todayTrades,
-      totalRevenue: totalProfit,
+      totalRevenue: gross,
       totalVolume,
       winRate: settledTrades > 0
-        ? Number(((winCount / settledTrades) * 100).toFixed(1))
+        ? Number(((wonCount / settledTrades) * 100).toFixed(1))
         : 0,
       settledTrades,
       monthlyRevenue: monthlyRevenue.map((r) => ({

@@ -219,8 +219,8 @@ export class OTCEngine {
       }
       this.secondCloses.set(state.pairId, prevClose);
       state.currentPrice = prevClose;
+      console.log(`[OTC] Backfilled ${rows.length} 1s candles for ${state.pairId}`);
     }
-    if (this.pairs.size > 0) console.log(`[OTC] Backfilled ${rows.length} 1s candles for ${state.pairId}`);
   }
 
   private categoryOf(pairId: string): string {

@@ -24,6 +24,7 @@ type Stats = {
 export default function ReportsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [pnl, setPnl] = useState<{ totals: { gross: number; stakesKept: number; payouts: number; volume: number; trades: number }; byPair: { pairId: string; pairName: string; trades: number; volume: number; gross: number }[] } | null>(null);
+  const [exposure, setExposure] = useState<{ pairId: string; pairName: string; up: number; down: number; net: number; total: number; count: number }[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -31,10 +32,12 @@ export default function ReportsPage() {
       fetch('/api/admin/stats')
         .then((r) => { if (!r.ok) throw new Error(); return r.json(); }),
       fetch('/api/admin/reports/pnl?days=30').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch('/api/admin/exposure').then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ])
-      .then(([s, p]) => {
+      .then(([s, p, e]) => {
         setStats(s);
         setPnl(p);
+        setExposure(e?.exposure ?? null);
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -47,7 +50,41 @@ export default function ReportsPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => <div key={i} className="bg-surface border border-border rounded-xl p-4 space-y-2"><Skeleton className="h-3 w-20" /><Skeleton className="h-6 w-24" /></div>)}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {exposure && exposure.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>Live Exposure (open positions)</CardTitle></CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-textDark uppercase">Asset</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-semibold text-textDark uppercase">Up</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-semibold text-textDark uppercase">Down</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-semibold text-textDark uppercase">Net</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-semibold text-textDark uppercase">Open</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {exposure.map((a) => (
+                    <tr key={a.pairId} className="border-b border-border/50">
+                      <td className="px-3 py-2 text-sm font-medium text-white">{a.pairName}</td>
+                      <td className="px-3 py-2 text-sm text-green text-right">${(a.up / 100).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-sm text-red text-right">${(a.down / 100).toFixed(2)}</td>
+                      <td className={`px-3 py-2 text-sm text-right font-semibold ${a.net >= 0 ? 'text-green' : 'text-red'}`}>
+                        {a.net >= 0 ? '+' : '−'}${(Math.abs(a.net) / 100).toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-text text-right">{a.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {[1, 2].map((i) => <Card key={i}><CardHeader><Skeleton className="h-5 w-28" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card>)}
         </div>
       </div>
