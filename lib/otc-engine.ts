@@ -83,6 +83,7 @@ export class OTCEngine {
   private currentSeed = "";
   private secondCloses = new Map<string, number>();
   private lastPersistedSecond = 0;
+  private ticking = false;
   private anchors = new Map<string, { price: number; fetchedAt: number }>();
   private mirrorTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -253,6 +254,16 @@ export class OTCEngine {
   }
 
   private async generateTicks() {
+    if (this.ticking) return;
+    this.ticking = true;
+    try {
+      await this.generateTicksInner();
+    } finally {
+      this.ticking = false;
+    }
+  }
+
+  private async generateTicksInner() {
     const now = Date.now();
     const day = dayStringUTC(new Date(now));
     if (day !== this.currentDay) {

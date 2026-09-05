@@ -113,6 +113,20 @@ async function authorizeWs(req: IncomingMessage): Promise<{ userId: string; role
   // TRACK-B B2: replace with BullMQ persistent queue + dead-letter queue.
   startSettlementWorker();
 
+  const shutdown = (signal: string) => {
+    console.log(`[Server] ${signal} received, stopping engines...`);
+    try {
+      engine.stop();
+    } catch {}
+    try {
+      stopSettlementWorker();
+    } catch {}
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5000).unref();
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+
   wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     const authed = await authorizeWs(req);
     if (!authed) {
