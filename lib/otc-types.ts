@@ -4,6 +4,7 @@ export interface PairState {
   pairId: string;
   name: string;
   category: string;
+  feed: string;
   basePrice: number;
   volatility: number;
   payoutPercent: number;

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { MIRRORED_PAIR_IDS } from '@/lib/mirror-feed';
 
 const TICKS_PER_SECOND = 10;
 const SECONDS_PER_DAY = 86400;
@@ -66,6 +67,11 @@ export default function VerifyPage() {
   const runVerify = async () => {
     setResult('');
     setOk(null);
+    if (MIRRORED_PAIR_IDS.includes(pairId)) {
+      setResult('This asset mirrors the live public market — compare it against public quotes, not the seed. Seed verification applies to synthetic assets.');
+      setOk(false);
+      return;
+    }
     if (!seed || !file || !day || !basePrice || !volatility) {
       setResult('Fill in every field and attach the CSV.');
       setOk(false);
@@ -142,6 +148,7 @@ export default function VerifyPage() {
           <p className="text-sm text-text-dark mt-1">
             Re-run the market math in your own browser. This page makes zero network calls —
             paste the revealed seed, upload the candle CSV, and check every candle.
+            Trade entries include a half-spread (shown on each pair); exits are the committed candle closes verified here.
           </p>
         </div>
         {result && (

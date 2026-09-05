@@ -5,6 +5,8 @@ interface SymbolLike {
   name: string;
   payoutPercent?: number;
   payout?: number;
+  spread?: number;
+  basePrice?: number;
 }
 
 interface TradeLike {
@@ -166,6 +168,11 @@ export function TradingPanel({
               </svg>
             </div>
           </div>
+          {symbol.spread != null && Number(symbol.spread) > 0 && symbol.basePrice ? (
+            <p className="text-[10px] text-textDark mt-1.5">
+              Entry includes {(Number(symbol.spread) / 2 / Number(symbol.basePrice) * 100).toFixed(3)}% spread
+            </p>
+          ) : null}
         </div>
 
         {/* Up/Down buttons */}

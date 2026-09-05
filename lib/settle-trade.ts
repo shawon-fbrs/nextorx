@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/db";
 import { postEntryInTx } from "@/lib/ledger";
 
-export async function getSnapshotPrice(pairId: string, fallbackBase: number): Promise<number> {
-  try {
+export async function getSnapshotPrice(pairId: string, fallbackBase: number): Promise<number> {  try {
     const { getOTCEngine } = await import("@/lib/otc-engine");
     const engine = await getOTCEngine();
     const committed = await engine.getLastCommittedSecondClose(pairId);
@@ -33,11 +32,13 @@ export async function settleTradeById(tradeId: string): Promise<boolean> {
       (trade.direction === "UP" && priceMovedUp) ||
       (trade.direction === "DOWN" && !priceMovedUp);
 
+    // Spread-based edge: entry already includes half-spread against the trader,
+    // so a pure price comparison is the full settlement rule. No hidden dice.
+    const won = directionCorrect;
+
     const profile = await prisma.userRiskProfile.findUnique({
       where: { userId: trade.userId },
     });
-    const effectiveWinRate = profile ? Number(profile.effectiveWinRate) : 0.48;
-    const won = directionCorrect && Math.random() < effectiveWinRate;
 
     const payout = Math.round(trade.amount * (Number(trade.payoutPercent) / 100));
     const profit = won ? payout : -trade.amount;

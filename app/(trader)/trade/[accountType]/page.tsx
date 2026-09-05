@@ -21,6 +21,7 @@ interface PairDef {
   category: string;
   payoutPercent: number;
   basePrice: number;
+  spread: number;
   minTrade: number;
   maxTrade: number;
 }
@@ -61,7 +62,19 @@ const toolOverlayMap: Record<string, string> = {
   'Arrow Marker': 'arrowMarker',
 };
 
-function TopBar({ pairs, activePair, onSelect }: { pairs: PairDef[]; activePair: PairDef; onSelect: (p: PairDef) => void }) {
+function TopBar({
+  pairs,
+  visibleIds,
+  activePair,
+  onSelect,
+  onClose,
+}: {
+  pairs: PairDef[];
+  visibleIds: string[];
+  activePair: PairDef | null;
+  onSelect: (p: PairDef) => void;
+  onClose: (id: string) => void;
+}) {
   const [addOpen, setAddOpen] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -86,7 +99,8 @@ function TopBar({ pairs, activePair, onSelect }: { pairs: PairDef[]; activePair:
           </div>
           <div className="max-h-[420px] overflow-y-auto px-2 pb-2">
             {pairs.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(pair => {
-              const isActive = pair.id === activePair.id;
+              const isActive = pair.id === activePair?.id;
+              const isOpen = visibleIds.includes(pair.id);
               return (
                 <button key={pair.id} onClick={() => { onSelect(pair); setAddOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all mb-0.5 ${isActive ? 'bg-blue/10 border border-blue/30' : 'hover:bg-surface-hover border border-transparent'}`}>
@@ -95,6 +109,7 @@ function TopBar({ pairs, activePair, onSelect }: { pairs: PairDef[]; activePair:
                   </div>
                   <div className="flex-1 text-left">
                     <span className="text-sm font-bold text-white">{pair.name}</span>
+                    {isOpen && <span className="text-[10px] text-blue ml-2">open</span>}
                   </div>
                   <span className="text-sm font-bold text-green">{pair.payoutPercent}%</span>
                 </button>
@@ -104,12 +119,12 @@ function TopBar({ pairs, activePair, onSelect }: { pairs: PairDef[]; activePair:
         </div>
       </div>
 
-      {pairs.slice(0, 7).map((pair) => {
-        const isActive = pair.id === activePair.id;
+      {pairs.filter((pair) => visibleIds.includes(pair.id)).slice(0, 7).map((pair) => {
+        const isActive = pair.id === activePair?.id;
         return (
           <button key={pair.id} onClick={() => onSelect(pair)}
             className={`h-11 w-40 min-w-0 flex-shrink rounded-xl flex items-center pl-4 pr-7 gap-2.5 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
-            <span onClick={(e) => e.stopPropagation()}
+            <span onClick={(e) => { e.stopPropagation(); onClose(pair.id); }}
               className="absolute top-0 right-0 w-5 h-5 bg-red rounded-bl-xl flex items-center justify-center hover:bg-red-hover transition-colors">
               <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} />
@@ -310,6 +325,7 @@ export default function TradingPage() {
   const [indOpen, setIndOpen] = useState(false);
   const [pairs, setPairs] = useState<PairDef[]>([]);
   const [activePair, setActivePair] = useState<PairDef | null>(null);
+  const [visibleIds, setVisibleIds] = useState<string[]>([]);
   const [investment, setInvestment] = useState(1);
   const [timeMinutes, setTimeMinutes] = useState(1);
   const [timeSeconds, setTimeSeconds] = useState(0);
@@ -332,15 +348,32 @@ export default function TradingPage() {
           ...p,
           payoutPercent: Number(p.payoutPercent),
           basePrice: Number(p.basePrice),
+          spread: Number(p.spread ?? 0),
           minTrade: Number(p.minTrade),
           maxTrade: Number(p.maxTrade),
         })) as PairDef[];
         setPairs(normalized);
-        if (normalized.length > 0) setActivePair(normalized[0]);
+        if (normalized.length > 0) {
+          setVisibleIds(normalized.map((p) => p.id));
+          setActivePair((cur) => cur ?? normalized[0]);
+        }
       })
       .catch(() => {});
     setMounted(true);
   }, []);
+
+  const handleSelectPair = useCallback((p: PairDef) => {
+    setVisibleIds((prev) => (prev.includes(p.id) ? prev : [...prev, p.id]));
+    setActivePair(p);
+  }, []);
+
+  const handleClosePair = useCallback((id: string) => {
+    const next = visibleIds.filter((v) => v !== id);
+    setVisibleIds(next);
+    if (activePair?.id === id) {
+      setActivePair(pairs.find((p) => next.includes(p.id)) ?? null);
+    }
+  }, [visibleIds, activePair, pairs]);
 
   const handleTick = useCallback(() => {}, []);
   const handleCandleClose = useCallback(() => {}, []);
@@ -500,7 +533,7 @@ export default function TradingPage() {
     });
   };
 
-  if (!mounted || !activePair) return <div className="h-full w-full bg-background" />;
+  if (!mounted) return <div className="h-full w-full bg-background" />;
 
   const isComingSoon = accountType === 'funded' || accountType === 'tournament';
 
@@ -516,7 +549,18 @@ export default function TradingPage() {
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <TopBar pairs={pairs} activePair={activePair} onSelect={setActivePair} />
+            <TopBar pairs={pairs} visibleIds={visibleIds} activePair={activePair} onSelect={handleSelectPair} onClose={handleClosePair} />
+            {!activePair ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
+                <div className="w-14 h-14 rounded-2xl bg-blue/10 border border-blue/20 flex items-center justify-center">
+                  <svg className="w-7 h-7 text-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <p className="text-sm font-bold text-white">No asset added</p>
+                <p className="text-xs text-textDark">Click + above to add an asset from the list.</p>
+              </div>
+            ) : (
             <div className="flex-1 flex min-w-0 overflow-hidden">
               <SideToolbar onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
@@ -663,6 +707,7 @@ export default function TradingPage() {
                 )}
               </div>
             </div>
+            )}
           </div>
         </div>
         {!isFullscreen && activePair && (

@@ -1,0 +1,1 @@
+ALTER TABLE "Pair" ADD COLUMN "feed" TEXT NOT NULL DEFAULT 'synthetic';

@@ -67,6 +67,11 @@ export interface SecondResult {
   jumped: boolean;
 }
 
+export interface SecondOptions {
+  anchor?: number;
+  pullStrength?: number;
+}
+
 export function computeSecond(
   serverSeed: string,
   pairId: string,
@@ -77,6 +82,7 @@ export function computeSecond(
   volatility: number,
   category: string,
   utcHour: number,
+  opts?: SecondOptions,
 ): SecondResult {
   const digest = digestForSecond(serverSeed, pairId, day, secondOfDay);
   const sigma = volatility * sessionMultiplier(category, utcHour) * SIGMA_PER_SECOND;
@@ -95,8 +101,15 @@ export function computeSecond(
     jumped = true;
   }
 
-  const floor = Math.max(basePrice * 0.5, 0.01);
-  const ceiling = basePrice * 2;
+  if (opts?.anchor != null && opts.anchor > 0) {
+    const pull = (opts.pullStrength ?? 0.02) * ((opts.anchor - prevClose) / prevClose);
+    exponent += Math.max(-0.005, Math.min(0.005, pull));
+  }
+
+  const refLow = Math.min(basePrice, opts?.anchor ?? basePrice);
+  const refHigh = Math.max(basePrice, opts?.anchor ?? basePrice);
+  const floor = Math.max(refLow * 0.5, 0.01);
+  const ceiling = refHigh * 2;
   const close = Math.min(ceiling, Math.max(floor, prevClose * Math.exp(exponent)));
 
   const step = (close - prevClose) / TICKS_PER_SECOND;

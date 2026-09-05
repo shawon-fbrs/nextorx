@@ -115,7 +115,10 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Duplicate trade detected. Please wait." }, { status: 409 });
     }
 
-    const openPrice = await getSnapshotPrice(pairId, Number(pair.basePrice));
+    const marketPrice = await getSnapshotPrice(pairId, Number(pair.basePrice));
+    const halfSpread = Number(pair.spread) / 2;
+    const rawEntry = direction === "UP" ? marketPrice + halfSpread : marketPrice - halfSpread;
+    const openPrice = Math.max(0.00000001, Math.round(rawEntry * 1e8) / 1e8);
 
     const trade = await prisma.$transaction(async (tx) => {
       const created = await tx.trade.create({
@@ -138,7 +141,7 @@ export async function POST(request: NextRequest) {
         debit: true,
         wallet,
         referenceId: created.id,
-        description: `Trade placed (${pair.name} ${direction} @ ${openPrice})`,
+        description: `Trade placed (${pair.name} ${direction} @ ${openPrice}, spread ${pair.spread})`,
       });
       return created;
     });

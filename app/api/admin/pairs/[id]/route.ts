@@ -8,7 +8,8 @@ import { getOTCEngine } from "@/lib/otc-engine";
 const updatePairSchema = z.object({
   name: z.string().min(1).max(50).optional(),
   symbol: z.string().max(20).optional().nullable(),
-  category: z.enum(["forex", "crypto", "commodities", "indices"]).optional(),
+  category: z.enum(["forex", "crypto", "commodities", "indices", "stocks"]).optional(),
+  feed: z.enum(["synthetic", "mirror"]).optional(),
   basePrice: z.number().positive().optional(),
   volatility: z.number().positive().optional(),
   payoutPercent: z.number().min(50).max(95).optional(),
@@ -51,6 +52,7 @@ export async function PUT(
         ...(data.name !== undefined && { name: data.name }),
         ...(data.symbol !== undefined && { symbol: data.symbol }),
         ...(data.category !== undefined && { category: data.category }),
+        ...(data.feed !== undefined && { feed: data.feed }),
         ...(data.basePrice !== undefined && { basePrice: data.basePrice }),
         ...(data.volatility !== undefined && { volatility: data.volatility }),
         ...(data.payoutPercent !== undefined && { payoutPercent: data.payoutPercent }),
@@ -76,6 +78,7 @@ export async function PUT(
       if (data.payoutPercent !== undefined) changes.payoutPercent = data.payoutPercent;
       if (data.spread !== undefined) changes.spread = data.spread;
       if (data.isActive !== undefined) changes.isActive = data.isActive;
+      if (data.feed !== undefined) changes.feed = data.feed;
       if (Object.keys(changes).length > 0) {
         await engine.updatePair(id, changes);
       }

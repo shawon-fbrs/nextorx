@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "crypto";
 import { prisma } from "./db";
+import { fetchMirrorQuotes } from "./mirror-feed";
 import {
   computeSecond,
   dayStringUTC,
@@ -82,6 +83,22 @@ export class OTCEngine {
   private currentSeed = "";
   private secondCloses = new Map<string, number>();
   private lastPersistedSecond = 0;
+  private anchors = new Map<string, { price: number; fetchedAt: number }>();
+  private mirrorTimer: ReturnType<typeof setInterval> | null = null;
+
+  async refreshAnchors() {
+    try {
+      const quotes = await fetchMirrorQuotes();
+      for (const q of quotes) {
+        this.anchors.set(q.pairId, { price: q.price, fetchedAt: q.fetchedAt });
+      }
+      if (quotes.length > 0) {
+        console.log(`[OTC] Mirror anchors updated: ${quotes.map((q) => `${q.pairId}=${q.price}`).join(" ")}`);
+      }
+    } catch (e) {
+      console.error("[OTC] Mirror refresh failed, keeping last anchors:", e);
+    }
+  }
 
   async init() {
     let retries = 10;
@@ -122,6 +139,7 @@ export class OTCEngine {
       pairId: p.id,
       name: p.name,
       category: p.category,
+      feed: (p as { feed?: string }).feed ?? "synthetic",
       basePrice,
       volatility: Number(p.volatility),
       payoutPercent: Number(p.payoutPercent),
@@ -148,6 +166,7 @@ export class OTCEngine {
     const fromSecond = currentSecond - BACKFILL_15M_SECONDS;
     const day = dayStringUTC(new Date(now));
     for (const state of Array.from(this.pairs.values())) {
+      if (state.feed === "mirror") continue;
       let prevClose = state.basePrice;
       const rows: Array<{
         pairId: string;
@@ -198,6 +217,8 @@ export class OTCEngine {
 
   start() {
     if (this.tickTimer) return;
+    void this.refreshAnchors();
+    this.mirrorTimer = setInterval(() => void this.refreshAnchors(), 60_000);
     this.tickTimer = setInterval(() => void this.generateTicks(), TICK_INTERVAL_MS);
     this.candleTimer = setInterval(() => void this.closeCandles(), CANDLE_INTERVAL_MS);
     this.seedTimer = setInterval(() => void this.checkSeeds(), 30_000);
@@ -205,10 +226,10 @@ export class OTCEngine {
   }
 
   stop() {
-    for (const timer of [this.tickTimer, this.candleTimer, this.persistTimer, this.seedTimer]) {
+    for (const timer of [this.tickTimer, this.candleTimer, this.persistTimer, this.seedTimer, this.mirrorTimer]) {
       if (timer) clearInterval(timer);
     }
-    this.tickTimer = this.candleTimer = this.persistTimer = this.seedTimer = null;
+    this.tickTimer = this.candleTimer = this.persistTimer = this.seedTimer = this.mirrorTimer = null;
   }
 
   private tickIndexInSecond(now: number): number {
@@ -226,6 +247,44 @@ export class OTCEngine {
     const utcHour = new Date(now).getUTCHours();
 
     for (const state of Array.from(this.pairs.values())) {
+      if (state.feed === "mirror") {
+        const anchor = this.anchors.get(state.pairId)?.price;
+        const prevClose = this.secondCloses.get(state.pairId) ?? state.currentPrice;
+        const r = computeSecond(
+          this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+          state.basePrice, state.volatility, state.category, utcHour,
+          anchor != null ? { anchor } : undefined,
+        );
+        const price = r.ticks[Math.min(idx, r.ticks.length - 1)];
+        state.currentPrice = Number(price.toFixed(8));
+
+        const candle = state.candle;
+        candle.close = state.currentPrice;
+        if (state.currentPrice > candle.high) candle.high = state.currentPrice;
+        if (state.currentPrice < candle.low) candle.low = state.currentPrice;
+        candle.volume += 1;
+
+        const secStart = Math.floor(now / 1000) * 1000;
+        if (secStart !== this.lastPersistedSecond && this.lastPersistedSecond !== 0) {
+          await this.persistSecond(this.lastPersistedSecond, day);
+        }
+        if (secStart !== this.lastPersistedSecond) {
+          this.lastPersistedSecond = secStart;
+        }
+        if (idx === TICKS_PER_SECOND - 1) {
+          this.secondCloses.set(state.pairId, r.close);
+        }
+
+        const msg: TickMessage = {
+          type: "tick",
+          pairId: state.pairId,
+          price: state.currentPrice,
+          timestamp: now,
+          candle: { ...candle },
+        };
+        if (this.broadcast) this.broadcast(msg);
+        continue;
+      }
       const prevClose = this.secondCloses.get(state.pairId) ?? state.currentPrice;
       const r = computeSecond(
         this.currentSeed, state.pairId, day, secondOfDay, prevClose,
@@ -268,9 +327,11 @@ export class OTCEngine {
     const rows = [];
     for (const state of Array.from(this.pairs.values())) {
       const prevClose = this.secondCloses.get(state.pairId) ?? state.basePrice;
+      const anchor = state.feed === "mirror" ? this.anchors.get(state.pairId)?.price : undefined;
       const r = computeSecond(
         this.currentSeed, state.pairId, day, secondOfDay, prevClose,
         state.basePrice, state.volatility, state.category, utcHour,
+        anchor != null ? { anchor } : undefined,
       );
       rows.push({
         pairId: state.pairId,
@@ -474,7 +535,7 @@ export class OTCEngine {
 
   async updatePair(
     pairId: string,
-    changes: Partial<Pick<PairState, "volatility" | "payoutPercent" | "spread" | "basePrice">> & { isActive?: boolean },
+    changes: Partial<Pick<PairState, "volatility" | "payoutPercent" | "spread" | "basePrice" | "feed">> & { isActive?: boolean },
   ): Promise<void> {
     if (changes.isActive === false) {
       await this.removePair(pairId);
@@ -485,6 +546,7 @@ export class OTCEngine {
     if (changes.volatility !== undefined) state.volatility = changes.volatility;
     if (changes.payoutPercent !== undefined) state.payoutPercent = changes.payoutPercent;
     if (changes.spread !== undefined) state.spread = changes.spread;
+    if (changes.feed !== undefined) state.feed = changes.feed;
     if (changes.basePrice !== undefined) {
       state.basePrice = changes.basePrice;
       state.currentPrice = changes.basePrice;
