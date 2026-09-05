@@ -9,6 +9,7 @@ export type AccountType = 'demo' | 'real' | 'funded' | 'tournament';
 
 interface HeaderProps {
   balance: number;
+  demoBalance?: number;
 }
 
 const accountData: Record<AccountType, { icon: ReactNode; color: string; label: string }> = {
@@ -50,7 +51,7 @@ const accountData: Record<AccountType, { icon: ReactNode; color: string; label: 
   },
 };
 
-export function Header({ balance }: HeaderProps) {
+export function Header({ balance, demoBalance = 0 }: HeaderProps) {
   const pathname = usePathname();
   const accountTypeMatch = pathname.match(/\/trade\/(\w+)/);
   const accountType = (accountTypeMatch ? accountTypeMatch[1] : 'real') as AccountType;
@@ -212,6 +213,7 @@ export function Header({ balance }: HeaderProps) {
                   const acc = accountData[type];
                   const isActive = type === accountType;
                   const isDisabled = type === 'funded' || type === 'tournament';
+                  const typeBalance = type === 'demo' ? demoBalance : balance;
                   return (
                     <Link
                       key={type}
@@ -243,7 +245,7 @@ export function Header({ balance }: HeaderProps) {
                         <span className={`text-[11px] font-bold ${isActive ? 'text-green' : 'text-text'}`}>{acc.label}</span>
                       </div>
                       <span className={`text-sm font-black ${isActive ? 'text-white' : 'text-text'}`}>
-                        {hidden ? '••••••' : isDisabled ? '—' : `$${balance.toFixed(2)}`}
+                        {hidden ? '••••••' : isDisabled ? '—' : `$${typeBalance.toFixed(2)}`}
                       </span>
                     </Link>
                   );

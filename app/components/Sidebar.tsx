@@ -61,7 +61,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
           )}
         </button>
 
-        <div className={`flex flex-col pt-4 gap-2 overflow-y-auto flex-1 min-h-0 pb-4 ${expanded ? 'px-3' : 'items-center px-2'}`}>
+        <div className={`flex flex-col pt-2 gap-1 overflow-y-auto flex-1 min-h-0 pb-4 ${expanded ? 'px-3' : 'items-center px-2'}`}>
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href === '/support' && pathname === '/support');
             return (
@@ -69,7 +69,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                 key={item.label}
                 href={item.href}
                 className={`flex items-center gap-3 rounded-xl transition-colors relative ${
-                  expanded ? 'px-4 py-3.5' : 'flex-col py-3 px-0 w-14'
+                  expanded ? 'px-4 py-2' : 'flex-col py-2 px-0 w-14'
                 } ${
                   isActive
                     ? 'bg-blue/15 text-blue'
@@ -91,7 +91,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
             );
           })}
           {expanded && (
-            <span className="text-[10px] font-bold text-text-dark uppercase tracking-wider px-4 pt-3">Wallet</span>
+            <span className="text-[10px] font-bold text-text-dark uppercase tracking-wider px-4 pt-2">Wallet</span>
           )}
           {moreItems.map((item) => {
             const isActive = pathname === item.href;
@@ -100,7 +100,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                 key={item.label}
                 href={item.href}
                 className={`flex items-center gap-3 rounded-xl transition-colors relative ${
-                  expanded ? 'px-4 py-3.5' : 'flex-col py-3 px-0 w-14'
+                  expanded ? 'px-4 py-2' : 'flex-col py-2 px-0 w-14'
                 } ${
                   isActive
                     ? 'bg-blue/15 text-blue'
