@@ -48,6 +48,8 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
   const [candle, setCandle] = useState<CandleData | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const subscribedPairRef = useRef<string | null>(null);
+  const pairIdRef = useRef(pairId);
+  pairIdRef.current = pairId;
   const onTickRef = useRef(onTick);
   const onCandleCloseRef = useRef(onCandleClose);
   const onSnapshotRef = useRef(onSnapshot);
@@ -57,16 +59,18 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     wsRef.current = ws;
+    const pairAtConnect = pairIdRef.current;
 
     ws.onopen = () => {
       setIsConnected(true);
-      if (pairId) {
-        ws.send(JSON.stringify({ type: 'subscribe', pairId }));
-        subscribedPairRef.current = pairId;
+      if (pairAtConnect) {
+        ws.send(JSON.stringify({ type: 'subscribe', pairId: pairAtConnect }));
+        subscribedPairRef.current = pairAtConnect;
       }
     };
 
@@ -92,16 +96,19 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
       } catch {}
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       setIsConnected(false);
       wsRef.current = null;
+      if (ev.code !== 1000 && ev.code !== 4401) {
+        console.warn(`[WS] closed unexpectedly (code=${ev.code}), reconnecting…`);
+      }
       reconnectTimer.current = setTimeout(connect, 2000);
     };
 
     ws.onerror = () => {
       ws.close();
     };
-  }, [pairId]);
+  }, []);
 
   useEffect(() => {
     connect();
