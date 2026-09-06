@@ -46,11 +46,14 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
     load();
     const timer = setInterval(load, 10000);
     const onFocus = () => load();
+    const onRefresh = () => load();
     window.addEventListener('focus', onFocus);
+    window.addEventListener('balance-refresh', onRefresh);
     return () => {
       cancelled = true;
       clearInterval(timer);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('balance-refresh', onRefresh);
     };
   }, [accountType]);
 

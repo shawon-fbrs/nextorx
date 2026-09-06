@@ -67,12 +67,14 @@ function TopBar({
   pairs,
   visibleIds,
   activePair,
+  effectivePayout,
   onSelect,
   onClose,
 }: {
   pairs: PairDef[];
   visibleIds: string[];
   activePair: PairDef | null;
+  effectivePayout: number | null;
   onSelect: (p: PairDef) => void;
   onClose: (id: string) => void;
 }) {
@@ -102,6 +104,7 @@ function TopBar({
             {pairs.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(pair => {
               const isActive = pair.id === activePair?.id;
               const isOpen = visibleIds.includes(pair.id);
+              const shownPayout = isActive && effectivePayout != null ? effectivePayout : pair.payoutPercent;
               return (
                 <button key={pair.id} onClick={() => { onSelect(pair); setAddOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all mb-0.5 ${isActive ? 'bg-blue/10 border border-blue/30' : 'hover:bg-surface-hover border border-transparent'}`}>
@@ -112,7 +115,7 @@ function TopBar({
                     <span className="text-sm font-bold text-white">{pair.name}</span>
                     {isOpen && <span className="text-[10px] text-blue ml-2">open</span>}
                   </div>
-                  <span className="text-sm font-bold text-green">{pair.payoutPercent}%</span>
+                  <span className="text-sm font-bold text-green">{shownPayout}%</span>
                 </button>
               );
             })}
@@ -122,6 +125,7 @@ function TopBar({
 
       {pairs.filter((pair) => visibleIds.includes(pair.id)).slice(0, 7).map((pair) => {
         const isActive = pair.id === activePair?.id;
+        const shownPayout = isActive && effectivePayout != null ? effectivePayout : pair.payoutPercent;
         return (
           <button key={pair.id} onClick={() => onSelect(pair)}
             className={`h-11 w-40 min-w-0 flex-shrink rounded-xl flex items-center pl-4 pr-7 gap-2.5 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
@@ -134,7 +138,7 @@ function TopBar({
             {isActive && <div className="w-0.5 h-6 bg-blue rounded-full" />}
             <div className="flex flex-col">
               <span className="text-xs font-bold text-white leading-tight">{pair.name}</span>
-              <span className="text-[10px] font-bold text-orange">{pair.payoutPercent}%</span>
+              <span className="text-[10px] font-bold text-orange">{shownPayout}%</span>
             </div>
           </button>
         );
@@ -326,6 +330,7 @@ export default function TradingPage() {
   const [indOpen, setIndOpen] = useState(false);
   const [pairs, setPairs] = useState<PairDef[]>([]);
   const [activePair, setActivePair] = useState<PairDef | null>(null);
+  const [effectivePayout, setEffectivePayout] = useState<number | null>(null);
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
   const prevActiveRef = useRef<Set<string>>(new Set());
@@ -528,7 +533,7 @@ export default function TradingPage() {
   };
 
   const price = currentPrice ?? activePair?.basePrice ?? 1.0;
-  const payout = activePair?.payoutPercent ?? 80;
+  const payout = effectivePayout ?? activePair?.payoutPercent ?? 80;
   const payoutAmount = (investment * (1 + payout / 100)).toFixed(2);
   const timeStr = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}:00`;
 
@@ -567,6 +572,7 @@ export default function TradingPage() {
           } else {
             toast.error(`Lost $${t.amount.toFixed(2)} on ${t.symbol || 'trade'}`);
           }
+          window.dispatchEvent(new Event('balance-refresh'));
         }
       }
       prevActiveRef.current = nowActive;
@@ -602,12 +608,32 @@ export default function TradingPage() {
     return () => clearInterval(timer);
   }, [refreshTrades]);
 
-  const [candleLeft, setCandleLeft] = useState('');
+  useEffect(() => {
+    if (!activePair) {
+      setEffectivePayout(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/market/pairs/${activePair.id}/payout`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && typeof data.payout === 'number') {
+          setEffectivePayout(data.payout);
+        }
+      } catch {}
+    };
+    setEffectivePayout(null);
+    load();
+    const timer = setInterval(load, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [activePair]);
 
-  const formatLeft = (expiresAt: number, now: number): string => {
-    const s = Math.max(0, Math.ceil((expiresAt - now) / 1000));
-    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-  };
+  const [candleLeft, setCandleLeft] = useState('');
 
   useEffect(() => {
     const update = () => {
@@ -629,18 +655,15 @@ export default function TradingPage() {
         setExpiryMarks([]);
         return;
       }
-      const marks: Array<{ id: string; x: number; y: number; left: string }> = [];
-      const actives = trades.filter((t) => t.status === 'active' && t.expiresAt);
-      actives.forEach((t, i) => {
-        if (!t.expiresAt) return;
-        marks.push({ id: t.id, x: anchor.x, y: anchor.y + i * 22, left: formatLeft(t.expiresAt, now) });
-      });
-      setExpiryMarks(marks);
+      const s = Math.floor(now / 1000);
+      const left = 60 - (s % 60);
+      const label = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+      setExpiryMarks([{ id: 'candle', x: anchor.x, y: anchor.y, left: label }]);
     };
     updateMarks();
     const timer = setInterval(updateMarks, 1000);
     return () => clearInterval(timer);
-  }, [trades, price]);
+  }, [price]);
 
   const handleTrade = useCallback(async (type: 'up' | 'down') => {
     if (!activePair) return;
@@ -677,6 +700,7 @@ export default function TradingPage() {
           }) ?? [];
           if (ids.length > 0) markerRef.current.set(String(t.id), ids);
         } catch {}
+        window.dispatchEvent(new Event('balance-refresh'));
         await refreshTrades();
       }
     } catch {
@@ -709,7 +733,7 @@ export default function TradingPage() {
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} onSelect={handleSelectPair} onClose={handleClosePair} />
+            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} onSelect={handleSelectPair} onClose={handleClosePair} />
             {!activePair ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
                 <div className="w-14 h-14 rounded-2xl bg-blue/10 border border-blue/20 flex items-center justify-center">

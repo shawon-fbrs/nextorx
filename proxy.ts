@@ -40,12 +40,13 @@ const RATE_LIMITS: Array<{ match: (pathname: string, method: string) => boolean;
   { match: (p, m) => m === "POST" && p === "/api/auth/reset-password", rule: { max: 5, windowMs: 15 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/trade/deposit", rule: { max: 10, windowMs: 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/auth/check-login", rule: { max: 10, windowMs: 5 * 60 * 1000 } },
+  { match: (p, m) => m === "GET" && p.includes("/api/market/pairs/") && p.endsWith("/payout"), rule: { max: 30, windowMs: 60 * 1000 } },
   { match: (p, m) => m === "GET" && p === "/api/market/verify/download", rule: { max: 10, windowMs: 60 * 1000 } },
   { match: (p, m) => m === "GET" && p === "/api/market/verify/regime", rule: { max: 20, windowMs: 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/auth/login-hint", rule: { max: 5, windowMs: 15 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/auth/record-login-attempt", rule: { max: 10, windowMs: 5 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/account/kyc", rule: { max: 3, windowMs: 60 * 60 * 1000 } },
-  { match: (p, m) => m === "POST" && p === "/api/trade/trades", rule: { max: 10, windowMs: 60 * 1000 } },
+  { match: (p, m) => m === "POST" && p === "/api/trade/trades", rule: { max: 60, windowMs: 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/trade/withdraw", rule: { max: 3, windowMs: 60 * 60 * 1000 } },
 ];
 
