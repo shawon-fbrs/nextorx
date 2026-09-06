@@ -222,7 +222,7 @@ export function TradingPanel({
                     </div>
                     <div>
                       <span className="text-white text-[11px] font-semibold block leading-tight">{t.symbol}</span>
-                      <span className="text-[9px] text-textDark">${t.amount} · {t.payoutPercent ?? payoutAmount}%</span>
+                      <span className="text-[9px] text-textDark">${t.amount} · {t.payoutPercent ?? symbol.payoutPercent}%</span>
                     </div>
                   </div>
                   <span className="text-[11px] font-mono font-bold text-blue">

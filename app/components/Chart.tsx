@@ -226,7 +226,13 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
             { timestamp: opts.entryMs, value: opts.entryPrice },
             { timestamp: opts.entryMs + 3600000, value: opts.entryPrice },
           ],
-          styles: { line: { color, size: 2 } },
+          styles: {
+            line: { color, size: 2 },
+            yAxis: { color, backgroundColor: color, size: 12 },
+          },
+          needDefaultPointFigure: false,
+          needDefaultXAxisFigure: false,
+          needDefaultYAxisFigure: true,
         } as never);
         if (typeof entryId === 'string') ids.push(entryId);
       } catch {

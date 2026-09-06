@@ -624,12 +624,17 @@ export default function TradingPage() {
   useEffect(() => {
     const updateMarks = () => {
       const now = Date.now();
-      const marks: Array<{ id: string; x: number; y: number; left: string }> = [];
-      for (const t of trades) {
-        if (t.status !== 'active' || !t.expiresAt) continue;
-        const pt = chartRef.current?.chartPixel(t.expiresAt, price) ?? null;
-        if (pt) marks.push({ id: t.id, x: pt.x, y: pt.y, left: formatLeft(t.expiresAt, now) });
+      const anchor = chartRef.current?.chartPixel(now + 120000, price) ?? null;
+      if (!anchor) {
+        setExpiryMarks([]);
+        return;
       }
+      const marks: Array<{ id: string; x: number; y: number; left: string }> = [];
+      const actives = trades.filter((t) => t.status === 'active' && t.expiresAt);
+      actives.forEach((t, i) => {
+        if (!t.expiresAt) return;
+        marks.push({ id: t.id, x: anchor.x, y: anchor.y + i * 22, left: formatLeft(t.expiresAt, now) });
+      });
       setExpiryMarks(marks);
     };
     updateMarks();
