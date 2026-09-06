@@ -364,6 +364,10 @@ export default function TradingPage() {
   const [timeSeconds, setTimeSeconds] = useState(0);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [tradeError, setTradeError] = useState('');
+  const [confirmTrade, setConfirmTrade] = useState<'up' | 'down' | null>(null);
+  const [placing, setPlacing] = useState(false);
+  const [badgeY, setBadgeY] = useState<number | null>(null);
+  const markerRef = useRef<Map<string, string[]>>(new Map());
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [panelPos, setPanelPos] = useState({ x: 0, y: 0 });
@@ -408,7 +412,19 @@ export default function TradingPage() {
     setMounted(true);
   }, []);
 
+  const clearMarkers = useCallback(() => {
+    for (const overlayIds of Array.from(markerRef.current.values())) {
+      for (const oid of overlayIds) {
+        try {
+          chartRef.current?.removeOverlay(oid);
+        } catch {}
+      }
+    }
+    markerRef.current.clear();
+  }, []);
+
   const handleSelectPair = useCallback((p: PairDef) => {
+    clearMarkers();
     setVisibleIds((prev) => {
       const cur = prev ?? [];
       const next = cur.includes(p.id) ? cur : [...cur, p.id];
@@ -429,9 +445,10 @@ export default function TradingPage() {
     } catch {}
     setVisibleIds(next);
     if (activePair?.id === id) {
+      clearMarkers();
       setActivePair(pairs.find((p) => next.includes(p.id)) ?? null);
     }
-  }, [visibleIds, activePair, pairs]);
+  }, [visibleIds, activePair, pairs, clearMarkers]);
 
   const handleTick = useCallback(() => {}, []);
   const handleCandleClose = useCallback(() => {}, []);
@@ -541,6 +558,17 @@ export default function TradingPage() {
         };
       });
       setTrades(mapped);
+      const activeIds = new Set(mapped.filter((t) => t.status === 'active').map((t) => t.id));
+      for (const [tradeId, overlayIds] of Array.from(markerRef.current.entries())) {
+        if (!activeIds.has(tradeId)) {
+          for (const oid of overlayIds) {
+            try {
+              chartRef.current?.removeOverlay(oid);
+            } catch {}
+          }
+          markerRef.current.delete(tradeId);
+        }
+      }
     } catch {}
   }, [accountType]);
 
@@ -550,9 +578,25 @@ export default function TradingPage() {
     return () => clearInterval(timer);
   }, [refreshTrades]);
 
+  const [candleLeft, setCandleLeft] = useState('');
+
+  useEffect(() => {
+    const update = () => {
+      const s = Math.floor(Date.now() / 1000);
+      const left = 60 - (s % 60);
+      setCandleLeft(`${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`);
+      const y = price > 0 ? chartRef.current?.getYPixel(price) ?? null : null;
+      setBadgeY(y);
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [price]);
+
   const handleTrade = useCallback(async (type: 'up' | 'down') => {
     if (!activePair) return;
     setTradeError('');
+    setPlacing(true);
 
     try {
       const res = await fetch('/api/trade/trades', {
@@ -575,10 +619,23 @@ export default function TradingPage() {
       }
 
       if (data.trade) {
+        try {
+          const t = data.trade as { id: string; openPrice: number | string; createdAt: string; durationSeconds: number };
+          const createdAt = new Date(t.createdAt).getTime();
+          const ids = chartRef.current?.drawTradeMarkers({
+            entryPrice: Number(t.openPrice),
+            expiryMs: createdAt + Number(t.durationSeconds) * 1000,
+            direction: type,
+          }) ?? [];
+          if (ids.length > 0) markerRef.current.set(String(t.id), ids);
+        } catch {}
         await refreshTrades();
       }
     } catch {
       setTradeError('Trade failed. Please try again.');
+    } finally {
+      setPlacing(false);
+      setConfirmTrade(null);
     }
   }, [activePair, investment, timeMinutes, timeSeconds, accountType, refreshTrades]);
 
@@ -623,6 +680,15 @@ export default function TradingPage() {
               <SideToolbar onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} onOverlaySelected={setSelectedOverlay} />
+                {badgeY !== null && (
+                  <div
+                    className="absolute right-16 z-40 pointer-events-none px-1.5 py-0.5 rounded bg-blue text-white text-[10px] font-mono font-bold tabular-nums"
+                    style={{ top: badgeY - 10 }}
+                    title="Time to candle close"
+                  >
+                    {candleLeft}
+                  </div>
+                )}
 
                 {isComingSoon && (
                   <div className="absolute inset-0 z-[70] bg-background/80 backdrop-blur-sm flex items-center justify-center">
@@ -751,11 +817,11 @@ export default function TradingPage() {
                         <span className="text-green font-bold text-sm">+{payoutAmount}$</span>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => handleTrade('up')} className="flex-1 bg-green hover:bg-green-hover text-white font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]">
+                        <button onClick={() => setConfirmTrade('up')} className="flex-1 bg-green hover:bg-green-hover text-white font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path d="M5 10l7-7m0 0l7 7m-7-7v18" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           Up
                         </button>
-                        <button onClick={() => handleTrade('down')} className="flex-1 bg-red hover:bg-red-hover text-white font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]">
+                        <button onClick={() => setConfirmTrade('down')} className="flex-1 bg-red hover:bg-red-hover text-white font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path d="M19 14l-7 7m0 0l-7-7m7 7V3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           Down
                         </button>
@@ -775,12 +841,70 @@ export default function TradingPage() {
             setInvestment={setInvestment}
             timeStr={timeStr}
             onTimeChange={handleTimeChange}
-            onTrade={handleTrade}
+            onTrade={(t) => setConfirmTrade(t)}
             payoutAmount={payoutAmount}
             trades={trades}
           />
         )}
       </div>
+
+      {confirmTrade && activePair && (() => {
+        const durationSec = timeMinutes * 60 + timeSeconds;
+        const expiry = new Date(Date.now() + durationSec * 1000);
+        const spreadPct = activePair.basePrice > 0
+          ? ((activePair.spread ?? 0) / 2 / activePair.basePrice * 100).toFixed(3)
+          : '0.000';
+        return (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => !placing && setConfirmTrade(null)}>
+            <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[360px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-5 border-b border-border">
+                <h3 className="text-base font-bold text-white">
+                  Confirm {confirmTrade === 'up' ? 'Up' : 'Down'} · {activePair.name}
+                </h3>
+                <p className="text-xs text-textDark mt-1">Review before placing</p>
+              </div>
+              <div className="px-6 py-5 space-y-2.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-textDark">Stake</span>
+                  <span className="text-white font-bold">${investment.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-textDark">Payout</span>
+                  <span className="text-green font-bold">{payout}% (+${(investment * payout / 100).toFixed(2)})</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-textDark">Duration</span>
+                  <span className="text-white font-semibold">{timeStr.slice(0, 5)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-textDark">Expires at</span>
+                  <span className="text-white font-semibold font-mono">{expiry.toLocaleTimeString()}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-textDark">Entry spread</span>
+                  <span className="text-textDark font-semibold">{spreadPct}%</span>
+                </div>
+              </div>
+              <div className="px-6 pb-5 flex gap-3">
+                <button
+                  onClick={() => setConfirmTrade(null)}
+                  disabled={placing}
+                  className="flex-1 bg-background border border-border text-text text-xs font-bold py-2.5 rounded-lg hover:bg-surface-hover disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleTrade(confirmTrade)}
+                  disabled={placing}
+                  className={`flex-1 text-white text-xs font-bold py-2.5 rounded-lg transition-colors disabled:opacity-50 ${confirmTrade === 'up' ? 'bg-green hover:bg-green-hover' : 'bg-red hover:bg-red-hover'}`}
+                >
+                  {placing ? 'Placing...' : `Place ${confirmTrade === 'up' ? 'Up' : 'Down'}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
