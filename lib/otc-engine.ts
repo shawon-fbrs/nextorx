@@ -116,8 +116,11 @@ export class OTCEngine {
         for (const p of pairs) {
           await this.loadPairState(p.id);
         }
+        await this.refreshAnchors();
         void this.backfillRecentSeconds().then(() => {
           console.log("[OTC] Full-day backfill complete");
+        }).catch((e) => {
+          console.error("[OTC] Full-day backfill failed:", e);
         });
         return;
       } catch (e) {
@@ -186,7 +189,7 @@ export class OTCEngine {
     const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
     const fromSecond = startOfDay;
     for (const state of Array.from(this.pairs.values())) {
-      if (state.feed === "mirror") continue;
+      const anchor = state.feed === "mirror" ? this.anchors.get(state.pairId)?.price : undefined;
       let prevClose = state.basePrice;
       const rows: Array<{
         pairId: string;
@@ -204,6 +207,7 @@ export class OTCEngine {
         const r = computeSecond(
           this.currentSeed, state.pairId, day, secondOfDay, prevClose,
           state.basePrice, state.volatility, this.categoryOf(state.pairId), utcHour,
+          anchor != null ? { anchor } : undefined,
         );
         const open = prevClose;
         rows.push({
