@@ -299,14 +299,26 @@ export class OTCEngine {
     void this.refreshAnchors();
     this.mirrorTimer = setInterval(() => void this.refreshAnchors(), 60_000);
     this.tickTimer = setInterval(() => void this.generateTicks(), TICK_INTERVAL_MS);
-    this.candleTimer = setInterval(() => void this.closeCandles(), CANDLE_INTERVAL_MS);
+    this.scheduleNextCandleClose();
     this.seedTimer = setInterval(() => void this.checkSeeds(), 30_000);
     console.log("[OTC] PF engine started (100ms deterministic ticks)");
   }
 
+  private scheduleNextCandleClose() {
+    const now = Date.now();
+    const delay = CANDLE_INTERVAL_MS - (now % CANDLE_INTERVAL_MS) + 5;
+    this.candleTimer = setTimeout(() => {
+      void this.closeCandles().finally(() => this.scheduleNextCandleClose());
+    }, delay) as unknown as ReturnType<typeof setInterval>;
+  }
+
   stop() {
-    for (const timer of [this.tickTimer, this.candleTimer, this.persistTimer, this.seedTimer, this.mirrorTimer]) {
+    for (const timer of [this.tickTimer, this.persistTimer, this.seedTimer, this.mirrorTimer]) {
       if (timer) clearInterval(timer);
+    }
+    if (this.candleTimer) {
+      clearTimeout(this.candleTimer as unknown as NodeJS.Timeout);
+      clearInterval(this.candleTimer);
     }
     this.tickTimer = this.candleTimer = this.persistTimer = this.seedTimer = this.mirrorTimer = null;
   }
@@ -396,6 +408,8 @@ export class OTCEngine {
     if (rows.length > 0) {
       await prisma.secondCandle.createMany({ data: rows, skipDuplicates: true }).catch(() => {});
     }
+    // Ensure the second is flushed before any minute that depends on it rolls up.
+    // If the caller is a minute boundary, the rollup below will wait for this row.
   }
 
   private async rolloverDay(day: string) {
@@ -484,6 +498,16 @@ export class OTCEngine {
   }
 
   private async rollupMinute(minuteStart: number) {
+    // Wait briefly for the 60 second rows to land (persistSecond is async inside ticks).
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const probe = await prisma.secondCandle.count({
+        where: {
+          timestamp: { gte: BigInt(minuteStart), lt: BigInt(minuteStart + CANDLE_INTERVAL_MS) },
+        },
+      });
+      if (probe >= 55) break;
+      await new Promise((r) => setTimeout(r, 400));
+    }
     for (const state of Array.from(this.pairs.values())) {
       try {
         const rows = await prisma.secondCandle.findMany({
