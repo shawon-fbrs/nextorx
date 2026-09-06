@@ -61,6 +61,7 @@ export default function VerifyPage() {
   const [volatility, setVolatility] = useState('0.5');
   const [category, setCategory] = useState('forex');
   const [file, setFile] = useState<File | null>(null);
+  const [regimeJson, setRegimeJson] = useState('');
   const [result, setResult] = useState<string>('');
   const [ok, setOk] = useState<boolean | null>(null);
   const [working, setWorking] = useState(false);
@@ -90,6 +91,17 @@ export default function VerifyPage() {
       const base = Number(basePrice);
       const vol = Number(volatility);
       const jumps = JUMPS[category] ?? JUMPS.forex;
+      let regimeMap: Record<number, number> = {};
+      if (regimeJson.trim() !== '') {
+        try {
+          const parsed = JSON.parse(regimeJson) as { regimes?: Array<{ hour: number; sigmaMult: number }> };
+          for (const r of parsed.regimes ?? []) {
+            if (Number.isFinite(r.hour) && Number.isFinite(r.sigmaMult)) regimeMap[r.hour] = r.sigmaMult;
+          }
+        } catch {
+          throw new Error('Volatility schedule is not valid JSON.');
+        }
+      }
       const tol = 1e-8;
       let prevClose = rows[0].open;
       let checked = 0;
@@ -97,7 +109,8 @@ export default function VerifyPage() {
         const secondOfDay = Math.floor(row.timestamp / 1000) % SECONDS_PER_DAY;
         const utcHour = new Date(row.timestamp).getUTCHours();
         const d = await hmacSha512HexKey(seed, `${pairId}:${day}:${secondOfDay}`);
-        const sigma = vol * sessionMult(category, utcHour) * SIGMA_PER_SECOND;
+        const mult = regimeMap[utcHour] ?? 1;
+        const sigma = vol * mult * sessionMult(category, utcHour) * SIGMA_PER_SECOND;
         const z = gauss(u64(d, 0), u64(d, 8));
         let exp = sigma * z;
         if (u64(d, 16) < jumps.lambda) {
@@ -193,6 +206,17 @@ export default function VerifyPage() {
           <div>
             <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Candle CSV</label>
             <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-sm text-text-dark" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Volatility schedule (optional JSON)</label>
+            <textarea
+              value={regimeJson}
+              onChange={(e) => setRegimeJson(e.target.value)}
+              placeholder='{"regimes": [{"hour": 10, "sigmaMult": 1.25}]}'
+              rows={3}
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-text-dark/50 focus:outline-none focus:border-blue"
+            />
+            <p className="text-[11px] text-textDark mt-1">Paste the output of /api/market/verify/regime for mirrored assets. Empty means ×1.0 for every hour.</p>
           </div>
           <button onClick={runVerify} disabled={working} className="w-full bg-green hover:bg-green-hover text-white font-bold text-sm py-3 rounded-xl transition-colors disabled:opacity-50">
             {working ? 'Verifying...' : 'Verify History'}

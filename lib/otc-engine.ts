@@ -86,6 +86,58 @@ export class OTCEngine {
   private ticking = false;
   private anchors = new Map<string, { price: number; fetchedAt: number }>();
   private mirrorTimer: ReturnType<typeof setInterval> | null = null;
+  private regimes = new Map<string, number>();
+  private lastMeasuredHour = -1;
+
+  private regimeKey(pairId: string, day: string, hour: number): string {
+    return `${pairId}:${day}:${hour}`;
+  }
+
+  private regimeMult(pairId: string, day: string, hour: number): number {
+    return this.regimes.get(this.regimeKey(pairId, day, hour)) ?? 1;
+  }
+
+  private effVol(state: PairState, day: string, hour: number): number {
+    return state.volatility * this.regimeMult(state.pairId, day, hour);
+  }
+
+  async refreshRegimes(day?: string) {
+    try {
+      const targetDay = day ?? dayStringUTC(new Date());
+      const rows = await prisma.pairVolRegime.findMany({ where: { day: targetDay } });
+      for (const row of rows) {
+        this.regimes.set(this.regimeKey(row.pairId, row.day, row.hour), Number(row.sigmaMult));
+      }
+    } catch (e) {
+      console.error("[OTC] Regime refresh failed:", e);
+    }
+  }
+
+  async measureRegimes(now = new Date()) {
+    const { measureRealizedSigma } = await import("./mirror-feed");
+    const day = dayStringUTC(now);
+    const hour = now.getUTCHours();
+    if (hour === this.lastMeasuredHour) return;
+    this.lastMeasuredHour = hour;
+    for (const state of Array.from(this.pairs.values())) {
+      if (state.feed !== "mirror") continue;
+      try {
+        const realized = await measureRealizedSigma(state.pairId);
+        if (realized == null || realized <= 0) continue;
+        const typical = state.volatility * 0.00008 * 60;
+        const mult = Math.max(0.5, Math.min(3, realized / typical));
+        await prisma.pairVolRegime.upsert({
+          where: { pairId_day_hour: { pairId: state.pairId, day, hour } },
+          create: { pairId: state.pairId, day, hour, sigmaMult: mult },
+          update: { sigmaMult: mult },
+        });
+        this.regimes.set(this.regimeKey(state.pairId, day, hour), mult);
+        console.log(`[OTC] Regime ${state.pairId} ${day}h${hour}: x${mult.toFixed(2)}`);
+      } catch (e) {
+        console.error(`[OTC] Regime measure failed for ${state.pairId}:`, e);
+      }
+    }
+  }
 
   async refreshAnchors() {
     try {
@@ -117,6 +169,8 @@ export class OTCEngine {
           await this.loadPairState(p.id);
         }
         await this.refreshAnchors();
+        await this.refreshRegimes(this.currentDay);
+        await this.measureRegimes(now);
         void this.backfillRecentSeconds().then(() => {
           console.log("[OTC] Full-day backfill complete");
         }).catch((e) => {
@@ -189,7 +243,6 @@ export class OTCEngine {
     const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
     const fromSecond = startOfDay;
     for (const state of Array.from(this.pairs.values())) {
-      const anchor = state.feed === "mirror" ? this.anchors.get(state.pairId)?.price : undefined;
       let prevClose = state.basePrice;
       const rows: Array<{
         pairId: string;
@@ -206,8 +259,7 @@ export class OTCEngine {
         const utcHour = new Date(s * 1000).getUTCHours();
         const r = computeSecond(
           this.currentSeed, state.pairId, day, secondOfDay, prevClose,
-          state.basePrice, state.volatility, this.categoryOf(state.pairId), utcHour,
-          anchor != null ? { anchor } : undefined,
+          state.basePrice, this.effVol(state, day, utcHour), this.categoryOf(state.pairId), utcHour,
         );
         const open = prevClose;
         rows.push({
@@ -281,48 +333,10 @@ export class OTCEngine {
     const utcHour = new Date(now).getUTCHours();
 
     for (const state of Array.from(this.pairs.values())) {
-      if (state.feed === "mirror") {
-        const anchor = this.anchors.get(state.pairId)?.price;
-        const prevClose = this.secondCloses.get(state.pairId) ?? state.currentPrice;
-        const r = computeSecond(
-          this.currentSeed, state.pairId, day, secondOfDay, prevClose,
-          state.basePrice, state.volatility, state.category, utcHour,
-          anchor != null ? { anchor } : undefined,
-        );
-        const price = r.ticks[Math.min(idx, r.ticks.length - 1)];
-        state.currentPrice = Number(price.toFixed(8));
-
-        const candle = state.candle;
-        candle.close = state.currentPrice;
-        if (state.currentPrice > candle.high) candle.high = state.currentPrice;
-        if (state.currentPrice < candle.low) candle.low = state.currentPrice;
-        candle.volume += 1;
-
-        const secStart = Math.floor(now / 1000) * 1000;
-        if (secStart !== this.lastPersistedSecond && this.lastPersistedSecond !== 0) {
-          await this.persistSecond(this.lastPersistedSecond, day);
-        }
-        if (secStart !== this.lastPersistedSecond) {
-          this.lastPersistedSecond = secStart;
-        }
-        if (idx === TICKS_PER_SECOND - 1) {
-          this.secondCloses.set(state.pairId, r.close);
-        }
-
-        const msg: TickMessage = {
-          type: "tick",
-          pairId: state.pairId,
-          price: state.currentPrice,
-          timestamp: now,
-          candle: { ...candle },
-        };
-        if (this.broadcast) this.broadcast(msg);
-        continue;
-      }
       const prevClose = this.secondCloses.get(state.pairId) ?? state.currentPrice;
       const r = computeSecond(
         this.currentSeed, state.pairId, day, secondOfDay, prevClose,
-        state.basePrice, state.volatility, this.categoryOf(state.pairId), utcHour,
+        state.basePrice, this.effVol(state, day, utcHour), state.category, utcHour,
       );
       const price = r.ticks[Math.min(idx, r.ticks.length - 1)];
       state.currentPrice = Number(price.toFixed(8));
@@ -361,11 +375,9 @@ export class OTCEngine {
     const rows = [];
     for (const state of Array.from(this.pairs.values())) {
       const prevClose = this.secondCloses.get(state.pairId) ?? state.basePrice;
-      const anchor = state.feed === "mirror" ? this.anchors.get(state.pairId)?.price : undefined;
       const r = computeSecond(
         this.currentSeed, state.pairId, day, secondOfDay, prevClose,
-        state.basePrice, state.volatility, state.category, utcHour,
-        anchor != null ? { anchor } : undefined,
+        state.basePrice, this.effVol(state, day, utcHour), state.category, utcHour,
       );
       rows.push({
         pairId: state.pairId,
@@ -388,9 +400,23 @@ export class OTCEngine {
     this.currentDay = day;
     this.currentSeed = await getSeedValue(day);
     this.secondCloses.clear();
+    this.regimes.clear();
+    await this.refreshAnchors();
     for (const state of Array.from(this.pairs.values())) {
+      if (state.feed === "mirror") {
+        const anchor = this.anchors.get(state.pairId)?.price;
+        if (anchor != null && anchor > 0) {
+          state.basePrice = anchor;
+          await prisma.pair.update({
+            where: { id: state.pairId },
+            data: { basePrice: anchor },
+          }).catch(() => {});
+        }
+      }
       this.secondCloses.set(state.pairId, state.basePrice);
     }
+    await this.refreshRegimes(day);
+    await this.measureRegimes(new Date());
     const revealed = await revealDueSeeds(new Date());
     for (const revealedDay of revealed) {
       const row = await prisma.serverSeed.findUnique({ where: { day: revealedDay } });
@@ -411,6 +437,7 @@ export class OTCEngine {
         const row = await prisma.serverSeed.findUnique({ where: { day: revealedDay } });
         if (row?.seed && this.onSeedRevealed) this.onSeedRevealed(revealedDay, row.seed);
       }
+      await this.measureRegimes(now);
       await prisma.secondCandle.deleteMany({
         where: { timestamp: { lt: BigInt(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },
       }).catch(() => {});
@@ -650,10 +677,7 @@ export class OTCEngine {
         const utcHour = new Date(minuteStart).getUTCHours();
         const r = computeSecond(
           this.currentSeed, state.pairId, day, secondOfDay, prevClose,
-          state.basePrice, state.volatility, category, utcHour,
-          state.feed === "mirror"
-            ? { anchor: this.anchors.get(state.pairId)?.price }
-            : undefined,
+          state.basePrice, this.effVol(state, day, utcHour), category, utcHour,
         );
         prevClose = r.close;
         end = r.close;
@@ -682,10 +706,7 @@ export class OTCEngine {
       const utcHour = new Date(minuteStart).getUTCHours();
       const r = computeSecond(
         this.currentSeed, state.pairId, day, secondOfDay, prevClose,
-        state.basePrice, state.volatility, category, utcHour,
-        state.feed === "mirror"
-          ? { anchor: this.anchors.get(state.pairId)?.price }
-          : undefined,
+        state.basePrice, this.effVol(state, day, utcHour), category, utcHour,
       );
       const open = prevClose;
       rows.push({

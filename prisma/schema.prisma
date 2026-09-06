@@ -464,10 +464,22 @@ model SecondCandle {
   high      Decimal @db.Decimal(16, 8)
   low       Decimal @db.Decimal(16, 8)
   close     Decimal @db.Decimal(16, 8)
-  ticks     Int     @default(0)
+  ticks     Int      @default(0)
 
   @@unique([pairId, timestamp])
   @@index([pairId, timestamp(sort: Desc)])
+}
+
+model PairVolRegime {
+  id        String   @id @default(uuid())
+  pairId    String
+  day       String
+  hour      Int
+  sigmaMult Decimal  @db.Decimal(8, 4)
+  createdAt DateTime @default(now())
+
+  @@unique([pairId, day, hour])
+  @@index([day, hour])
 }
 
 // ─────────────────────────── media library ───────────────────────────

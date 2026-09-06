@@ -16,7 +16,7 @@ const YAHOO_SYMBOLS: Record<string, string> = {
 
 export const MIRRORED_PAIR_IDS = Object.keys(YAHOO_SYMBOLS);
 
-async function fetchYahooClose(symbol: string): Promise<number | null> {
+async function fetchYahooCloses(symbol: string): Promise<number[] | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -32,16 +32,38 @@ async function fetchYahooClose(symbol: string): Promise<number | null> {
     const closes: Array<number | null> | undefined =
       json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
     if (!closes) return null;
-    for (let i = closes.length - 1; i >= 0; i--) {
-      const c = closes[i];
-      if (typeof c === "number" && Number.isFinite(c) && c > 0) return c;
-    }
-    return null;
+    return closes.filter((c): c is number => typeof c === "number" && Number.isFinite(c) && c > 0);
   } catch {
     return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchYahooClose(symbol: string): Promise<number | null> {
+  const closes = await fetchYahooCloses(symbol);
+  if (!closes) return null;
+  return closes[closes.length - 1] ?? null;
+}
+
+export function hourlyRealizedSigma(closes: number[]): number | null {
+  const tail = closes.slice(-61);
+  if (tail.length < 30) return null;
+  const logRets: number[] = [];
+  for (let i = 1; i < tail.length; i++) {
+    logRets.push(Math.log(tail[i] / tail[i - 1]));
+  }
+  const mean = logRets.reduce((s, r) => s + r, 0) / logRets.length;
+  const variance = logRets.reduce((s, r) => s + (r - mean) * (r - mean), 0) / logRets.length;
+  return Math.sqrt(variance * 60);
+}
+
+export async function measureRealizedSigma(pairId: string): Promise<number | null> {
+  const symbol = YAHOO_SYMBOLS[pairId];
+  if (!symbol) return null;
+  const closes = await fetchYahooCloses(symbol);
+  if (!closes) return null;
+  return hourlyRealizedSigma(closes);
 }
 
 export async function fetchMirrorQuotes(): Promise<MirrorQuote[]> {

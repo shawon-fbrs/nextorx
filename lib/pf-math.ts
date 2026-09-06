@@ -70,8 +70,7 @@ export interface SecondResult {
 }
 
 export interface SecondOptions {
-  anchor?: number;
-  pullStrength?: number;
+  volatilityOverride?: number;
 }
 
 export function computeSecond(
@@ -87,7 +86,8 @@ export function computeSecond(
   opts?: SecondOptions,
 ): SecondResult {
   const digest = digestForSecond(serverSeed, pairId, day, secondOfDay);
-  const sigma = volatility * sessionMultiplier(category, utcHour) * SIGMA_PER_SECOND;
+  const vol = opts?.volatilityOverride ?? volatility;
+  const sigma = vol * sessionMultiplier(category, utcHour) * SIGMA_PER_SECOND;
 
   const z = boxMuller(u64(digest, 0), u64(digest, 8));
   let exponent = sigma * z;
@@ -103,13 +103,8 @@ export function computeSecond(
     jumped = true;
   }
 
-  if (opts?.anchor != null && opts.anchor > 0) {
-    const pull = (opts.pullStrength ?? 0.02) * ((opts.anchor - prevClose) / prevClose);
-    exponent += Math.max(-0.005, Math.min(0.005, pull));
-  }
-
-  const refLow = Math.min(basePrice, opts?.anchor ?? basePrice);
-  const refHigh = Math.max(basePrice, opts?.anchor ?? basePrice);
+  const refLow = basePrice;
+  const refHigh = basePrice;
   const floor = Math.max(refLow * 0.5, 0.01);
   const ceiling = refHigh * 2;
   const close = Math.min(ceiling, Math.max(floor, prevClose * Math.exp(exponent)));
