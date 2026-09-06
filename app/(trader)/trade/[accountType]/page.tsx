@@ -30,6 +30,7 @@ interface PairDef {
 interface Trade {
   id: string;
   symbol: string;
+  pairId?: string;
   type: 'up' | 'down';
   amount: number;
   payout: number;
@@ -69,6 +70,8 @@ function TopBar({
   activePair,
   effectivePayout,
   payoutMap,
+  trades,
+  currentPrice,
   onSelect,
   onClose,
 }: {
@@ -77,6 +80,8 @@ function TopBar({
   activePair: PairDef | null;
   effectivePayout: number | null;
   payoutMap: Record<string, number>;
+  trades: Trade[];
+  currentPrice: number | null;
   onSelect: (p: PairDef) => void;
   onClose: (id: string) => void;
 }) {
@@ -128,6 +133,18 @@ function TopBar({
       {pairs.filter((pair) => visibleIds.includes(pair.id)).slice(0, 7).map((pair) => {
         const isActive = pair.id === activePair?.id;
         const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
+        const pairActiveTrades = trades.filter((t) => t.status === 'active' && t.pairId === pair.id);
+        const unrealized = (() => {
+          if (pairActiveTrades.length === 0 || currentPrice == null || pair.id !== activePair?.id) return null;
+          let sum = 0;
+          for (const t of pairActiveTrades) {
+            if (t.openPrice == null) continue;
+            const win = (t.type === 'up' && currentPrice > t.openPrice) || (t.type === 'down' && currentPrice < t.openPrice);
+            const pct = t.payout ?? payoutMap[pair.id] ?? pair.payoutPercent;
+            sum += win ? t.amount * pct / 100 : -t.amount;
+          }
+          return sum;
+        })();
         return (
           <button key={pair.id} onClick={() => onSelect(pair)}
             className={`h-11 w-40 min-w-0 flex-shrink rounded-xl flex items-center pl-4 pr-7 gap-2.5 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
@@ -138,9 +155,15 @@ function TopBar({
               </svg>
             </span>
             {isActive && <div className="w-0.5 h-6 bg-blue rounded-full" />}
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-white leading-tight">{pair.name}</span>
-              <span className="text-[10px] font-bold text-orange">{shownPayout}%</span>
+            <div className="flex flex-col flex-1 min-w-0">
+              <span className="text-xs font-bold text-white leading-tight truncate">{pair.name}</span>
+              {unrealized !== null ? (
+                <span className={`text-[10px] font-bold ${unrealized >= 0 ? 'text-green' : 'text-red'}`}>{unrealized >= 0 ? '+' : ''}{unrealized.toFixed(2)}$</span>
+              ) : pairActiveTrades.length > 0 ? (
+                <span className="text-[10px] font-bold text-blue">{pairActiveTrades.length} open</span>
+              ) : (
+                <span className="text-[10px] font-bold text-orange">{shownPayout}%</span>
+              )}
             </div>
           </button>
         );
@@ -563,6 +586,8 @@ export default function TradingPage() {
           closePrice: t.closePrice != null ? Number(t.closePrice) : undefined,
           payoutPercent: Number(t.payoutPercent ?? 0),
           expiresAt: createdAt + duration * 1000,
+          pairId: (t.pairId as string) ?? ((t.pair as Record<string, unknown> | undefined)?.id as string) ?? '',
+
         };
       });
       setTrades(mapped);
@@ -732,9 +757,15 @@ export default function TradingPage() {
     setTimeSeconds(prev => {
       const next = prev + delta;
       if (next >= 60) { setTimeMinutes(m => m + 1); return 0; }
-      if (next < 0) { setTimeMinutes(m => Math.max(1, m - 1)); return 59; }
+      if (next < 0) { setTimeMinutes(m => Math.max(0, m - 1)); return 59; }
       return next;
     });
+  };
+
+  const handleTimeSet = (m: number, s: number) => {
+    const total = Math.max(30, Math.min(3600, m * 60 + s));
+    setTimeMinutes(Math.floor(total / 60));
+    setTimeSeconds(total % 60);
   };
 
   if (!mounted) return <div className="h-full w-full bg-background" />;
@@ -753,7 +784,7 @@ export default function TradingPage() {
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} onSelect={handleSelectPair} onClose={handleClosePair} />
+            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} trades={trades} currentPrice={price} onSelect={handleSelectPair} onClose={handleClosePair} />
             {!activePair ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
                 <div className="w-14 h-14 rounded-2xl bg-blue/10 border border-blue/20 flex items-center justify-center">
@@ -876,36 +907,40 @@ export default function TradingPage() {
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
                           <input
-                            value={timeStr.slice(0, 5)}
+                            type="number"
+                            value={timeMinutes}
                             onChange={(e) => {
-                              const v = e.target.value;
-                              const parts = v.split(':');
-                              if (parts.length === 2) {
-                                const m = parseInt(parts[0], 10);
-                                const s = parseInt(parts[1], 10);
-                                if (!isNaN(m) && !isNaN(s) && m >= 0 && m <= 60 && s >= 0 && s < 60) {
-                                  const total = m * 60 + s;
-                                  const cur = timeMinutes * 60 + timeSeconds;
-                                  handleTimeChange(total - cur);
-                                }
-                              }
+                              const v = parseInt(e.target.value, 10);
+                              if (!isNaN(v)) handleTimeSet(Math.max(0, Math.min(60, v)), timeSeconds);
                             }}
-                            placeholder="01:00"
-                            className="flex-1 bg-background border border-border rounded-lg px-2 py-1 text-white font-bold text-sm text-center tracking-wider focus:outline-none focus:border-blue"
+                            min={0}
+                            max={60}
+                            className="w-10 bg-background border border-border rounded-lg px-1 py-1 text-white font-bold text-sm text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <span className="text-white font-bold">:</span>
+                          <input
+                            type="number"
+                            value={String(timeSeconds).padStart(2, '0')}
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value, 10);
+                              if (!isNaN(v)) handleTimeSet(timeMinutes, Math.max(0, Math.min(59, v)));
+                              else if (e.target.value === '') handleTimeSet(timeMinutes, 0);
+                            }}
+                            min={0}
+                            max={59}
+                            className="w-10 bg-background border border-border rounded-lg px-1 py-1 text-white font-bold text-sm text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <button onClick={() => handleTimeChange(10)} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-white transition-all">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
                         </div>
                         <div className="flex gap-1 mt-1.5">
-                          {['00:30', '01:00', '03:00', '05:00'].map((t) => (
-                            <button key={t} onClick={() => {
-                              const [m, s] = t.split(':').map(Number);
-                              const total = m * 60 + s;
-                              const cur = timeMinutes * 60 + timeSeconds;
-                              handleTimeChange(total - cur);
-                            }} className={`flex-1 py-0.5 text-[8px] font-semibold rounded transition-all border ${timeStr.slice(0,5) === t ? 'text-white bg-blue/15 border-blue/40' : 'text-text-dark bg-background border-transparent hover:text-white'}`}>{t}</button>
-                          ))}
+                          {['00:30', '01:00', '03:00', '05:00'].map((t) => {
+                            const [m, s] = t.split(':').map(Number);
+                            return (
+                              <button key={t} onClick={() => handleTimeSet(m, s)} className={`flex-1 py-0.5 text-[8px] font-semibold rounded transition-all border ${timeMinutes === m && timeSeconds === s ? 'text-white bg-blue/15 border-blue/40' : 'text-text-dark bg-background border-transparent hover:text-white'}`}>{t}</button>
+                            );
+                          })}
                         </div>
                       </div>
                       <div>
@@ -967,7 +1002,10 @@ export default function TradingPage() {
             investment={investment}
             setInvestment={setInvestment}
             timeStr={timeStr}
+            timeMinutes={timeMinutes}
+            timeSeconds={timeSeconds}
             onTimeChange={handleTimeChange}
+            onTimeSet={handleTimeSet}
             onTrade={handleTrade}
             payoutAmount={payoutAmount}
             trades={trades}

@@ -37,7 +37,10 @@ interface TradingPanelProps {
   investment: number;
   setInvestment: (v: number) => void;
   timeStr: string;
+  timeMinutes: number;
+  timeSeconds: number;
   onTimeChange: (delta: number) => void;
+  onTimeSet: (m: number, s: number) => void;
   onTrade: (type: 'up' | 'down') => void;
   payoutAmount: string;
   trades: TradeLike[];
@@ -48,7 +51,10 @@ export function TradingPanel({
   investment,
   setInvestment,
   timeStr,
+  timeMinutes,
+  timeSeconds,
   onTimeChange,
+  onTimeSet,
   onTrade,
   payoutAmount,
   trades,
@@ -61,28 +67,8 @@ export function TradingPanel({
     return () => clearInterval(timer);
   }, []);
 
-  const parseTimeStr = (t: string) => {
-    const [m, s] = t.split(':').map(Number);
-    return { m: isNaN(m) ? 0 : m, s: isNaN(s) ? 0 : s };
-  };
   const quickTimes = ['00:30', '01:00', '03:00', '05:00'];
-  const currentQuick = timeStr.slice(0, 5);
-
-  const handleTimeInput = (val: string) => {
-    // Expect mm:ss
-    const parts = val.split(':');
-    if (parts.length === 2) {
-      const m = parseInt(parts[0], 10);
-      const s = parseInt(parts[1], 10);
-      if (!isNaN(m) && !isNaN(s)) {
-        const total = m * 60 + s;
-        const cur = parseTimeStr(timeStr);
-        const curTotal = cur.m * 60 + cur.s;
-        const delta = total - curTotal;
-        if (delta !== 0) onTimeChange(delta);
-      }
-    }
-  };
+  const currentQuick = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}`;
 
   return (
     <aside className="w-[260px] bg-surface border-l border-border flex flex-col z-30 flex-shrink-0">
@@ -99,14 +85,31 @@ export function TradingPanel({
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-            <div className="flex-1 flex flex-col items-center">
+            <div className="flex-1 flex items-center gap-1.5 justify-center">
               <input
-                value={timeStr.slice(0, 5)}
-                onChange={(e) => handleTimeInput(e.target.value)}
-                placeholder="01:00"
-                className="w-20 bg-surface border border-border rounded-lg px-2 py-1 text-white font-bold text-lg tracking-wider text-center focus:outline-none focus:border-blue"
+                type="number"
+                value={String(timeMinutes).padStart(2, '0')}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (!isNaN(v)) onTimeSet(Math.max(0, Math.min(60, v)), timeSeconds);
+                }}
+                min={0}
+                max={60}
+                className="w-12 bg-surface border border-border rounded-lg px-1 py-1 text-white font-bold text-lg text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-              <span className="text-[9px] text-textDark mt-0.5">min : sec</span>
+              <span className="text-white font-bold">:</span>
+              <input
+                type="number"
+                value={String(timeSeconds).padStart(2, '0')}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (!isNaN(v)) onTimeSet(timeMinutes, Math.max(0, Math.min(59, v)));
+                  else if (e.target.value === '') onTimeSet(timeMinutes, 0);
+                }}
+                min={0}
+                max={59}
+                className="w-12 bg-surface border border-border rounded-lg px-1 py-1 text-white font-bold text-lg text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
             </div>
             <button onClick={() => onTimeChange(10)}
               className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-white hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
@@ -116,16 +119,19 @@ export function TradingPanel({
             </button>
           </div>
           <div className="flex gap-1.5 mt-2">
-            {quickTimes.map((t) => (
-              <button key={t} onClick={() => handleTimeInput(t)}
-                className={`flex-1 py-1 text-[9px] font-semibold rounded-md transition-all border ${
-                  currentQuick === t
-                    ? 'text-white bg-blue/15 border-blue/40'
-                    : 'text-textDark bg-surface border-transparent hover:text-white hover:bg-surface-hover hover:border-border'
-                }`}>
-                {t}
-              </button>
-            ))}
+            {quickTimes.map((t) => {
+              const [m, s] = t.split(':').map(Number);
+              return (
+                <button key={t} onClick={() => onTimeSet(m, s)}
+                  className={`flex-1 py-1 text-[9px] font-semibold rounded-md transition-all border ${
+                    currentQuick === t
+                      ? 'text-white bg-blue/15 border-blue/40'
+                      : 'text-textDark bg-surface border-transparent hover:text-white hover:bg-surface-hover hover:border-border'
+                  }`}>
+                  {t}
+                </button>
+              );
+            })}
           </div>
         </div>
 
