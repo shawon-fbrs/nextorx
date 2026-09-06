@@ -68,6 +68,7 @@ function TopBar({
   visibleIds,
   activePair,
   effectivePayout,
+  payoutMap,
   onSelect,
   onClose,
 }: {
@@ -75,6 +76,7 @@ function TopBar({
   visibleIds: string[];
   activePair: PairDef | null;
   effectivePayout: number | null;
+  payoutMap: Record<string, number>;
   onSelect: (p: PairDef) => void;
   onClose: (id: string) => void;
 }) {
@@ -104,7 +106,7 @@ function TopBar({
             {pairs.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(pair => {
               const isActive = pair.id === activePair?.id;
               const isOpen = visibleIds.includes(pair.id);
-              const shownPayout = isActive && effectivePayout != null ? effectivePayout : pair.payoutPercent;
+              const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
               return (
                 <button key={pair.id} onClick={() => { onSelect(pair); setAddOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all mb-0.5 ${isActive ? 'bg-blue/10 border border-blue/30' : 'hover:bg-surface-hover border border-transparent'}`}>
@@ -125,7 +127,7 @@ function TopBar({
 
       {pairs.filter((pair) => visibleIds.includes(pair.id)).slice(0, 7).map((pair) => {
         const isActive = pair.id === activePair?.id;
-        const shownPayout = isActive && effectivePayout != null ? effectivePayout : pair.payoutPercent;
+        const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
         return (
           <button key={pair.id} onClick={() => onSelect(pair)}
             className={`h-11 w-40 min-w-0 flex-shrink rounded-xl flex items-center pl-4 pr-7 gap-2.5 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
@@ -331,6 +333,7 @@ export default function TradingPage() {
   const [pairs, setPairs] = useState<PairDef[]>([]);
   const [activePair, setActivePair] = useState<PairDef | null>(null);
   const [effectivePayout, setEffectivePayout] = useState<number | null>(null);
+  const [payoutMap, setPayoutMap] = useState<Record<string, number>>({});
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
   const prevActiveRef = useRef<Set<string>>(new Set());
@@ -533,7 +536,7 @@ export default function TradingPage() {
   };
 
   const price = currentPrice ?? activePair?.basePrice ?? 1.0;
-  const payout = effectivePayout ?? activePair?.payoutPercent ?? 80;
+  const payout = activePair ? (payoutMap[activePair.id] ?? effectivePayout ?? activePair.payoutPercent) : 80;
   const payoutAmount = (investment * (1 + payout / 100)).toFixed(2);
   const timeStr = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}:00`;
 
@@ -609,29 +612,46 @@ export default function TradingPage() {
   }, [refreshTrades]);
 
   useEffect(() => {
-    if (!activePair) {
-      setEffectivePayout(null);
-      return;
-    }
+    if (pairs.length === 0) return;
     let cancelled = false;
-    const load = async () => {
+    const loadAll = async () => {
       try {
-        const res = await fetch(`/api/market/pairs/${activePair.id}/payout`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && typeof data.payout === 'number') {
-          setEffectivePayout(data.payout);
+        const entries = await Promise.all(
+          pairs.map(async (p) => {
+            try {
+              const res = await fetch(`/api/market/pairs/${p.id}/payout`);
+              if (!res.ok) return null;
+              const data = await res.json();
+              return typeof data.payout === 'number' ? ([p.id, data.payout] as const) : null;
+            } catch {
+              return null;
+            }
+          }),
+        );
+        if (cancelled) return;
+        const map: Record<string, number> = {};
+        for (const e of entries) {
+          if (e) map[e[0]] = e[1];
         }
+        setPayoutMap(map);
       } catch {}
     };
-    setEffectivePayout(null);
-    load();
-    const timer = setInterval(load, 60000);
+    loadAll();
+    const timer = setInterval(loadAll, 60000);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [activePair]);
+  }, [pairs]);
+
+  useEffect(() => {
+    if (!activePair) {
+      setEffectivePayout(null);
+      return;
+    }
+    const v = payoutMap[activePair.id];
+    setEffectivePayout(v ?? activePair.payoutPercent);
+  }, [activePair, payoutMap]);
 
   const [candleLeft, setCandleLeft] = useState('');
 
@@ -733,7 +753,7 @@ export default function TradingPage() {
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} onSelect={handleSelectPair} onClose={handleClosePair} />
+            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} onSelect={handleSelectPair} onClose={handleClosePair} />
             {!activePair ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
                 <div className="w-14 h-14 rounded-2xl bg-blue/10 border border-blue/20 flex items-center justify-center">
