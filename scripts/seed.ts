@@ -11,7 +11,7 @@ const OTC_PAIRS = [
   { id: "EURUSD", name: "EUR/USD", symbol: "EUR/USD", category: "forex", feed: "mirror", basePrice: 1.1627, volatility: 0.50, payoutPercent: 82, weekendPayout: 79, spread: 0.00015, tags: ["major", "popular"], sortOrder: 1 },
   { id: "GBPUSD", name: "GBP/USD", symbol: "GBP/USD", category: "forex", feed: "mirror", basePrice: 1.3500, volatility: 0.55, payoutPercent: 80, weekendPayout: 77, spread: 0.00020, tags: ["major", "popular"], sortOrder: 2 },
   { id: "USDJPY", name: "USD/JPY", symbol: "USD/JPY", category: "forex", feed: "mirror", basePrice: 155.00, volatility: 0.50, payoutPercent: 84, weekendPayout: 81, spread: 0.015, tags: ["major", "popular"], sortOrder: 3 },
-  { id: "XAUUSD", name: "Gold", symbol: "XAU/USD", category: "commodities", feed: "mirror", basePrice: 3950.00, volatility: 0.90, payoutPercent: 85, weekendPayout: 82, spread: 0.30, tags: ["major", "popular"], sortOrder: 4 },
+  { id: "XAUUSD", name: "Gold", symbol: "XAU/USD", category: "commodities", feed: "mirror", basePrice: 4476.60, volatility: 0.90, payoutPercent: 85, weekendPayout: 82, spread: 0.30, tags: ["major", "popular"], sortOrder: 4 },
   { id: "BTCUSD", name: "BTC/USD", symbol: "BTC/USD", category: "crypto", feed: "mirror", basePrice: 92000.00, volatility: 2.20, payoutPercent: 90, weekendPayout: 90, spread: 25.00, tags: ["major", "popular", "volatile"], sortOrder: 5 },
 ];
 
