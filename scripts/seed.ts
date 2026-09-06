@@ -62,19 +62,7 @@ async function main() {
   for (const pair of OTC_PAIRS) {
     await prisma.pair.upsert({
       where: { id: pair.id },
-      update: {
-        name: pair.name,
-        symbol: pair.symbol,
-        category: pair.category,
-        feed: pair.feed,
-        basePrice: pair.basePrice,
-        volatility: pair.volatility,
-        payoutPercent: pair.payoutPercent,
-        weekendPayout: pair.weekendPayout,
-        spread: pair.spread,
-        tags: pair.tags,
-        sortOrder: pair.sortOrder,
-      },
+      update: {},
       create: pair,
     });
   }
