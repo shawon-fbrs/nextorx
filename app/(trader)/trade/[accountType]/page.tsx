@@ -87,6 +87,29 @@ function TopBar({
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [lastPnL, setLastPnL] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!activePair || currentPrice == null) return;
+    const activeTrades = trades.filter((t) => t.status === 'active' && t.pairId === activePair.id);
+    if (activeTrades.length === 0) {
+      setLastPnL((prev) => {
+        if (prev[activePair.id] === undefined) return prev;
+        const next = { ...prev };
+        delete next[activePair.id];
+        return next;
+      });
+      return;
+    }
+    let sum = 0;
+    for (const t of activeTrades) {
+      if (t.openPrice == null) continue;
+      const win = (t.type === 'up' && currentPrice > t.openPrice) || (t.type === 'down' && currentPrice < t.openPrice);
+      const pct = (t as unknown as { payout?: number }).payout ?? payoutMap[activePair.id] ?? activePair.payoutPercent;
+      sum += win ? t.amount * pct / 100 : -t.amount;
+    }
+    setLastPnL((prev) => ({ ...prev, [activePair.id]: sum }));
+  }, [trades, currentPrice, activePair, payoutMap]);
 
   return (
     <div className="h-14 flex items-center gap-2 px-3 bg-surface border-b border-border flex-shrink-0 relative z-50">
@@ -134,7 +157,7 @@ function TopBar({
         const isActive = pair.id === activePair?.id;
         const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
         const pairActiveTrades = trades.filter((t) => t.status === 'active' && t.pairId === pair.id);
-        const unrealized = (() => {
+        const liveUnrealized = (() => {
           if (pairActiveTrades.length === 0 || currentPrice == null || pair.id !== activePair?.id) return null;
           let sum = 0;
           for (const t of pairActiveTrades) {
@@ -145,6 +168,8 @@ function TopBar({
           }
           return sum;
         })();
+        const unrealized = liveUnrealized ?? lastPnL[pair.id] ?? null;
+        const showLive = liveUnrealized !== null;
         return (
           <button key={pair.id} onClick={() => onSelect(pair)}
             className={`h-11 w-40 min-w-0 flex-shrink rounded-xl flex items-center pl-4 pr-7 gap-2.5 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
@@ -157,13 +182,14 @@ function TopBar({
             {isActive && <div className="w-0.5 h-6 bg-blue rounded-full" />}
             <div className="flex flex-col flex-1 min-w-0">
               <span className="text-xs font-bold text-white leading-tight truncate">{pair.name}</span>
-              {unrealized !== null ? (
-                <span className={`text-[10px] font-bold ${unrealized >= 0 ? 'text-green' : 'text-red'}`}>{unrealized >= 0 ? '+' : ''}{unrealized.toFixed(2)}$</span>
-              ) : pairActiveTrades.length > 0 ? (
-                <span className="text-[10px] font-bold text-blue">{pairActiveTrades.length} open</span>
-              ) : (
+              <div className="flex items-center gap-1 leading-tight">
                 <span className="text-[10px] font-bold text-orange">{shownPayout}%</span>
-              )}
+                {unrealized !== null ? (
+                  <span className={`text-[10px] font-bold ${!showLive ? 'opacity-60' : ''} ${unrealized >= 0 ? 'text-green' : 'text-red'}`}>• {unrealized >= 0 ? '+' : ''}{unrealized.toFixed(2)}$</span>
+                ) : pairActiveTrades.length > 0 ? (
+                  <span className="text-[10px] font-bold text-blue">• {pairActiveTrades.length} open</span>
+                ) : null}
+              </div>
             </div>
           </button>
         );
