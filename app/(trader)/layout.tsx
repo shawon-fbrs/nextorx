@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
-import { SessionTimer } from '../components/SessionTimer';
 import { useAuth } from '@/lib/auth-context';
+import { Toaster } from 'sonner';
 
 const ADMIN_ROLES = new Set(['super_admin', 'finance', 'support', 'risk']);
 
@@ -66,9 +66,7 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
           {children}
         </div>
       </div>
-      <div className="fixed bottom-3 right-3 z-50">
-        <SessionTimer />
-      </div>
+      <Toaster position="bottom-left" theme="dark" richColors closeButton />
     </div>
   );
 }

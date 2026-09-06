@@ -23,7 +23,7 @@ interface ChartProps {
 
 export interface ChartHandle {
   createOverlay: (name: string, onSelected?: (id: string) => void, onDeselected?: () => void) => string | null;
-  drawTradeMarkers: (opts: { entryPrice: number; expiryMs: number; direction: 'up' | 'down' }) => string[];
+  drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; expiryMs: number; direction: 'up' | 'down' }) => string[];
   removeOverlay: (id?: string) => void;
   removeAllOverlays: () => void;
   overrideOverlay: (id: string, overlay: Record<string, unknown>) => void;
@@ -211,19 +211,18 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       return chart ? chart.getOverlays({}).map(o => ({ id: o.id ?? '', name: o.name ?? '' })) : [];
     },
     getChart: () => chartRef.current,
-    drawTradeMarkers: (opts: { entryPrice: number; expiryMs: number; direction: 'up' | 'down' }) => {
+    drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; expiryMs: number; direction: 'up' | 'down' }) => {
       const ids: string[] = [];
       try {
         const chart = chartRef.current;
         if (!chart) return ids;
         const color = opts.direction === 'up' ? '#00c365' : '#ff4954';
-        const now = Date.now();
         const entryId = chart.createOverlay({
-          name: 'horizontalStraightLine',
+          name: 'horizontalSegment',
           lock: true,
           visible: true,
           points: [
-            { timestamp: now - 3600000, value: opts.entryPrice },
+            { timestamp: opts.entryMs, value: opts.entryPrice },
             { timestamp: opts.expiryMs, value: opts.entryPrice },
           ],
           styles: { line: { color, size: 1 } },
@@ -233,10 +232,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
           name: 'verticalStraightLine',
           lock: true,
           visible: true,
-          points: [
-            { timestamp: opts.expiryMs, value: opts.entryPrice * 0.999 },
-            { timestamp: opts.expiryMs, value: opts.entryPrice * 1.001 },
-          ],
+          points: [{ timestamp: opts.expiryMs }],
           styles: { line: { color, size: 1 } },
         } as never);
         if (typeof expiryId === 'string') ids.push(expiryId);
