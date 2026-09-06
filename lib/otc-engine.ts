@@ -243,7 +243,13 @@ export class OTCEngine {
     const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
     const fromSecond = startOfDay;
     for (const state of Array.from(this.pairs.values())) {
-      let prevClose = state.basePrice;
+      const lastRow = await prisma.secondCandle.findFirst({
+        where: { pairId: state.pairId, timestamp: { gte: BigInt(startOfDay * 1000) } },
+        orderBy: { timestamp: "desc" },
+        select: { timestamp: true, close: true },
+      });
+      const resumeFrom = lastRow ? Number(lastRow.timestamp) / 1000 + 1 : startOfDay;
+      let prevClose = lastRow ? Number(lastRow.close) : state.basePrice;
       const rows: Array<{
         pairId: string;
         timestamp: bigint;
@@ -253,8 +259,7 @@ export class OTCEngine {
         close: number;
         ticks: number;
       }> = [];
-      const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
-      for (let s = Math.max(fromSecond, startOfDay); s < currentSecond; s++) {
+      for (let s = Math.max(fromSecond, startOfDay, resumeFrom); s < currentSecond; s++) {
         const secondOfDay = s % SECONDS_PER_DAY;
         const utcHour = new Date(s * 1000).getUTCHours();
         const r = computeSecond(
@@ -273,8 +278,6 @@ export class OTCEngine {
         const batch = rows.slice(i, i + 500);
         await prisma.secondCandle.createMany({ data: batch, skipDuplicates: true });
       }
-      this.secondCloses.set(state.pairId, prevClose);
-      state.currentPrice = prevClose;
       console.log(`[OTC] Backfilled ${rows.length} 1s candles for ${state.pairId}`);
     }
   }
