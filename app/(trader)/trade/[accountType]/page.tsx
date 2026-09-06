@@ -863,24 +863,49 @@ export default function TradingPage() {
                   </div>
                 )}
                 {isFullscreen && (
-                  <div className="absolute z-50 w-[200px] bg-surface/95 backdrop-blur-sm border border-border rounded-xl shadow-2xl overflow-hidden"
+                  <div className="absolute z-50 w-[220px] bg-surface/95 backdrop-blur-sm border border-border rounded-xl shadow-2xl overflow-hidden"
                     style={{ right: 16 + panelPos.x, top: `calc(50% + ${panelPos.y}px)`, transform: 'translateY(-50%)' }}>
                     <div onMouseDown={onDragStart} className="h-7 bg-background border-b border-border flex items-center justify-center cursor-move select-none">
                       <div className="w-8 h-1 bg-border rounded-full" />
                     </div>
-                    <div className="p-2.5 flex flex-col gap-2">
+                    <div className="p-2.5 flex flex-col gap-2.5">
                       <div>
                         <span className="text-[9px] text-text-dark font-semibold uppercase tracking-wider block mb-1">Expiration</span>
                         <div className="flex items-center gap-1.5">
                           <button onClick={() => handleTimeChange(-10)} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-white transition-all">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
-                          <div className="flex-1 text-center">
-                            <span className="text-white font-bold text-base tracking-wider block leading-none">{timeStr.slice(0, 5)}</span>
-                          </div>
+                          <input
+                            value={timeStr.slice(0, 5)}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const parts = v.split(':');
+                              if (parts.length === 2) {
+                                const m = parseInt(parts[0], 10);
+                                const s = parseInt(parts[1], 10);
+                                if (!isNaN(m) && !isNaN(s) && m >= 0 && m <= 60 && s >= 0 && s < 60) {
+                                  const total = m * 60 + s;
+                                  const cur = timeMinutes * 60 + timeSeconds;
+                                  handleTimeChange(total - cur);
+                                }
+                              }
+                            }}
+                            placeholder="01:00"
+                            className="flex-1 bg-background border border-border rounded-lg px-2 py-1 text-white font-bold text-sm text-center tracking-wider focus:outline-none focus:border-blue"
+                          />
                           <button onClick={() => handleTimeChange(10)} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-white transition-all">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
+                        </div>
+                        <div className="flex gap-1 mt-1.5">
+                          {['00:30', '01:00', '03:00', '05:00'].map((t) => (
+                            <button key={t} onClick={() => {
+                              const [m, s] = t.split(':').map(Number);
+                              const total = m * 60 + s;
+                              const cur = timeMinutes * 60 + timeSeconds;
+                              handleTimeChange(total - cur);
+                            }} className={`flex-1 py-0.5 text-[8px] font-semibold rounded transition-all border ${timeStr.slice(0,5) === t ? 'text-white bg-blue/15 border-blue/40' : 'text-text-dark bg-background border-transparent hover:text-white'}`}>{t}</button>
+                          ))}
                         </div>
                       </div>
                       <div>
@@ -889,10 +914,22 @@ export default function TradingPage() {
                           <button onClick={() => setInvestment(Math.max(1, investment - 1))} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-white transition-all">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
-                          <div className="flex-1 text-center">
-                            <span className="text-white font-bold text-base block leading-none">${investment}</span>
+                          <div className="flex-1 flex items-center gap-1">
+                            <span className="text-white font-bold text-sm">$</span>
+                            <input
+                              type="number"
+                              value={investment}
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value, 10);
+                                if (!isNaN(v)) setInvestment(Math.max(1, Math.min(1000, v)));
+                                else if (e.target.value === '') setInvestment(1);
+                              }}
+                              min={1}
+                              max={1000}
+                              className="flex-1 bg-background border border-border rounded-lg px-2 py-1 text-white font-bold text-sm text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
                           </div>
-                          <button onClick={() => setInvestment(Math.min(100, investment + 1))} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-white transition-all">
+                          <button onClick={() => setInvestment(Math.min(1000, investment + 1))} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-white transition-all">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
                         </div>
