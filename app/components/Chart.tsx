@@ -23,7 +23,7 @@ interface ChartProps {
 
 export interface ChartHandle {
   createOverlay: (name: string, onSelected?: (id: string) => void, onDeselected?: () => void) => string | null;
-  drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; expiryMs: number; direction: 'up' | 'down' }) => string[];
+  drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; direction: 'up' | 'down' }) => string[];
   removeOverlay: (id?: string) => void;
   removeAllOverlays: () => void;
   overrideOverlay: (id: string, overlay: Record<string, unknown>) => void;
@@ -31,6 +31,7 @@ export interface ChartHandle {
   getOverlays: () => Array<{ id: string; name: string }>;
   getChart: () => KLineChart | null;
   getYPixel: (price: number) => number | null;
+  chartPixel: (timestamp: number, price: number) => { x: number; y: number } | null;
 }
 
 const CUSTOM_OVERLAYS: Array<{
@@ -211,7 +212,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       return chart ? chart.getOverlays({}).map(o => ({ id: o.id ?? '', name: o.name ?? '' })) : [];
     },
     getChart: () => chartRef.current,
-    drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; expiryMs: number; direction: 'up' | 'down' }) => {
+    drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; direction: 'up' | 'down' }) => {
       const ids: string[] = [];
       try {
         const chart = chartRef.current;
@@ -223,19 +224,11 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
           visible: true,
           points: [
             { timestamp: opts.entryMs, value: opts.entryPrice },
-            { timestamp: opts.expiryMs, value: opts.entryPrice },
+            { timestamp: opts.entryMs + 3600000, value: opts.entryPrice },
           ],
-          styles: { line: { color, size: 1 } },
+          styles: { line: { color, size: 2 } },
         } as never);
         if (typeof entryId === 'string') ids.push(entryId);
-        const expiryId = chart.createOverlay({
-          name: 'verticalStraightLine',
-          lock: true,
-          visible: true,
-          points: [{ timestamp: opts.expiryMs }],
-          styles: { line: { color, size: 1 } },
-        } as never);
-        if (typeof expiryId === 'string') ids.push(expiryId);
       } catch {
       }
       return ids;
@@ -247,6 +240,19 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         const axes = chart.getYAxes({});
         const y = axes?.[0]?.convertToPixel(price);
         return typeof y === 'number' && Number.isFinite(y) ? y : null;
+      } catch {
+        return null;
+      }
+    },
+    chartPixel: (timestamp: number, price: number) => {
+      try {
+        const chart = chartRef.current;
+        if (!chart) return null;
+        const out = chart.convertToPixel({ timestamp, value: price });
+        const pt = Array.isArray(out) ? out[0] : out;
+        if (!pt || typeof pt.x !== 'number' || typeof pt.y !== 'number') return null;
+        if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) return null;
+        return { x: pt.x, y: pt.y };
       } catch {
         return null;
       }

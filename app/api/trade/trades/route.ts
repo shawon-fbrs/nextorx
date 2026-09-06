@@ -10,7 +10,6 @@ import { getSetting } from "@/lib/settings";
 
 const MIN_DURATION_SECONDS = 30;
 const MAX_DURATION_SECONDS = 3600;
-const DUPLICATE_WINDOW_MS = 3000;
 
 const tradeSchema = z.object({
   pairId: z.string().min(1),
@@ -98,21 +97,6 @@ export async function POST(request: NextRequest) {
       if (todayVolume + amountCents > profile.betLimitDaily) {
         return Response.json({ error: "Daily trading limit reached" }, { status: 400 });
       }
-    }
-
-    const duplicate = await prisma.trade.findFirst({
-      where: {
-        userId: user.id,
-        pairId,
-        direction,
-        amount: amountCents,
-        wallet,
-        createdAt: { gte: new Date(Date.now() - DUPLICATE_WINDOW_MS) },
-      },
-      select: { id: true },
-    });
-    if (duplicate) {
-      return Response.json({ error: "Duplicate trade detected. Please wait." }, { status: 409 });
     }
 
     const marketPrice = await getSnapshotPrice(pairId, Number(pair.basePrice));

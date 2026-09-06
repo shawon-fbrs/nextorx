@@ -366,7 +366,7 @@ export default function TradingPage() {
   const [timeSeconds, setTimeSeconds] = useState(0);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [tradeError, setTradeError] = useState('');
-  const [badgeY, setBadgeY] = useState<number | null>(null);
+  const [expiryMarks, setExpiryMarks] = useState<Array<{ id: string; x: number; y: number; left: string }>>([]);
   const markerRef = useRef<Map<string, string[]>>(new Map());
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -571,6 +571,18 @@ export default function TradingPage() {
       }
       prevActiveRef.current = nowActive;
       const activeIds = new Set(mapped.filter((t) => t.status === 'active').map((t) => t.id));
+      for (const t of mapped) {
+        if (t.status === 'active' && !markerRef.current.has(t.id) && t.openPrice != null && t.expiresAt != null) {
+          try {
+            const ids = chartRef.current?.drawTradeMarkers({
+              entryPrice: t.openPrice,
+              entryMs: t.timestamp,
+              direction: t.type,
+            }) ?? [];
+            if (ids.length > 0) markerRef.current.set(t.id, ids);
+          } catch {}
+        }
+      }
       for (const [tradeId, overlayIds] of Array.from(markerRef.current.entries())) {
         if (!activeIds.has(tradeId)) {
           for (const oid of overlayIds) {
@@ -592,18 +604,38 @@ export default function TradingPage() {
 
   const [candleLeft, setCandleLeft] = useState('');
 
+  const formatLeft = (expiresAt: number, now: number): string => {
+    const s = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  };
+
   useEffect(() => {
     const update = () => {
-      const s = Math.floor(Date.now() / 1000);
+      const now = Date.now();
+      const s = Math.floor(now / 1000);
       const left = 60 - (s % 60);
       setCandleLeft(`${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`);
-      const y = price > 0 ? chartRef.current?.getYPixel(price) ?? null : null;
-      setBadgeY(y);
     };
     update();
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, [price]);
+  }, []);
+
+  useEffect(() => {
+    const updateMarks = () => {
+      const now = Date.now();
+      const marks: Array<{ id: string; x: number; y: number; left: string }> = [];
+      for (const t of trades) {
+        if (t.status !== 'active' || !t.expiresAt) continue;
+        const pt = chartRef.current?.chartPixel(t.expiresAt, price) ?? null;
+        if (pt) marks.push({ id: t.id, x: pt.x, y: pt.y, left: formatLeft(t.expiresAt, now) });
+      }
+      setExpiryMarks(marks);
+    };
+    updateMarks();
+    const timer = setInterval(updateMarks, 1000);
+    return () => clearInterval(timer);
+  }, [trades, price]);
 
   const handleTrade = useCallback(async (type: 'up' | 'down') => {
     if (!activePair) return;
@@ -636,7 +668,6 @@ export default function TradingPage() {
           const ids = chartRef.current?.drawTradeMarkers({
             entryPrice: Number(t.openPrice),
             entryMs: createdAt,
-            expiryMs: createdAt + Number(t.durationSeconds) * 1000,
             direction: type,
           }) ?? [];
           if (ids.length > 0) markerRef.current.set(String(t.id), ids);
@@ -689,15 +720,16 @@ export default function TradingPage() {
               <SideToolbar onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} onOverlaySelected={setSelectedOverlay} />
-                {badgeY !== null && (
+                {expiryMarks.map((m) => (
                   <div
-                    className="absolute right-1 z-40 pointer-events-none px-1 py-0.5 rounded bg-blue text-white text-[10px] font-mono font-bold tabular-nums text-center min-w-12"
-                    style={{ top: badgeY - 10 }}
-                    title="Time to candle close"
+                    key={m.id}
+                    className="absolute z-40 pointer-events-none px-1.5 py-0.5 rounded bg-blue text-white text-[10px] font-mono font-bold tabular-nums whitespace-nowrap"
+                    style={{ left: Math.max(4, m.x - 24), top: m.y - 10 }}
+                    title="Time to trade expiry"
                   >
-                    {candleLeft}
+                    {m.left}
                   </div>
-                )}
+                ))}
 
                 {isComingSoon && (
                   <div className="absolute inset-0 z-[70] bg-background/80 backdrop-blur-sm flex items-center justify-center">
