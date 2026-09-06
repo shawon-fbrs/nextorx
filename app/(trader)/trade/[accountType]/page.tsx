@@ -663,6 +663,29 @@ export default function TradingPage() {
   }, [refreshTrades]);
 
   useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refreshTrades();
+        if (activePair) {
+          fetch(`/api/market/pairs/${activePair.id}/candles?limit=300`)
+            .then((r) => r.json())
+            .then((data) => {
+              const bars = ((data.candles ?? []) as CandleData[]).sort((a, b) => a.timestamp - b.timestamp);
+              setSeed({ pairId: activePair.id, bars });
+            })
+            .catch(() => {});
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [refreshTrades, activePair]);
+
+  useEffect(() => {
     if (pairs.length === 0) return;
     let cancelled = false;
     const loadAll = async () => {
@@ -928,8 +951,8 @@ export default function TradingPage() {
                     <div className="p-2.5 flex flex-col gap-2.5">
                       <div>
                         <span className="text-[9px] text-text-dark font-semibold uppercase tracking-wider block mb-1">Expiration</span>
-                        <div className="flex items-center gap-1.5">
-                          <button onClick={() => handleTimeChange(-10)} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-white transition-all">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button onClick={() => handleTimeChange(-10)} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-white transition-all flex-shrink-0">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
                           <input
@@ -956,11 +979,11 @@ export default function TradingPage() {
                             max={59}
                             className="w-10 bg-background border border-border rounded-lg px-1 py-1 text-white font-bold text-sm text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
-                          <button onClick={() => handleTimeChange(10)} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-white transition-all">
+                          <button onClick={() => handleTimeChange(10)} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-white transition-all flex-shrink-0">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
                         </div>
-                        <div className="flex gap-1 mt-1.5">
+                        <div className="flex gap-1 mt-1.5 w-full">
                           {['00:30', '01:00', '03:00', '05:00'].map((t) => {
                             const [m, s] = t.split(':').map(Number);
                             return (

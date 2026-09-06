@@ -360,7 +360,7 @@ export class OTCEngine {
       candle.close = state.currentPrice;
       if (state.currentPrice > candle.high) candle.high = state.currentPrice;
       if (state.currentPrice < candle.low) candle.low = state.currentPrice;
-      candle.volume += 1;
+      if (idx === 0) candle.volume += TICKS_PER_SECOND;
 
       const secStart = Math.floor(now / 1000) * 1000;
       if (secStart !== this.lastPersistedSecond && this.lastPersistedSecond !== 0) {
