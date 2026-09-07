@@ -743,15 +743,15 @@ export default function TradingPage() {
 
   useEffect(() => {
     const updateMarks = () => {
-      const y = chartRef.current?.getYPixel(price) ?? null;
-      if (y == null) {
+      const anchor = chartRef.current?.chartPixel(Date.now() + 120000, price) ?? null;
+      if (!anchor) {
         setExpiryMarks([]);
         return;
       }
       const s = Math.floor(Date.now() / 1000);
       const left = 60 - (s % 60);
       const label = `00:${String(left % 60).padStart(2, '0')}`;
-      setExpiryMarks([{ id: 'candle', x: 0, y, left: label }]);
+      setExpiryMarks([{ id: 'candle', x: anchor.x, y: anchor.y, left: label }]);
     };
     updateMarks();
     const timer = setInterval(updateMarks, 1000);
@@ -868,7 +868,7 @@ export default function TradingPage() {
                   <div
                     key={m.id}
                     className="absolute z-40 pointer-events-none px-1.5 py-0.5 rounded bg-blue text-white text-[10px] font-mono font-bold tabular-nums whitespace-nowrap"
-                    style={{ right: 48, top: m.y - 10 }}
+                    style={{ left: Math.max(4, m.x - 24), top: m.y - 10 }}
                     title="Time to candle close"
                   >
                     {m.left}

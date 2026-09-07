@@ -360,7 +360,7 @@ export class OTCEngine {
       candle.close = state.currentPrice;
       if (state.currentPrice > candle.high) candle.high = state.currentPrice;
       if (state.currentPrice < candle.low) candle.low = state.currentPrice;
-      if (idx === 0) candle.volume += 5 + (r.volume % 8);
+      if (idx === 0) candle.volume += 2 + (r.volume % 6);
 
       const secStart = Math.floor(now / 1000) * 1000;
       if (secStart !== this.lastPersistedSecond && this.lastPersistedSecond !== 0) {
@@ -527,6 +527,7 @@ export class OTCEngine {
           if (h > high) high = h;
           if (l < low) low = l;
         }
+        const vol = 250 + (minuteStart % 7) * 40 + (state.pairId.charCodeAt(0) % 11) * 7 + (rows.length * 3);
         await prisma.candle.upsert({
           where: { pairId_timestamp: { pairId: state.pairId, timestamp: BigInt(minuteStart) } },
           create: {
@@ -536,14 +537,14 @@ export class OTCEngine {
             high,
             low,
             close: Number(rows[rows.length - 1].close),
-            volume: BigInt(rows.length * 10),
+            volume: BigInt(vol),
           },
           update: {
             open: Number(rows[0].open),
             high,
             low,
             close: Number(rows[rows.length - 1].close),
-            volume: BigInt(rows.length * 10),
+            volume: BigInt(vol),
           },
         });
       } catch {}
