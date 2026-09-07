@@ -9,6 +9,7 @@ import type { ChartHandle } from '../../../components/Chart';
 const Chart = dynamic(() => import('../../../components/Chart').then(m => m.Chart), { ssr: false });
 import { TradingPanel } from '../../../components/TradingPanel';
 import { usePairWS, type CandleData } from '@/lib/use-ws';
+import { getServerNow, syncWithServer } from '@/lib/server-time';
 import {
   TrendingUp, BarChart3, Square, ArrowUpRight,
   Minus, MoveHorizontal, ChevronRight,
@@ -733,10 +734,16 @@ export default function TradingPage() {
   const [candleLeft, setCandleLeft] = useState('');
 
   useEffect(() => {
+    void syncWithServer();
+    const iv = setInterval(() => void syncWithServer(), 60000);
+    return () => clearInterval(iv);
+  }, []);
+
+  useEffect(() => {
     const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const update = () => {
-      const now = Date.now();
+      const now = getServerNow();
       const leftMs = intervalMs - (now % intervalMs);
       const leftSec = Math.ceil(leftMs / 1000);
       const m = Math.floor(leftSec / 60);
@@ -752,13 +759,14 @@ export default function TradingPage() {
     const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const updateMarks = () => {
-      const nextCloseMs = Date.now() + (intervalMs - (Date.now() % intervalMs));
-      const anchor = chartRef.current?.chartPixel(nextCloseMs, price) ?? chartRef.current?.chartPixel(Date.now() + intervalMs, price) ?? null;
+      const now = getServerNow();
+      const nextCloseMs = now + (intervalMs - (now % intervalMs));
+      const anchor = chartRef.current?.chartPixel(nextCloseMs, price) ?? chartRef.current?.chartPixel(now + intervalMs, price) ?? null;
       if (!anchor) {
         setExpiryMarks([]);
         return;
       }
-      const leftMs = intervalMs - (Date.now() % intervalMs);
+      const leftMs = intervalMs - (now % intervalMs);
       const leftSec = Math.ceil(leftMs / 1000);
       const mm = String(Math.floor(leftSec / 60)).padStart(2, '0');
       const ss = String(leftSec % 60).padStart(2, '0');

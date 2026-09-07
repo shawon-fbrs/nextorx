@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { init, dispose, registerOverlay, Chart as KLineChart, KLineData } from 'klinecharts';
+import { getServerNow, syncWithServer } from '@/lib/server-time';
 
 export interface CandleData {
   timestamp: number;
@@ -405,6 +406,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   }));
 
   useEffect(() => {
+    void syncWithServer();
     if (!chartContainerRef.current || chartRef.current) return;
 
     const chart = init(chartIdRef.current, { styles: 'dark' });
@@ -528,7 +530,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
 
     let bucketStart: number;
     if (intervalMs < 60_000) {
-      bucketStart = Math.floor(Date.now() / intervalMs) * intervalMs;
+      bucketStart = Math.floor(getServerNow() / intervalMs) * intervalMs;
     } else {
       bucketStart = Math.floor(currentCandle.timestamp / intervalMs) * intervalMs;
     }

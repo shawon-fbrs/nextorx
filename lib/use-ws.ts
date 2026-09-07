@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { setServerOffset } from '@/lib/server-time';
 
 export interface CandleData {
   timestamp: number;
@@ -24,6 +25,7 @@ export interface SnapshotMessage {
   pairId: string;
   price: number;
   candle: CandleData;
+  timestamp?: number;
 }
 
 export interface CandleCloseMessage {
@@ -80,6 +82,7 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
         const msg: WSMessage = JSON.parse(event.data);
 
         if (msg.type === 'tick') {
+          setServerOffset(msg.timestamp, Date.now());
           const now = Date.now();
           if (now - lastTickRef.current >= 150) {
             lastTickRef.current = now;
@@ -90,6 +93,8 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
         }
 
         if (msg.type === 'snapshot') {
+          const ts = (msg as SnapshotMessage).timestamp ?? Date.now();
+          setServerOffset(ts, Date.now());
           setCurrentPrice(msg.price);
           setCandle(msg.candle);
           onSnapshotRef.current?.(msg);

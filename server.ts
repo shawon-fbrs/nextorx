@@ -152,6 +152,7 @@ async function authorizeWs(req: IncomingMessage): Promise<{ userId: string; role
               pairId: msg.pairId,
               price,
               candle,
+              timestamp: Date.now(),
             }));
           }
         }
