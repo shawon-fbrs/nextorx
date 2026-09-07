@@ -526,8 +526,9 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         // keep existing
       } else {
         const openPrice = last ? Number(last.close) : price;
-        const initHigh = Math.max(openPrice, price, currentCandle.high);
-        const initLow = Math.min(openPrice, price, currentCandle.low);
+        const isSubMinute = intervalMs < 60_000;
+        const initHigh = isSubMinute ? Math.max(openPrice, price) : Math.max(openPrice, price, currentCandle.high);
+        const initLow = isSubMinute ? Math.min(openPrice, price) : Math.min(openPrice, price, currentCandle.low);
         bucketBaseRef.current = {
           timestamp: bucketStart,
           open: openPrice,
@@ -540,11 +541,12 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     }
     const base = bucketBaseRef.current;
     if (!base) return;
+    const isSubMinute = intervalMs < 60_000;
     const bar: KLineData = {
       timestamp: bucketStart,
       open: base.open,
-      high: Math.max(base.high, price, currentCandle.high),
-      low: Math.min(base.low, price, currentCandle.low),
+      high: isSubMinute ? Math.max(base.high, price) : Math.max(base.high, price, currentCandle.high),
+      low: isSubMinute ? Math.min(base.low, price) : Math.min(base.low, price, currentCandle.low),
       close: price,
       volume: (base.volume || 0) + 0.15,
     };

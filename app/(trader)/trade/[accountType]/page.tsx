@@ -752,7 +752,8 @@ export default function TradingPage() {
     const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const updateMarks = () => {
-      const anchor = chartRef.current?.chartPixel(Date.now() + 120000, price) ?? null;
+      const nextCloseMs = Date.now() + (intervalMs - (Date.now() % intervalMs));
+      const anchor = chartRef.current?.chartPixel(nextCloseMs, price) ?? chartRef.current?.chartPixel(Date.now() + intervalMs, price) ?? null;
       if (!anchor) {
         setExpiryMarks([]);
         return;
