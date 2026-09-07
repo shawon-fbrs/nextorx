@@ -94,7 +94,7 @@ export async function getDayCandlesWithCache(opts: {
         }
       }
       const candles = [...map.values()].sort((a, b) => a.timestamp - b.timestamp);
-      if (candles.length > 0) return { candles, verified: true, source: 'hot' };
+      if (candles.length >= 200) return { candles, verified: true, source: 'hot' };
     }
   } else {
     const rows = await prisma.secondCandle.findMany({
@@ -117,7 +117,7 @@ export async function getDayCandlesWithCache(opts: {
         }
       }
       const candles = [...map.values()].sort((a, b) => a.timestamp - b.timestamp);
-      if (candles.length > 0) return { candles, verified: true, source: 'hot' };
+      if (candles.length >= 200) return { candles, verified: true, source: 'hot' };
     }
   }
 
@@ -132,8 +132,17 @@ export async function getDayCandlesWithCache(opts: {
     }
   }
 
-  const pair = await prisma.pair.findUnique({ where: { id: pairId } });
-  const seedRow = await prisma.serverSeed.findUnique({ where: { day } });
+  let pair = await prisma.pair.findUnique({ where: { id: pairId } });
+  let seedRow = await prisma.serverSeed.findUnique({ where: { day } });
+  if (!seedRow) {
+    try {
+      const { randomBytes } = await import('crypto');
+      const { createHash } = await import('crypto');
+      const seed = randomBytes(32).toString('hex');
+      const seedHash = createHash('sha256').update(seed, 'utf8').digest('hex');
+      seedRow = await prisma.serverSeed.create({ data: { day, seedHash, seed, revealed: false } });
+    } catch {}
+  }
   if (!pair || !seedRow?.seed) return { candles: [], verified: false, source: 'generated' };
   const regimes = await prisma.pairVolRegime.findMany({ where: { pairId, day } });
   const sigmaMults = new Map<number, number>();
