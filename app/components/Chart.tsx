@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { init, dispose, registerOverlay, Chart as KLineChart, KLineData } from 'klinecharts';
 
 export interface CandleData {
@@ -96,7 +96,9 @@ const CUSTOM_OVERLAYS: Array<{
 
 CUSTOM_OVERLAYS.forEach(o => registerOverlay(o));
 
-const PERIOD_MAP: Record<string, { span: number; type: 'minute' | 'hour' | 'day' }> = {
+const PERIOD_MAP: Record<string, { span: number; type: 'second' | 'minute' | 'hour' | 'day' }> = {
+  '5s': { span: 5, type: 'second' },
+  '30s': { span: 30, type: 'second' },
   '1m': { span: 1, type: 'minute' },
   '5m': { span: 5, type: 'minute' },
   '15m': { span: 15, type: 'minute' },
@@ -106,6 +108,22 @@ const PERIOD_MAP: Record<string, { span: number; type: 'minute' | 'hour' | 'day'
   '1d': { span: 1, type: 'day' },
 };
 
+const INTERVAL_MS_MAP: Record<string, number> = {
+  '5s': 5_000,
+  '30s': 30_000,
+  '1m': 60_000,
+  '5m': 300_000,
+  '15m': 900_000,
+  '30m': 1_800_000,
+  '1h': 3_600_000,
+  '4h': 14_400_000,
+  '1d': 86_400_000,
+};
+
+function storageKey(pairId: string, timeframe: string): string {
+  return `nextorx:drawings:${pairId}:${timeframe}`;
+}
+
 export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, seed, timeframe = '1m', onOverlaySelected }, ref) {
   const chartIdRef = useRef(`kline-${Math.random().toString(36).slice(2)}`);
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -113,12 +131,71 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   const pairIdRef = useRef(pairId);
   const timeframeRef = useRef(timeframe);
   timeframeRef.current = timeframe;
+  pairIdRef.current = pairId ?? pairIdRef.current;
   const onOverlaySelectedRef = useRef(onOverlaySelected);
   onOverlaySelectedRef.current = onOverlaySelected;
   const subscribeBarCallbackRef = useRef<((data: KLineData) => void) | null>(null);
   const barsCacheRef = useRef<Map<string, KLineData[]>>(new Map());
   const bucketStartRef = useRef<number | null>(null);
   const bucketBaseRef = useRef<KLineData | null>(null);
+  const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const persistDrawings = useCallback(() => {
+    try {
+      const chart = chartRef.current;
+      const pid = pairIdRef.current;
+      const tf = timeframeRef.current;
+      if (!chart || !pid) return;
+      const overlays = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
+      const toSave = overlays.map(o => ({
+        name: o.name,
+        points: o.points,
+        styles: o.styles,
+        lock: (o as unknown as { lock?: boolean }).lock,
+        visible: (o as unknown as { visible?: boolean }).visible,
+      }));
+      localStorage.setItem(storageKey(pid, tf), JSON.stringify(toSave));
+    } catch {}
+  }, []);
+
+  const restoreDrawings = useCallback(() => {
+    try {
+      const chart = chartRef.current;
+      const pid = pairIdRef.current;
+      const tf = timeframeRef.current;
+      if (!chart || !pid) return;
+      const raw = localStorage.getItem(storageKey(pid, tf));
+      if (!raw) return;
+      const arr = JSON.parse(raw) as Array<{ name: string; points: unknown; styles: unknown; lock?: boolean; visible?: boolean }>;
+      if (!Array.isArray(arr) || arr.length === 0) return;
+      for (const o of arr) {
+        if (!o.name || !o.points) continue;
+        try {
+          chart.createOverlay({
+            name: o.name,
+            points: o.points as never,
+            styles: o.styles as never,
+            lock: o.lock,
+            visible: o.visible,
+            needDefaultPointFigure: true,
+            needDefaultXAxisFigure: true,
+            needDefaultYAxisFigure: true,
+            onSelected: (event: any) => {
+              const oid = (event as { overlay?: { id?: string } }).overlay?.id ?? '';
+              onOverlaySelectedRef.current?.({ id: oid, name: o.name });
+              return true;
+            },
+            onDeselected: () => {
+              onOverlaySelectedRef.current?.(null);
+              return true;
+            },
+            onDrawEnd: () => persistDrawings(),
+            onRemoved: () => persistDrawings(),
+          } as never);
+        } catch {}
+      }
+    } catch {}
+  }, [persistDrawings]);
 
   const loadBars = async (type: string, timestamp: number | null | undefined, callback: (bars: KLineData[], more: boolean) => void) => {
     const pid = pairIdRef.current;
@@ -145,6 +222,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
           close: c.close,
           volume: Number(c.volume) || 0,
         })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
+        barsCacheRef.current.set(cacheKey, bars);
         callback(bars, false);
       } catch {
         callback([], false);
@@ -175,7 +253,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         needDefaultPointFigure: true,
         needDefaultXAxisFigure: true,
         needDefaultYAxisFigure: true,
-        onSelected: (event) => {
+        onSelected: (event: any) => {
           const oid = (event as { overlay?: { id?: string } }).overlay?.id ?? '';
           onOverlaySelectedRef.current?.({ id: oid, name });
           onSelected?.(oid);
@@ -186,47 +264,73 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
           onDeselected?.();
           return true;
         },
-        onRightClick: (event) => { (event as { preventDefault?: () => void }).preventDefault?.(); return true; },
-      });
+        onDrawEnd: () => { setTimeout(persistDrawings, 50); return true; },
+        onRemoved: () => { setTimeout(persistDrawings, 50); return true; },
+        onRightClick: (event: any) => { (event as { preventDefault?: () => void }).preventDefault?.(); return true; },
+      } as never);
+      setTimeout(persistDrawings, 150);
       return typeof id === 'string' ? id : null;
     },
-    removeOverlay: (id?: string) => { if (id) chartRef.current?.removeOverlay({ id }); },
+    removeOverlay: (id?: string) => {
+      if (id) chartRef.current?.removeOverlay({ id });
+      setTimeout(persistDrawings, 50);
+    },
     removeAllOverlays: () => {
       const chart = chartRef.current;
-      if (chart) { chart.getOverlays({}).forEach(o => { if (o.id) chart.removeOverlay({ id: o.id }); }); }
+      if (chart) {
+        const toRemove = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
+        for (const o of toRemove) { if (o.id) chart.removeOverlay({ id: o.id }); }
+        setTimeout(persistDrawings, 50);
+      }
     },
-    overrideOverlay: (id: string, overlay: Record<string, unknown>) => { chartRef.current?.overrideOverlay({ id, ...overlay }); },
+    overrideOverlay: (id: string, overlay: Record<string, unknown>) => {
+      chartRef.current?.overrideOverlay({ id, ...overlay } as never);
+      setTimeout(persistDrawings, 50);
+    },
     copyOverlay: (id: string) => {
       const chart = chartRef.current;
       if (!chart) return;
       const src = chart.getOverlays({}).find(o => o.id === id);
       if (!src) return;
-      const offset = 30;
+      const tf = timeframeRef.current;
+      const intervalMs = INTERVAL_MS_MAP[tf] ?? 60_000;
+      const tsOffset = Math.max(intervalMs * 8, 60_000 * 3);
+      const priceOffsetFactor = 1.002;
       const newPoints = (src.points ?? []).map((p: { timestamp?: number; dataIndex?: number; value?: number }) => ({
         ...p,
-        timestamp: p.timestamp ? p.timestamp + offset * 60000 : undefined,
-        dataIndex: p.dataIndex !== undefined ? p.dataIndex + offset : undefined,
-        value: p.value !== undefined ? p.value * 1.02 : undefined,
+        timestamp: p.timestamp ? p.timestamp + tsOffset : undefined,
+        dataIndex: p.dataIndex !== undefined ? p.dataIndex + 12 : undefined,
+        value: p.value !== undefined ? (p.value >= 0 ? p.value * priceOffsetFactor : p.value * (2 - priceOffsetFactor)) : undefined,
       }));
-      chart.createOverlay({
+      const newId = chart.createOverlay({
         name: src.name ?? '',
-        points: newPoints,
-        styles: src.styles ? { ...src.styles } : undefined,
+        points: newPoints as never,
+        styles: src.styles ? { ...(src.styles as object) } : undefined,
+        lock: (src as unknown as { lock?: boolean }).lock,
+        visible: (src as unknown as { visible?: boolean }).visible,
         needDefaultPointFigure: true,
         needDefaultXAxisFigure: true,
         needDefaultYAxisFigure: true,
-        onSelected: (event) => {
-          const newId = (event as { overlay?: { id?: string } }).overlay?.id ?? '';
-          onOverlaySelectedRef.current?.({ id: newId, name: src.name ?? '' });
+        onSelected: (event: any) => {
+          const newOid = (event as { overlay?: { id?: string } }).overlay?.id ?? '';
+          onOverlaySelectedRef.current?.({ id: newOid, name: src.name ?? '' });
           return true;
         },
         onDeselected: () => { onOverlaySelectedRef.current?.(null); return true; },
-        onRightClick: (event) => { (event as { preventDefault?: () => void }).preventDefault?.(); return true; },
-      });
+        onDrawEnd: () => { setTimeout(persistDrawings, 50); return true; },
+        onRemoved: () => { setTimeout(persistDrawings, 50); return true; },
+        onRightClick: (event: any) => { (event as { preventDefault?: () => void }).preventDefault?.(); return true; },
+      } as never);
+      setTimeout(persistDrawings, 100);
+      if (typeof newId === 'string') {
+        setTimeout(() => {
+          onOverlaySelectedRef.current?.({ id: newId, name: src.name ?? '' });
+        }, 80);
+      }
     },
     getOverlays: () => {
       const chart = chartRef.current;
-      return chart ? chart.getOverlays({}).map(o => ({ id: o.id ?? '', name: o.name ?? '' })) : [];
+      return chart ? chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment').map(o => ({ id: o.id ?? '', name: o.name ?? '' })) : [];
     },
     getChart: () => chartRef.current,
     drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; direction: 'up' | 'down' }) => {
@@ -302,12 +406,11 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
           subscribeBarCallbackRef.current = callback;
         },
         unsubscribeBar: () => {
-          subscribeBarCallbackRef.current = null;
         },
       });
 
       chart.resetData();
-      chart.setBarSpace(8);
+      chart.setBarSpace(6);
       chart.scrollToRealTime(0);
     }
 
@@ -318,54 +421,83 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       ro.disconnect();
       dispose(chartIdRef.current);
       chartRef.current = null;
-      subscribeBarCallbackRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (pairId) {
-      pairIdRef.current = pairId;
-      timeframeRef.current = timeframe;
-      bucketStartRef.current = null;
-      bucketBaseRef.current = null;
-      const chart = chartRef.current;
-      if (chart && chartContainerRef.current) {
-        const pricePrec = pairId.includes('JPY') ? 3 : 5;
-        const p = PERIOD_MAP[timeframe] ?? PERIOD_MAP['1m'];
-        chart.setSymbol({ ticker: pairId, pricePrecision: pricePrec, volumePrecision: 0 });
-        chart.setPeriod(p as never);
-        if (seed && seed.pairId === pairId && seed.bars.length > 0) {
+    if (!pairId) return;
+    const prevPid = pairIdRef.current;
+    const prevTf = timeframeRef.current;
+    if (prevPid && prevPid !== pairId) {
+      persistDrawings();
+    } else if (prevTf !== timeframe) {
+      persistDrawings();
+    }
+    pairIdRef.current = pairId;
+    timeframeRef.current = timeframe;
+    bucketStartRef.current = null;
+    bucketBaseRef.current = null;
+    const chart = chartRef.current;
+    if (chart && chartContainerRef.current) {
+      const pricePrec = pairId.includes('JPY') ? 3 : 5;
+      const p = PERIOD_MAP[timeframe] ?? PERIOD_MAP['1m'];
+      chart.setSymbol({ ticker: pairId, pricePrecision: pricePrec, volumePrecision: 0 });
+      chart.setPeriod(p as never);
+      if (seed && seed.pairId === pairId && seed.bars.length > 0) {
+        const cacheKey = `${pairId}:${timeframe}`;
+        barsCacheRef.current.set(
+          cacheKey,
+          seed.bars.map((c) => ({
+            timestamp: c.timestamp,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: Number(c.volume) || 0,
+          })),
+        );
+        chart.resetData();
+        chart.scrollToRealTime(0);
+        if (restoreTimerRef.current) clearTimeout(restoreTimerRef.current);
+        restoreTimerRef.current = setTimeout(() => {
+          restoreDrawings();
+        }, 180);
+      } else {
+        chart.resetData();
+        chart.scrollToRealTime(0);
+        if (restoreTimerRef.current) clearTimeout(restoreTimerRef.current);
+        restoreTimerRef.current = setTimeout(() => {
           const cacheKey = `${pairId}:${timeframe}`;
-          barsCacheRef.current.set(
-            cacheKey,
-            seed.bars.map((c) => ({
-              timestamp: c.timestamp,
-              open: c.open,
-              high: c.high,
-              low: c.low,
-              close: c.close,
-              volume: Number(c.volume) || 0,
-            })),
-          );
-          subscribeBarCallbackRef.current = null;
-          chart.resetData();
-          chart.scrollToRealTime(0);
-        } else {
-          chart.resetData();
-          chart.scrollToRealTime(0);
-        }
+          if (!barsCacheRef.current.has(cacheKey)) {
+            // no seed yet, still restore drawings after load will happen on next seed; keep placeholder
+          }
+          restoreDrawings();
+        }, 250);
       }
     }
-  }, [pairId, seed, timeframe]);
+    return () => {
+      if (restoreTimerRef.current) clearTimeout(restoreTimerRef.current);
+    };
+  }, [pairId, seed, timeframe, restoreDrawings, persistDrawings]);
 
   useEffect(() => {
     if (!currentCandle) return;
-    const cb = subscribeBarCallbackRef.current;
-    if (!cb) return;
-    if (timeframe === '1m') {
+    const chart = chartRef.current;
+    const tf = timeframeRef.current;
+    const intervalMs = INTERVAL_MS_MAP[tf] ?? 60_000;
+
+    // helper to push bar either via subscription callback or direct updateData fallback
+    const pushBar = (bar: KLineData) => {
+      const cb = subscribeBarCallbackRef.current;
+      if (cb) {
+        try { cb(bar); } catch {}
+      }
+    };
+
+    if (tf === '1m') {
       bucketStartRef.current = null;
       bucketBaseRef.current = null;
-      cb({
+      pushBar({
         timestamp: currentCandle.timestamp,
         open: currentCandle.open,
         high: currentCandle.high,
@@ -375,12 +507,50 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       });
       return;
     }
-    const msMap: Record<string, number> = { '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
-    const intervalMs = msMap[timeframe] ?? 60000;
+
+    if (intervalMs < 60_000) {
+      const now = Date.now();
+      const bucketStart = Math.floor(now / intervalMs) * intervalMs;
+      const price = currentPrice ?? currentCandle.close;
+      if (bucketStartRef.current !== bucketStart) {
+        bucketStartRef.current = bucketStart;
+        const cacheKey = `${pairIdRef.current}:${tf}`;
+        const cached = barsCacheRef.current.get(cacheKey);
+        const last = cached?.[cached.length - 1];
+        if (last && last.timestamp === bucketStart) {
+          bucketBaseRef.current = { ...last };
+        } else if (bucketBaseRef.current && bucketBaseRef.current.timestamp === bucketStart) {
+          // keep existing bucketBase
+        } else {
+          bucketBaseRef.current = {
+            timestamp: bucketStart,
+            open: price,
+            high: price,
+            low: price,
+            close: price,
+            volume: 0,
+          };
+        }
+      }
+      const base = bucketBaseRef.current;
+      if (!base) return;
+      const bar: KLineData = {
+        timestamp: bucketStart,
+        open: base.open,
+        high: Math.max(base.high, price, currentCandle.high),
+        low: Math.min(base.low, price, currentCandle.low),
+        close: price,
+        volume: (base.volume || 0) + 0.2,
+      };
+      bucketBaseRef.current = { ...bar };
+      pushBar(bar);
+      return;
+    }
+
     const bucketStart = Math.floor(currentCandle.timestamp / intervalMs) * intervalMs;
     if (bucketStartRef.current !== bucketStart) {
       bucketStartRef.current = bucketStart;
-      const cacheKey = `${pairIdRef.current}:${timeframeRef.current}`;
+      const cacheKey = `${pairIdRef.current}:${tf}`;
       const cached = barsCacheRef.current.get(cacheKey);
       const last = cached?.[cached.length - 1];
       if (last && last.timestamp === bucketStart) {
@@ -404,11 +574,11 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       high: Math.max(base.high, currentCandle.high),
       low: Math.min(base.low, currentCandle.low),
       close: currentCandle.close,
-      volume: (base.volume || 0) + (currentCandle.volume || 0),
+      volume: (base.volume || 0) + (currentCandle.volume || 0) * 0.1,
     };
     bucketBaseRef.current = { ...bar };
-    cb(bar);
-  }, [currentCandle, timeframe]);
+    pushBar(bar);
+  }, [currentCandle, currentPrice, timeframe]);
 
   return (
     <div className="absolute inset-0 bg-[#161a22] overflow-hidden">

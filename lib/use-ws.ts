@@ -64,13 +64,13 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     wsRef.current = ws;
-    const pairAtConnect = pairIdRef.current;
 
     ws.onopen = () => {
       setIsConnected(true);
-      if (pairAtConnect) {
-        ws.send(JSON.stringify({ type: 'subscribe', pairId: pairAtConnect }));
-        subscribedPairRef.current = pairAtConnect;
+      const cur = pairIdRef.current;
+      if (cur) {
+        ws.send(JSON.stringify({ type: 'subscribe', pairId: cur }));
+        subscribedPairRef.current = cur;
       }
     };
 

@@ -280,7 +280,7 @@ function SideToolbar({ timeframe, onTimeframeChange, onIndToggle, onDrawTool, on
           <div className="absolute left-full top-0 ml-1 w-40 bg-[#242a38] border border-[#31394c] rounded-lg shadow-2xl p-1.5 z-50">
             <div className="text-[9px] font-bold text-[#5c677f] uppercase tracking-wider mb-1.5 px-1">Timeframe</div>
             <div className="grid grid-cols-3 gap-1">
-              {['1m', '5m', '15m', '30m', '1h', '4h', '1d'].map(tf => (
+              {['5s', '30s', '1m', '5m', '15m', '30m', '1h', '4h', '1d'].map(tf => (
                 <button key={tf} onClick={() => { onTimeframeChange(tf); setTfOpen(false); }}
                   className={`py-1.5 text-[11px] font-semibold rounded-md transition-all ${timeframe === tf ? 'bg-blue-500 text-white' : 'text-[#93a0b5] hover:bg-[#2a3142] hover:text-white'}`}>
                   {tf}
@@ -671,7 +671,7 @@ export default function TradingPage() {
       if (document.visibilityState === 'visible') {
         refreshTrades();
         if (activePair) {
-          fetch(`/api/market/pairs/${activePair.id}/candles?limit=300`)
+          fetch(`/api/market/pairs/${activePair.id}/candles?limit=300&interval=${encodeURIComponent(timeframe)}`)
             .then((r) => r.json())
             .then((data) => {
               const bars = ((data.candles ?? []) as CandleData[]).sort((a, b) => a.timestamp - b.timestamp);
@@ -687,7 +687,7 @@ export default function TradingPage() {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [refreshTrades, activePair]);
+  }, [refreshTrades, activePair, timeframe]);
 
   const [payoutDetails, setPayoutDetails] = useState<Record<string, { base: number; payout: number; adjustments: { reason: string; delta: number }[] }>>({});
 
@@ -854,7 +854,7 @@ export default function TradingPage() {
                 <button
                   onClick={() => {
                     if (!activePair) return;
-                    fetch(`/api/market/pairs/${activePair.id}/candles?limit=300`)
+                    fetch(`/api/market/pairs/${activePair.id}/candles?limit=300&interval=${encodeURIComponent(timeframe)}`)
                       .then((r) => r.json())
                       .then((data) => {
                         const bars = ((data.candles ?? []) as CandleData[]).sort((a, b) => a.timestamp - b.timestamp);

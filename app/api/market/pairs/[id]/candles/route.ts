@@ -19,40 +19,34 @@ export async function GET(
       throw new ApiError(400, "Invalid before cursor");
     }
     const interval = request.nextUrl.searchParams.get("interval") ?? "1m";
-    const INTERVAL_MAP: Record<string, number> = { "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440 };
-    if (!INTERVAL_MAP[interval]) {
+    const INTERVAL_MS_MAP: Record<string, number> = { "5s": 5_000, "30s": 30_000, "1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000 };
+    if (!(interval in INTERVAL_MS_MAP)) {
       throw new ApiError(400, "Invalid interval");
     }
-    const mult = INTERVAL_MAP[interval];
+    const intervalMs = INTERVAL_MS_MAP[interval];
 
-    const fetchRaw = async () => {
-      const rawTake = Math.min(limit * mult, 10000);
-      return prisma.candle.findMany({
-        where: {
-          pairId: id,
-          ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
-        },
-        orderBy: { timestamp: "desc" },
-        take: rawTake,
-      });
-    };
+    let candles: Array<{ id: string; pairId: string; timestamp: bigint; open: unknown; high: unknown; low: unknown; close: unknown; volume: bigint }> = [];
 
-    let rawCandles = await fetchRaw();
-
-    if (rawCandles.length < 50) {
-      const engine = await getOTCEngine();
-      await engine.ensureHistoricalCandles();
-      rawCandles = await fetchRaw();
-    }
-
-    // Aggregate 1m base into requested interval
-    let candles: typeof rawCandles;
-    if (mult === 1) {
-      candles = rawCandles.slice(0, limit);
-    } else {
-      const intervalMs = mult * 60_000;
-      const buckets = new Map<number, typeof rawCandles>();
-      for (const c of rawCandles) {
+    if (intervalMs < 60_000) {
+      const rawPerBucket = intervalMs / 1000;
+      const rawTake = Math.min(Math.ceil(limit * rawPerBucket * 1.1), 10000);
+      const fetchSec = async () =>
+        prisma.secondCandle.findMany({
+          where: {
+            pairId: id,
+            ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
+          },
+          orderBy: { timestamp: "desc" },
+          take: rawTake,
+        });
+      let rawSecs = await fetchSec();
+      if (rawSecs.length < 20) {
+        const engine = await getOTCEngine();
+        await engine.ensureHistoricalCandles();
+        rawSecs = await fetchSec();
+      }
+      const buckets = new Map<number, typeof rawSecs>();
+      for (const c of rawSecs) {
         const ts = Number(c.timestamp);
         const bucket = Math.floor(ts / intervalMs) * intervalMs;
         const arr = buckets.get(bucket);
@@ -66,24 +60,81 @@ export async function GET(
         const last = sorted[sorted.length - 1];
         let high = Number(first.high);
         let low = Number(first.low);
-        let volume = 0;
+        let ticks = 0;
         for (const r of sorted) {
           const h = Number(r.high);
           const l = Number(r.low);
           if (h > high) high = h;
           if (l < low) low = l;
-          volume += Number(r.volume);
+          ticks += (r as unknown as { ticks: number }).ticks;
         }
         return {
-          ...first,
+          id: `${id}:${bucketTs}`,
+          pairId: id,
           timestamp: BigInt(bucketTs),
           open: first.open,
           high: high as unknown as typeof first.high,
           low: low as unknown as typeof first.low,
           close: last.close,
-          volume: BigInt(volume),
-        } as typeof rawCandles[number];
+          volume: BigInt(ticks || sorted.length),
+        };
       }).sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+    } else {
+      const mult = intervalMs / 60_000;
+      const fetchRaw = async () => {
+        const rawTake = Math.min(Math.ceil(limit * mult * 1.1), 10000);
+        return prisma.candle.findMany({
+          where: {
+            pairId: id,
+            ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
+          },
+          orderBy: { timestamp: "desc" },
+          take: rawTake,
+        });
+      };
+      let rawCandles = await fetchRaw();
+      if (rawCandles.length < 50) {
+        const engine = await getOTCEngine();
+        await engine.ensureHistoricalCandles();
+        rawCandles = await fetchRaw();
+      }
+      if (mult === 1) {
+        candles = rawCandles.slice(0, limit).map((c) => ({ ...c, volume: BigInt(c.volume) })) as typeof candles;
+      } else {
+        const buckets = new Map<number, typeof rawCandles>();
+        for (const c of rawCandles) {
+          const ts = Number(c.timestamp);
+          const bucket = Math.floor(ts / intervalMs) * intervalMs;
+          const arr = buckets.get(bucket);
+          if (!arr) buckets.set(bucket, [c]);
+          else arr.push(c);
+        }
+        const sortedBuckets = [...buckets.entries()].sort((a, b) => b[0] - a[0]).slice(0, limit);
+        candles = sortedBuckets.map(([bucketTs, arr]) => {
+          const sorted = arr.sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+          const first = sorted[0];
+          const last = sorted[sorted.length - 1];
+          let high = Number(first.high);
+          let low = Number(first.low);
+          let volume = 0;
+          for (const r of sorted) {
+            const h = Number(r.high);
+            const l = Number(r.low);
+            if (h > high) high = h;
+            if (l < low) low = l;
+            volume += Number(r.volume);
+          }
+          return {
+            ...first,
+            timestamp: BigInt(bucketTs),
+            open: first.open,
+            high: high as unknown as typeof first.high,
+            low: low as unknown as typeof first.low,
+            close: last.close,
+            volume: BigInt(volume),
+          } as typeof candles[number];
+        }).sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+      }
     }
 
     return Response.json({
