@@ -48,6 +48,7 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
   const [isConnected, setIsConnected] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [candle, setCandle] = useState<CandleData | null>(null);
+  const [serverTime, setServerTime] = useState<number | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const subscribedPairRef = useRef<string | null>(null);
   const pairIdRef = useRef(pairId);
@@ -83,6 +84,7 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
 
         if (msg.type === 'tick') {
           setServerOffset(msg.timestamp, Date.now());
+          setServerTime(msg.timestamp);
           const now = Date.now();
           if (now - lastTickRef.current >= 150) {
             lastTickRef.current = now;
@@ -95,6 +97,7 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
         if (msg.type === 'snapshot') {
           const ts = (msg as SnapshotMessage).timestamp ?? Date.now();
           setServerOffset(ts, Date.now());
+          setServerTime(ts);
           setCurrentPrice(msg.price);
           setCandle(msg.candle);
           onSnapshotRef.current?.(msg);
@@ -153,7 +156,7 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
     }
   }, []);
 
-  return { isConnected, currentPrice, candle, sendMessage };
+  return { isConnected, currentPrice, candle, serverTime, sendMessage };
 }
 
 type UsePairWSReturn = ReturnType<typeof usePairWS>;

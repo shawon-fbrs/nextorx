@@ -20,6 +20,7 @@ interface ChartProps {
   currentCandle: CandleData | null;
   seed: { pairId: string; bars: CandleData[] } | null;
   timeframe?: string;
+  serverTime?: number | null;
   onOverlaySelected?: (overlay: { id: string; name: string } | null) => void;
 }
 
@@ -125,7 +126,7 @@ function storageKey(pairId: string, timeframe: string): string {
   return `nextorx:drawings:${pairId}:${timeframe}`;
 }
 
-export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, seed, timeframe = '1m', onOverlaySelected }, ref) {
+export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, seed, timeframe = '1m', serverTime = null, onOverlaySelected }, ref) {
   const chartIdRef = useRef(`kline-${Math.random().toString(36).slice(2)}`);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<KLineChart | null>(null);
@@ -528,9 +529,10 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       return;
     }
 
+    const nowServer = serverTime ?? getServerNow();
     let bucketStart: number;
     if (intervalMs < 60_000) {
-      bucketStart = Math.floor(getServerNow() / intervalMs) * intervalMs;
+      bucketStart = Math.floor(nowServer / intervalMs) * intervalMs;
     } else {
       bucketStart = Math.floor(currentCandle.timestamp / intervalMs) * intervalMs;
     }
@@ -572,7 +574,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     };
     bucketBaseRef.current = { ...bar };
     pushBar(bar);
-  }, [currentCandle, currentPrice, timeframe]);
+  }, [currentCandle, currentPrice, timeframe, serverTime]);
 
   return (
     <div className="absolute inset-0 bg-[#161a22] overflow-hidden">

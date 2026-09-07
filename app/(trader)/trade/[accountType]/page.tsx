@@ -516,7 +516,7 @@ export default function TradingPage() {
   const handleCandleClose = useCallback(() => {}, []);
   const handleSnapshot = useCallback(() => {}, []);
 
-  const { isConnected, currentPrice, candle } = usePairWS({
+  const { isConnected, currentPrice, candle, serverTime } = usePairWS({
     pairId: activePair?.id ?? null,
     onTick: handleTick,
     onCandleClose: handleCandleClose,
@@ -867,7 +867,7 @@ export default function TradingPage() {
             <div className="flex-1 flex min-w-0 overflow-hidden">
               <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
-                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} onOverlaySelected={setSelectedOverlay} />
+                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} />
                 <button
                   onClick={() => {
                     if (!activePair) return;
