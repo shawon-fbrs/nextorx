@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { settleTradeById } from "@/lib/settle-trade";
 import { postEntryInTx } from "@/lib/ledger";
 
-const POLL_INTERVAL_MS = 1000;
+const POLL_INTERVAL_MS = 500;
 const BATCH_SIZE = 100;
 
 let timer: ReturnType<typeof setInterval> | null = null;

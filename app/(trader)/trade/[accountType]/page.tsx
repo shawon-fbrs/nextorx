@@ -70,6 +70,7 @@ function TopBar({
   activePair,
   effectivePayout,
   payoutMap,
+  payoutDetails,
   trades,
   currentPrice,
   onSelect,
@@ -80,6 +81,7 @@ function TopBar({
   activePair: PairDef | null;
   effectivePayout: number | null;
   payoutMap: Record<string, number>;
+  payoutDetails: Record<string, { base: number; payout: number; adjustments: { reason: string; delta: number }[] }>;
   trades: Trade[];
   currentPrice: number | null;
   onSelect: (p: PairDef) => void;
@@ -135,6 +137,8 @@ function TopBar({
               const isActive = pair.id === activePair?.id;
               const isOpen = visibleIds.includes(pair.id);
               const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
+              const detail = payoutDetails[pair.id];
+              const title = detail ? `Base ${detail.base}%${detail.adjustments.length ? ' ' + detail.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${detail.payout}%` : `${shownPayout}%`;
               return (
                 <button key={pair.id} onClick={() => { onSelect(pair); setAddOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all mb-0.5 ${isActive ? 'bg-blue/10 border border-blue/30' : 'hover:bg-surface-hover border border-transparent'}`}>
@@ -145,7 +149,7 @@ function TopBar({
                     <span className="text-sm font-bold text-white">{pair.name}</span>
                     {isOpen && <span className="text-[10px] text-blue ml-2">open</span>}
                   </div>
-                  <span className="text-sm font-bold text-green">{shownPayout}%</span>
+                  <span className="text-sm font-bold text-green" title={title}>{shownPayout}%</span>
                 </button>
               );
             })}
@@ -183,7 +187,7 @@ function TopBar({
             <div className="flex flex-col flex-1 min-w-0">
               <span className="text-xs font-bold text-white leading-tight truncate">{pair.name}</span>
               <div className="flex items-center gap-1 leading-tight">
-                <span className="text-[10px] font-bold text-orange">{shownPayout}%</span>
+                <span className="text-[10px] font-bold text-orange" title={(() => { const d = payoutDetails[pair.id]; return d ? `Base ${d.base}%${d.adjustments.length ? ' ' + d.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${d.payout}%` : `${shownPayout}%`; })()}>{shownPayout}%</span>
                 {unrealized !== null ? (
                   <span className={`text-[10px] font-bold ${!showLive ? 'opacity-60' : ''} ${unrealized >= 0 ? 'text-green' : 'text-red'}`}>• {unrealized >= 0 ? '+' : ''}{unrealized.toFixed(2)}$</span>
                 ) : pairActiveTrades.length > 0 ? (
@@ -658,7 +662,7 @@ export default function TradingPage() {
 
   useEffect(() => {
     refreshTrades();
-    const timer = setInterval(refreshTrades, 5000);
+    const timer = setInterval(refreshTrades, 2000);
     return () => clearInterval(timer);
   }, [refreshTrades]);
 
@@ -685,29 +689,28 @@ export default function TradingPage() {
     };
   }, [refreshTrades, activePair]);
 
+  const [payoutDetails, setPayoutDetails] = useState<Record<string, { base: number; payout: number; adjustments: { reason: string; delta: number }[] }>>({});
+
   useEffect(() => {
     if (pairs.length === 0) return;
     let cancelled = false;
     const loadAll = async () => {
       try {
-        const entries = await Promise.all(
-          pairs.map(async (p) => {
-            try {
-              const res = await fetch(`/api/market/pairs/${p.id}/payout`);
-              if (!res.ok) return null;
-              const data = await res.json();
-              return typeof data.payout === 'number' ? ([p.id, data.payout] as const) : null;
-            } catch {
-              return null;
-            }
-          }),
-        );
+        const res = await fetch('/api/market/payouts');
+        if (!res.ok) return;
+        const data = await res.json();
         if (cancelled) return;
         const map: Record<string, number> = {};
-        for (const e of entries) {
-          if (e) map[e[0]] = e[1];
+        const details: Record<string, { base: number; payout: number; adjustments: { reason: string; delta: number }[] }> = {};
+        for (const p of pairs) {
+          const b = data.payouts?.[p.id];
+          if (b && typeof b.payout === 'number') {
+            map[p.id] = b.payout;
+            details[p.id] = b;
+          }
         }
         setPayoutMap(map);
+        setPayoutDetails(details);
       } catch {}
     };
     loadAll();
@@ -832,7 +835,7 @@ export default function TradingPage() {
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} trades={trades} currentPrice={price} onSelect={handleSelectPair} onClose={handleClosePair} />
+            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={handleSelectPair} onClose={handleClosePair} />
             {!activePair ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
                 <div className="w-14 h-14 rounded-2xl bg-blue/10 border border-blue/20 flex items-center justify-center">
