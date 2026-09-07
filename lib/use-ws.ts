@@ -64,8 +64,13 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     if (wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    const getWsUrl = () => {
+      const host = window.location.host;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${host}/ws`;
+    };
+    const wsUrl = getWsUrl();
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
