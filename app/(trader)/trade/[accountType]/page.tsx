@@ -743,16 +743,15 @@ export default function TradingPage() {
 
   useEffect(() => {
     const updateMarks = () => {
-      const now = Date.now();
-      const anchor = chartRef.current?.chartPixel(now + 120000, price) ?? null;
-      if (!anchor) {
+      const y = chartRef.current?.getYPixel(price) ?? null;
+      if (y == null) {
         setExpiryMarks([]);
         return;
       }
-      const s = Math.floor(now / 1000);
+      const s = Math.floor(Date.now() / 1000);
       const left = 60 - (s % 60);
-      const label = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
-      setExpiryMarks([{ id: 'candle', x: anchor.x, y: anchor.y, left: label }]);
+      const label = `00:${String(left % 60).padStart(2, '0')}`;
+      setExpiryMarks([{ id: 'candle', x: 0, y, left: label }]);
     };
     updateMarks();
     const timer = setInterval(updateMarks, 1000);
@@ -849,12 +848,28 @@ export default function TradingPage() {
               <SideToolbar onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} onOverlaySelected={setSelectedOverlay} />
+                <button
+                  onClick={() => {
+                    if (!activePair) return;
+                    fetch(`/api/market/pairs/${activePair.id}/candles?limit=300`)
+                      .then((r) => r.json())
+                      .then((data) => {
+                        const bars = ((data.candles ?? []) as CandleData[]).sort((a, b) => a.timestamp - b.timestamp);
+                        setSeed({ pairId: activePair.id, bars });
+                      })
+                      .catch(() => {});
+                  }}
+                  className="absolute top-2 right-2 z-30 w-7 h-7 rounded-lg bg-surface/80 backdrop-blur border border-border flex items-center justify-center text-text hover:text-white hover:bg-surface transition-colors"
+                  title="Refresh chart"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
                 {expiryMarks.map((m) => (
                   <div
                     key={m.id}
                     className="absolute z-40 pointer-events-none px-1.5 py-0.5 rounded bg-blue text-white text-[10px] font-mono font-bold tabular-nums whitespace-nowrap"
-                    style={{ left: Math.max(4, m.x - 24), top: m.y - 10 }}
-                    title="Time to trade expiry"
+                    style={{ right: 48, top: m.y - 10 }}
+                    title="Time to candle close"
                   >
                     {m.left}
                   </div>

@@ -74,13 +74,18 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
       }
     };
 
+    const lastTickRef = { current: 0 } as { current: number };
     ws.onmessage = (event) => {
       try {
         const msg: WSMessage = JSON.parse(event.data);
 
         if (msg.type === 'tick') {
-          setCurrentPrice(msg.price);
-          setCandle(msg.candle);
+          const now = Date.now();
+          if (now - lastTickRef.current >= 150) {
+            lastTickRef.current = now;
+            setCurrentPrice(msg.price);
+            setCandle(msg.candle);
+          }
           onTickRef.current?.(msg);
         }
 
