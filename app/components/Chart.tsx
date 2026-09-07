@@ -179,6 +179,18 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       if (!raw) return;
       const arr = JSON.parse(raw) as Array<{ name: string; points: unknown; styles: unknown; lock?: boolean; visible?: boolean }>;
       if (!Array.isArray(arr) || arr.length === 0) return;
+      const existing = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
+      if (existing.length > 0) {
+        const existingSig = new Set(existing.map(o => `${o.name}:${JSON.stringify(o.points)}`));
+        const toRestoreSig = new Set(arr.filter(o => o.name && o.points).map(o => {
+          const pts = o.points as unknown as Array<{ timestamp?: number; value?: number }>;
+          const clean = Array.isArray(pts) ? pts.map(p => ({ timestamp: p?.timestamp, value: p?.value })) : [];
+          return `${o.name}:${JSON.stringify(clean)}`;
+        }));
+        const already = [...toRestoreSig].every(s => existingSig.has(s)) && existing.length === arr.length;
+        if (already) return;
+        for (const o of existing) { if (o.id) try { chart.removeOverlay({ id: o.id }); } catch {} }
+      }
       for (const o of arr) {
         if (!o.name || !o.points) continue;
         try {

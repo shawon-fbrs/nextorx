@@ -888,7 +888,7 @@ export default function TradingPage() {
                   <div
                     key={m.id}
                     className="absolute z-40 pointer-events-none px-1.5 py-0.5 rounded bg-blue text-white text-[10px] font-mono font-bold tabular-nums whitespace-nowrap"
-                    style={{ left: Math.max(4, m.x - 24), top: m.y - 10 }}
+                    style={{ left: Math.max(4, m.x + 10), top: m.y - 10 }}
                     title="Time to candle close"
                   >
                     {m.left}
