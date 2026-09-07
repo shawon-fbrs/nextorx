@@ -203,11 +203,10 @@ function TopBar({
   );
 }
 
-function SideToolbar({ onIndToggle, onDrawTool, onRemoveDrawings }: { onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void }) {
+function SideToolbar({ timeframe, onTimeframeChange, onIndToggle, onDrawTool, onRemoveDrawings }: { timeframe: string; onTimeframeChange: (tf: string) => void; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void }) {
   const [activeDrawGroup, setActiveDrawGroup] = useState<string | null>(null);
   const [chartType, setChartType] = useState<'candle' | 'line' | 'area'>('candle');
   const [ctOpen, setCtOpen] = useState(false);
-  const [timeframe, setTimeframe] = useState('1m');
   const [tfOpen, setTfOpen] = useState(false);
 
   const toolIcons: Record<string, React.ReactNode> = {
@@ -282,7 +281,7 @@ function SideToolbar({ onIndToggle, onDrawTool, onRemoveDrawings }: { onIndToggl
             <div className="text-[9px] font-bold text-[#5c677f] uppercase tracking-wider mb-1.5 px-1">Timeframe</div>
             <div className="grid grid-cols-3 gap-1">
               {['1m', '5m', '15m', '30m', '1h', '4h', '1d'].map(tf => (
-                <button key={tf} onClick={() => { setTimeframe(tf); setTfOpen(false); }}
+                <button key={tf} onClick={() => { onTimeframeChange(tf); setTfOpen(false); }}
                   className={`py-1.5 text-[11px] font-semibold rounded-md transition-all ${timeframe === tf ? 'bg-blue-500 text-white' : 'text-[#93a0b5] hover:bg-[#2a3142] hover:text-white'}`}>
                   {tf}
                 </button>
@@ -389,6 +388,7 @@ export default function TradingPage() {
   const [payoutMap, setPayoutMap] = useState<Record<string, number>>({});
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
+  const [timeframe, setTimeframe] = useState('1m');
   const prevActiveRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -397,7 +397,7 @@ export default function TradingPage() {
       return;
     }
     let cancelled = false;
-    fetch(`/api/market/pairs/${activePair.id}/candles?limit=300`)
+    fetch(`/api/market/pairs/${activePair.id}/candles?limit=300&interval=${encodeURIComponent(timeframe)}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -410,7 +410,7 @@ export default function TradingPage() {
     return () => {
       cancelled = true;
     };
-  }, [activePair]);
+  }, [activePair, timeframe]);
 
   const readStoredTabs = (): string[] | null => {
     try {
@@ -848,9 +848,9 @@ export default function TradingPage() {
               </div>
             ) : (
             <div className="flex-1 flex min-w-0 overflow-hidden">
-              <SideToolbar onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
+              <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
-                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} onOverlaySelected={setSelectedOverlay} />
+                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} onOverlaySelected={setSelectedOverlay} />
                 <button
                   onClick={() => {
                     if (!activePair) return;

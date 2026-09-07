@@ -18,6 +18,7 @@ interface ChartProps {
   currentPrice: number | null;
   currentCandle: CandleData | null;
   seed: { pairId: string; bars: CandleData[] } | null;
+  timeframe?: string;
   onOverlaySelected?: (overlay: { id: string; name: string } | null) => void;
 }
 
@@ -95,30 +96,46 @@ const CUSTOM_OVERLAYS: Array<{
 
 CUSTOM_OVERLAYS.forEach(o => registerOverlay(o));
 
-export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, seed, onOverlaySelected }, ref) {
+const PERIOD_MAP: Record<string, { span: number; type: 'minute' | 'hour' | 'day' }> = {
+  '1m': { span: 1, type: 'minute' },
+  '5m': { span: 5, type: 'minute' },
+  '15m': { span: 15, type: 'minute' },
+  '30m': { span: 30, type: 'minute' },
+  '1h': { span: 1, type: 'hour' },
+  '4h': { span: 4, type: 'hour' },
+  '1d': { span: 1, type: 'day' },
+};
+
+export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, seed, timeframe = '1m', onOverlaySelected }, ref) {
   const chartIdRef = useRef(`kline-${Math.random().toString(36).slice(2)}`);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<KLineChart | null>(null);
   const pairIdRef = useRef(pairId);
+  const timeframeRef = useRef(timeframe);
+  timeframeRef.current = timeframe;
   const onOverlaySelectedRef = useRef(onOverlaySelected);
   onOverlaySelectedRef.current = onOverlaySelected;
   const subscribeBarCallbackRef = useRef<((data: KLineData) => void) | null>(null);
   const barsCacheRef = useRef<Map<string, KLineData[]>>(new Map());
+  const bucketStartRef = useRef<number | null>(null);
+  const bucketBaseRef = useRef<KLineData | null>(null);
 
   const loadBars = async (type: string, timestamp: number | null | undefined, callback: (bars: KLineData[], more: boolean) => void) => {
     const pid = pairIdRef.current;
+    const tf = timeframeRef.current;
     if (!pid) {
       callback([], false);
       return;
     }
     if (type === 'init') {
-      const cached = barsCacheRef.current.get(pid);
+      const cacheKey = `${pid}:${tf}`;
+      const cached = barsCacheRef.current.get(cacheKey);
       if (cached && cached.length > 0) {
         callback(cached, false);
         return;
       }
       try {
-        const res = await fetch(`/api/market/pairs/${pid}/candles?limit=300`);
+        const res = await fetch(`/api/market/pairs/${pid}/candles?limit=300&interval=${encodeURIComponent(tf)}`);
         const data = await res.json();
         const bars: KLineData[] = (data.candles || []).map((c: any) => ({
           timestamp: c.timestamp,
@@ -134,7 +151,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       }
     } else if (type === 'backward' && timestamp) {
       try {
-        const res = await fetch(`/api/market/pairs/${pid}/candles?limit=100&before=${timestamp}`);
+        const res = await fetch(`/api/market/pairs/${pid}/candles?limit=100&before=${timestamp}&interval=${encodeURIComponent(tf)}`);
         const data = await res.json();
         const bars: KLineData[] = (data.candles || []).map((c: any) => ({
           timestamp: c.timestamp,
@@ -273,8 +290,9 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
 
     if (chart) {
       const pricePrec = pairIdRef.current?.includes('JPY') ? 3 : 5;
+      const p = PERIOD_MAP[timeframeRef.current] ?? PERIOD_MAP['1m'];
       chart.setSymbol({ ticker: pairIdRef.current || 'OTC', pricePrecision: pricePrec, volumePrecision: 0 });
-      chart.setPeriod({ span: 1, type: 'minute' });
+      chart.setPeriod(p as never);
 
       chart.setDataLoader({
         getBars: async ({ type, timestamp, callback }) => {
@@ -307,13 +325,19 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   useEffect(() => {
     if (pairId) {
       pairIdRef.current = pairId;
+      timeframeRef.current = timeframe;
+      bucketStartRef.current = null;
+      bucketBaseRef.current = null;
       const chart = chartRef.current;
       if (chart && chartContainerRef.current) {
+        const pricePrec = pairId.includes('JPY') ? 3 : 5;
+        const p = PERIOD_MAP[timeframe] ?? PERIOD_MAP['1m'];
+        chart.setSymbol({ ticker: pairId, pricePrecision: pricePrec, volumePrecision: 0 });
+        chart.setPeriod(p as never);
         if (seed && seed.pairId === pairId && seed.bars.length > 0) {
-          const pricePrec = pairId.includes('JPY') ? 3 : 5;
-          chart.setSymbol({ ticker: pairId, pricePrecision: pricePrec, volumePrecision: 0 });
+          const cacheKey = `${pairId}:${timeframe}`;
           barsCacheRef.current.set(
-            pairId,
+            cacheKey,
             seed.bars.map((c) => ({
               timestamp: c.timestamp,
               open: c.open,
@@ -326,15 +350,21 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
           subscribeBarCallbackRef.current = null;
           chart.resetData();
           chart.scrollToRealTime(0);
+        } else {
+          chart.resetData();
+          chart.scrollToRealTime(0);
         }
       }
     }
-  }, [pairId, seed]);
+  }, [pairId, seed, timeframe]);
 
   useEffect(() => {
     if (!currentCandle) return;
     const cb = subscribeBarCallbackRef.current;
-    if (cb) {
+    if (!cb) return;
+    if (timeframe === '1m') {
+      bucketStartRef.current = null;
+      bucketBaseRef.current = null;
       cb({
         timestamp: currentCandle.timestamp,
         open: currentCandle.open,
@@ -343,8 +373,42 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         close: currentCandle.close,
         volume: currentCandle.volume,
       });
+      return;
     }
-  }, [currentCandle]);
+    const msMap: Record<string, number> = { '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
+    const intervalMs = msMap[timeframe] ?? 60000;
+    const bucketStart = Math.floor(currentCandle.timestamp / intervalMs) * intervalMs;
+    if (bucketStartRef.current !== bucketStart) {
+      bucketStartRef.current = bucketStart;
+      const cacheKey = `${pairIdRef.current}:${timeframeRef.current}`;
+      const cached = barsCacheRef.current.get(cacheKey);
+      const last = cached?.[cached.length - 1];
+      if (last && last.timestamp === bucketStart) {
+        bucketBaseRef.current = { ...last };
+      } else {
+        bucketBaseRef.current = {
+          timestamp: bucketStart,
+          open: currentCandle.open,
+          high: currentCandle.high,
+          low: currentCandle.low,
+          close: currentCandle.close,
+          volume: 0,
+        };
+      }
+    }
+    const base = bucketBaseRef.current;
+    if (!base) return;
+    const bar: KLineData = {
+      timestamp: bucketStart,
+      open: base.open,
+      high: Math.max(base.high, currentCandle.high),
+      low: Math.min(base.low, currentCandle.low),
+      close: currentCandle.close,
+      volume: (base.volume || 0) + (currentCandle.volume || 0),
+    };
+    bucketBaseRef.current = { ...bar };
+    cb(bar);
+  }, [currentCandle, timeframe]);
 
   return (
     <div className="absolute inset-0 bg-[#161a22] overflow-hidden">
