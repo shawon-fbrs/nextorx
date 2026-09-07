@@ -455,11 +455,18 @@ export class OTCEngine {
         if (row?.seed && this.onSeedRevealed) this.onSeedRevealed(revealedDay, row.seed);
       }
       await this.measureRegimes(now);
+      try {
+        const archiveDay = dayStringUTC(new Date(now.getTime() - 31 * 86400000));
+        const { archiveDayToS3 } = await import('./pf-history');
+        for (const state of Array.from(this.pairs.values())) {
+          await archiveDayToS3(archiveDay, state.pairId, 60000).catch(() => {});
+        }
+      } catch {}
       await prisma.secondCandle.deleteMany({
         where: { timestamp: { lt: BigInt(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },
       }).catch(() => {});
       await prisma.candle.deleteMany({
-        where: { timestamp: { lt: BigInt(now.getTime() - 30 * 24 * 60 * 60 * 1000) } },
+        where: { timestamp: { lt: BigInt(now.getTime() - 32 * 24 * 60 * 60 * 1000) } },
       }).catch(() => {});
     } catch (e) {
       console.error("[OTC] Seed check error:", e);

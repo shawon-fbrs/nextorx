@@ -559,3 +559,17 @@ model PaymentMethod {
 
   @@unique([name, networkName])
 }
+
+model CandleDayArchive {
+  id         String   @id @default(uuid())
+  day        String
+  pairId     String
+  intervalMs Int
+  merkleRoot String
+  s3Key      String
+  rowCount   Int
+  createdAt  DateTime @default(now())
+
+  @@unique([day, pairId, intervalMs])
+  @@index([day, pairId])
+}

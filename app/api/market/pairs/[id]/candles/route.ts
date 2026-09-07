@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/db";
 import { toJsonError, ApiError } from "@/lib/api";
-import { getOTCEngine } from "@/lib/otc-engine";
+import { getDayCandlesWithCache } from "@/lib/pf-history";
+import { dayStringUTC } from "@/lib/pf-math";
 
 export async function GET(
   request: NextRequest,
@@ -24,130 +24,41 @@ export async function GET(
       throw new ApiError(400, "Invalid interval");
     }
     const intervalMs = INTERVAL_MS_MAP[interval];
-
-    let candles: Array<{ id: string; pairId: string; timestamp: bigint; open: unknown; high: unknown; low: unknown; close: unknown; volume: bigint }> = [];
-
-    if (intervalMs < 60_000) {
-      const rawPerBucket = intervalMs / 1000;
-      const rawTake = Math.min(Math.ceil(limit * rawPerBucket * 1.1), 10000);
-      const fetchSec = async () =>
-        prisma.secondCandle.findMany({
-          where: {
-            pairId: id,
-            ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
-          },
-          orderBy: { timestamp: "desc" },
-          take: rawTake,
-        });
-      let rawSecs = await fetchSec();
-      if (rawSecs.length < 20) {
-        const engine = await getOTCEngine();
-        await engine.ensureHistoricalCandles();
-        rawSecs = await fetchSec();
+    const beforeTs = before ? Number(before) : Math.floor(Date.now() / intervalMs) * intervalMs;
+    const collected: Array<{ timestamp: number; open: number; high: number; low: number; close: number; volume: number }> = [];
+    let cursorMs = beforeTs - 1;
+    let guard = 0;
+    const maxDays = 500;
+    while (collected.length < limit && guard++ < maxDays) {
+      const day = dayStringUTC(new Date(cursorMs));
+      const { candles } = await getDayCandlesWithCache({ pairId: id, day, intervalMs });
+      if (!candles.length) {
+        cursorMs = Date.parse(`${day}T00:00:00.000Z`) - 1;
+        if (cursorMs < Date.now() - 365 * 86400000) break;
+        continue;
       }
-      const buckets = new Map<number, typeof rawSecs>();
-      for (const c of rawSecs) {
-        const ts = Number(c.timestamp);
-        const bucket = Math.floor(ts / intervalMs) * intervalMs;
-        const arr = buckets.get(bucket);
-        if (!arr) buckets.set(bucket, [c]);
-        else arr.push(c);
+      const filtered = candles.filter(c => c.timestamp < beforeTs).sort((a, b) => b.timestamp - a.timestamp);
+      for (const c of filtered) {
+        if (collected.length >= limit) break;
+        if (c.timestamp < beforeTs) collected.push(c);
       }
-      const sortedBuckets = [...buckets.entries()].sort((a, b) => b[0] - a[0]).slice(0, limit);
-      candles = sortedBuckets.map(([bucketTs, arr]) => {
-        const sorted = arr.sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
-        const first = sorted[0];
-        const last = sorted[sorted.length - 1];
-        let high = Number(first.high);
-        let low = Number(first.low);
-        let ticks = 0;
-        for (const r of sorted) {
-          const h = Number(r.high);
-          const l = Number(r.low);
-          if (h > high) high = h;
-          if (l < low) low = l;
-          ticks += (r as unknown as { ticks: number }).ticks;
-        }
-        return {
-          id: `${id}:${bucketTs}`,
-          pairId: id,
-          timestamp: BigInt(bucketTs),
-          open: first.open,
-          high: high as unknown as typeof first.high,
-          low: low as unknown as typeof first.low,
-          close: last.close,
-          volume: BigInt(ticks || sorted.length),
-        };
-      }).sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
-    } else {
-      const mult = intervalMs / 60_000;
-      const fetchRaw = async () => {
-        const rawTake = Math.min(Math.ceil(limit * mult * 1.1), 10000);
-        return prisma.candle.findMany({
-          where: {
-            pairId: id,
-            ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
-          },
-          orderBy: { timestamp: "desc" },
-          take: rawTake,
-        });
-      };
-      let rawCandles = await fetchRaw();
-      if (rawCandles.length < 50) {
-        const engine = await getOTCEngine();
-        await engine.ensureHistoricalCandles();
-        rawCandles = await fetchRaw();
-      }
-      if (mult === 1) {
-        candles = rawCandles.slice(0, limit).map((c) => ({ ...c, volume: BigInt(c.volume) })) as typeof candles;
-      } else {
-        const buckets = new Map<number, typeof rawCandles>();
-        for (const c of rawCandles) {
-          const ts = Number(c.timestamp);
-          const bucket = Math.floor(ts / intervalMs) * intervalMs;
-          const arr = buckets.get(bucket);
-          if (!arr) buckets.set(bucket, [c]);
-          else arr.push(c);
-        }
-        const sortedBuckets = [...buckets.entries()].sort((a, b) => b[0] - a[0]).slice(0, limit);
-        candles = sortedBuckets.map(([bucketTs, arr]) => {
-          const sorted = arr.sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
-          const first = sorted[0];
-          const last = sorted[sorted.length - 1];
-          let high = Number(first.high);
-          let low = Number(first.low);
-          let volume = 0;
-          for (const r of sorted) {
-            const h = Number(r.high);
-            const l = Number(r.low);
-            if (h > high) high = h;
-            if (l < low) low = l;
-            volume += Number(r.volume);
-          }
-          return {
-            ...first,
-            timestamp: BigInt(bucketTs),
-            open: first.open,
-            high: high as unknown as typeof first.high,
-            low: low as unknown as typeof first.low,
-            close: last.close,
-            volume: BigInt(volume),
-          } as typeof candles[number];
-        }).sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
-      }
+      cursorMs = Date.parse(`${day}T00:00:00.000Z`) - 1;
+      if (day < '2024-01-01') break;
     }
-
+    collected.sort((a, b) => b.timestamp - a.timestamp);
+    const sliced = collected.slice(0, limit).sort((a, b) => a.timestamp - b.timestamp);
     return Response.json({
-      candles: candles.map((c: any) => ({
-        id: c.id,
-        pairId: c.pairId,
-        timestamp: Number(c.timestamp),
-        open: Number(c.open),
-        high: Number(c.high),
-        low: Number(c.low),
-        close: Number(c.close),
-        volume: Number(c.volume),
+      candles: sliced.map(c => ({
+        id: `${id}:${c.timestamp}`,
+        pairId: id,
+        timestamp: c.timestamp,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume,
       })),
+      meta: { verified: true },
     });
   } catch (e) {
     return toJsonError(e);
