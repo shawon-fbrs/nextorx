@@ -147,13 +147,22 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       const tf = timeframeRef.current;
       if (!chart || !pid) return;
       const overlays = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
-      const toSave = overlays.map(o => ({
-        name: o.name,
-        points: o.points,
-        styles: o.styles,
-        lock: (o as unknown as { lock?: boolean }).lock,
-        visible: (o as unknown as { visible?: boolean }).visible,
-      }));
+      const toSave = overlays.map(o => {
+        const rawPoints = (o as unknown as { points?: Array<{ timestamp?: number; value?: number; dataIndex?: number }> }).points ?? [];
+        const points = rawPoints.map(p => {
+          const q: Record<string, unknown> = {};
+          if (typeof p.timestamp === 'number' && Number.isFinite(p.timestamp)) q.timestamp = p.timestamp;
+          if (typeof p.value === 'number' && Number.isFinite(p.value)) q.value = p.value;
+          return q;
+        }).filter(p => p.timestamp !== undefined || p.value !== undefined);
+        return {
+          name: o.name,
+          points: points.length ? points : o.points,
+          styles: o.styles,
+          lock: (o as unknown as { lock?: boolean }).lock,
+          visible: (o as unknown as { visible?: boolean }).visible,
+        };
+      });
       localStorage.setItem(storageKey(pid, tf), JSON.stringify(toSave));
     } catch {}
   }, []);
@@ -171,9 +180,17 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       for (const o of arr) {
         if (!o.name || !o.points) continue;
         try {
+          const rawPts = o.points as unknown as Array<{ timestamp?: number; value?: number; dataIndex?: number }>;
+          const pts = Array.isArray(rawPts) ? rawPts.map(p => {
+            const q: Record<string, unknown> = {};
+            if (typeof p?.timestamp === 'number' && Number.isFinite(p.timestamp)) q.timestamp = p.timestamp;
+            if (typeof p?.value === 'number' && Number.isFinite(p.value)) q.value = p.value;
+            return q;
+          }).filter(p => p.timestamp !== undefined || p.value !== undefined) : rawPts as unknown;
+          const points = (pts as unknown as Array<Record<string,unknown>>).length ? pts : rawPts;
           chart.createOverlay({
             name: o.name,
-            points: o.points as never,
+            points: points as never,
             styles: o.styles as never,
             lock: o.lock,
             visible: o.visible,
@@ -191,6 +208,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
             },
             onDrawEnd: () => persistDrawings(),
             onRemoved: () => persistDrawings(),
+            onPressedMoveEnd: () => persistDrawings(),
           } as never);
         } catch {}
       }
@@ -266,6 +284,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         },
         onDrawEnd: () => { setTimeout(persistDrawings, 50); return true; },
         onRemoved: () => { setTimeout(persistDrawings, 50); return true; },
+        onPressedMoveEnd: () => { setTimeout(persistDrawings, 50); return true; },
         onRightClick: (event: any) => { (event as { preventDefault?: () => void }).preventDefault?.(); return true; },
       } as never);
       setTimeout(persistDrawings, 150);
@@ -296,10 +315,8 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       const intervalMs = INTERVAL_MS_MAP[tf] ?? 60_000;
       const tsOffset = Math.max(intervalMs * 8, 60_000 * 3);
       const priceOffsetFactor = 1.002;
-      const newPoints = (src.points ?? []).map((p: { timestamp?: number; dataIndex?: number; value?: number }) => ({
-        ...p,
+      const newPoints = (src.points ?? []).map((p: { timestamp?: number; value?: number }) => ({
         timestamp: p.timestamp ? p.timestamp + tsOffset : undefined,
-        dataIndex: p.dataIndex !== undefined ? p.dataIndex + 12 : undefined,
         value: p.value !== undefined ? (p.value >= 0 ? p.value * priceOffsetFactor : p.value * (2 - priceOffsetFactor)) : undefined,
       }));
       const newId = chart.createOverlay({
@@ -319,6 +336,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         onDeselected: () => { onOverlaySelectedRef.current?.(null); return true; },
         onDrawEnd: () => { setTimeout(persistDrawings, 50); return true; },
         onRemoved: () => { setTimeout(persistDrawings, 50); return true; },
+        onPressedMoveEnd: () => { setTimeout(persistDrawings, 50); return true; },
         onRightClick: (event: any) => { (event as { preventDefault?: () => void }).preventDefault?.(); return true; },
       } as never);
       setTimeout(persistDrawings, 100);
