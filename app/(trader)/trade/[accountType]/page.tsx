@@ -733,33 +733,41 @@ export default function TradingPage() {
   const [candleLeft, setCandleLeft] = useState('');
 
   useEffect(() => {
+    const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
+    const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const update = () => {
       const now = Date.now();
-      const s = Math.floor(now / 1000);
-      const left = 60 - (s % 60);
-      setCandleLeft(`${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`);
+      const leftMs = intervalMs - (now % intervalMs);
+      const leftSec = Math.ceil(leftMs / 1000);
+      const m = Math.floor(leftSec / 60);
+      const s = leftSec % 60;
+      setCandleLeft(`${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
     };
     update();
-    const timer = setInterval(update, 1000);
+    const timer = setInterval(update, 250);
     return () => clearInterval(timer);
-  }, []);
+  }, [timeframe]);
 
   useEffect(() => {
+    const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
+    const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const updateMarks = () => {
       const anchor = chartRef.current?.chartPixel(Date.now() + 120000, price) ?? null;
       if (!anchor) {
         setExpiryMarks([]);
         return;
       }
-      const s = Math.floor(Date.now() / 1000);
-      const left = 60 - (s % 60);
-      const label = `00:${String(left % 60).padStart(2, '0')}`;
+      const leftMs = intervalMs - (Date.now() % intervalMs);
+      const leftSec = Math.ceil(leftMs / 1000);
+      const mm = String(Math.floor(leftSec / 60)).padStart(2, '0');
+      const ss = String(leftSec % 60).padStart(2, '0');
+      const label = `${mm}:${ss}`;
       setExpiryMarks([{ id: 'candle', x: anchor.x, y: anchor.y, left: label }]);
     };
     updateMarks();
-    const timer = setInterval(updateMarks, 1000);
+    const timer = setInterval(updateMarks, 250);
     return () => clearInterval(timer);
-  }, [price]);
+  }, [price, timeframe]);
 
   const handleTrade = useCallback(async (type: 'up' | 'down') => {
     if (!activePair) return;

@@ -485,8 +485,8 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     const chart = chartRef.current;
     const tf = timeframeRef.current;
     const intervalMs = INTERVAL_MS_MAP[tf] ?? 60_000;
+    const price = currentPrice ?? currentCandle.close;
 
-    // helper to push bar either via subscription callback or direct updateData fallback
     const pushBar = (bar: KLineData) => {
       const cb = subscribeBarCallbackRef.current;
       if (cb) {
@@ -508,46 +508,13 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       return;
     }
 
+    let bucketStart: number;
     if (intervalMs < 60_000) {
-      const now = Date.now();
-      const bucketStart = Math.floor(now / intervalMs) * intervalMs;
-      const price = currentPrice ?? currentCandle.close;
-      if (bucketStartRef.current !== bucketStart) {
-        bucketStartRef.current = bucketStart;
-        const cacheKey = `${pairIdRef.current}:${tf}`;
-        const cached = barsCacheRef.current.get(cacheKey);
-        const last = cached?.[cached.length - 1];
-        if (last && last.timestamp === bucketStart) {
-          bucketBaseRef.current = { ...last };
-        } else if (bucketBaseRef.current && bucketBaseRef.current.timestamp === bucketStart) {
-          // keep existing bucketBase
-        } else {
-          bucketBaseRef.current = {
-            timestamp: bucketStart,
-            open: price,
-            high: price,
-            low: price,
-            close: price,
-            volume: 0,
-          };
-        }
-      }
-      const base = bucketBaseRef.current;
-      if (!base) return;
-      const bar: KLineData = {
-        timestamp: bucketStart,
-        open: base.open,
-        high: Math.max(base.high, price, currentCandle.high),
-        low: Math.min(base.low, price, currentCandle.low),
-        close: price,
-        volume: (base.volume || 0) + 0.2,
-      };
-      bucketBaseRef.current = { ...bar };
-      pushBar(bar);
-      return;
+      bucketStart = Math.floor(Date.now() / intervalMs) * intervalMs;
+    } else {
+      bucketStart = Math.floor(currentCandle.timestamp / intervalMs) * intervalMs;
     }
 
-    const bucketStart = Math.floor(currentCandle.timestamp / intervalMs) * intervalMs;
     if (bucketStartRef.current !== bucketStart) {
       bucketStartRef.current = bucketStart;
       const cacheKey = `${pairIdRef.current}:${tf}`;
@@ -555,14 +522,19 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       const last = cached?.[cached.length - 1];
       if (last && last.timestamp === bucketStart) {
         bucketBaseRef.current = { ...last };
+      } else if (bucketBaseRef.current && bucketBaseRef.current.timestamp === bucketStart) {
+        // keep existing
       } else {
+        const openPrice = last ? Number(last.close) : price;
+        const initHigh = Math.max(openPrice, price, currentCandle.high);
+        const initLow = Math.min(openPrice, price, currentCandle.low);
         bucketBaseRef.current = {
           timestamp: bucketStart,
-          open: currentCandle.open,
-          high: currentCandle.high,
-          low: currentCandle.low,
-          close: currentCandle.close,
-          volume: 0,
+          open: openPrice,
+          high: initHigh,
+          low: initLow,
+          close: price,
+          volume: last ? Number(last.volume) || 0 : 0,
         };
       }
     }
@@ -571,10 +543,10 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     const bar: KLineData = {
       timestamp: bucketStart,
       open: base.open,
-      high: Math.max(base.high, currentCandle.high),
-      low: Math.min(base.low, currentCandle.low),
-      close: currentCandle.close,
-      volume: (base.volume || 0) + (currentCandle.volume || 0) * 0.1,
+      high: Math.max(base.high, price, currentCandle.high),
+      low: Math.min(base.low, price, currentCandle.low),
+      close: price,
+      volume: (base.volume || 0) + 0.15,
     };
     bucketBaseRef.current = { ...bar };
     pushBar(bar);
