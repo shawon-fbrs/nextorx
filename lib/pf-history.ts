@@ -12,6 +12,9 @@ export interface PfCandle {
   volume: number;
 }
 
+const dayCache = new Map<string, { candles: PfCandle[]; ts: number }>();
+const CACHE_TTL = 60_000;
+
 function getSeedForDaySync(day: string): string | null {
   return null;
 }
@@ -66,6 +69,11 @@ export async function getDayCandlesWithCache(opts: {
   intervalMs: number;
 }): Promise<{ candles: PfCandle[]; verified: boolean; source: 'hot' | 's3' | 'generated' }> {
   const { pairId, day, intervalMs } = opts;
+  const cacheKey = `${pairId}:${day}:${intervalMs}`;
+  const cached = dayCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    return { candles: cached.candles, verified: false, source: 'generated' };
+  }
   const dayStart = Date.parse(`${day}T00:00:00.000Z`);
   const dayEnd = dayStart + 86400000;
 
@@ -157,6 +165,7 @@ export async function getDayCandlesWithCache(opts: {
     seed: seedRow.seed,
     sigmaMults,
   });
+  dayCache.set(cacheKey, { candles, ts: Date.now() });
   return { candles, verified: false, source: 'generated' };
 }
 
