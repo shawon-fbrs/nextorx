@@ -229,52 +229,51 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     } catch {}
   }, [persistDrawings]);
 
-  const loadBars = async (type: string, timestamp: number | null | undefined, callback: (bars: KLineData[], more: boolean) => void) => {
+  const loadBars = async (type: string, timestamp: number | null | undefined, callback: (bars: KLineData[], more?: boolean | { backward?: boolean; forward?: boolean }) => void) => {
     const pid = pairIdRef.current;
     const tf = timeframeRef.current;
     if (!pid) {
-      callback([], false);
+      callback([], { backward: false, forward: false });
       return;
     }
+    const toBars = (candles: any): KLineData[] =>
+      (candles || []).map((c: any) => ({
+        timestamp: c.timestamp,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: Number(c.volume) || 0,
+      })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
     if (type === 'init') {
       const cacheKey = `${pid}:${tf}`;
       const cached = barsCacheRef.current.get(cacheKey);
       if (cached && cached.length > 0) {
-        callback(cached, false);
+        callback(cached, { backward: false, forward: true });
         return;
       }
       try {
         const res = await fetch(`/api/market/pairs/${pid}/candles?limit=300&interval=${encodeURIComponent(tf)}`);
         const data = await res.json();
-        const bars: KLineData[] = (data.candles || []).map((c: any) => ({
-          timestamp: c.timestamp,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          volume: Number(c.volume) || 0,
-        })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
+        const bars = toBars(data.candles);
         barsCacheRef.current.set(cacheKey, bars);
-        callback(bars, false);
+        callback(bars, { backward: false, forward: true });
       } catch {
-        callback([], false);
+        callback([], { backward: false, forward: true });
       }
-    } else if (type === 'backward' && timestamp) {
+    } else if (type === 'forward' && timestamp) {
       try {
-        const res = await fetch(`/api/market/pairs/${pid}/candles?limit=100&before=${timestamp}&interval=${encodeURIComponent(tf)}`);
+        const res = await fetch(`/api/market/pairs/${pid}/candles?limit=200&before=${timestamp}&interval=${encodeURIComponent(tf)}`);
         const data = await res.json();
-        const bars: KLineData[] = (data.candles || []).map((c: any) => ({
-          timestamp: c.timestamp,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          volume: Number(c.volume) || 0,
-        })).sort((a: KLineData, b: KLineData) => a.timestamp - b.timestamp);
-        callback(bars, bars.length < 100);
+        const bars = toBars(data.candles);
+        callback(bars, { backward: false, forward: bars.length >= 200 });
       } catch {
-        callback([], true);
+        callback([], { backward: false, forward: true });
       }
+    } else if (type === 'backward') {
+      callback([], { backward: false });
+    } else {
+      callback([], { backward: false, forward: false });
     }
   };
 
