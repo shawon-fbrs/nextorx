@@ -207,11 +207,37 @@ export class OTCEngine {
           orderBy: { timestamp: "desc" },
           select: { close: true },
         });
-    const startPrice = lastSecond
+    let startPrice = lastSecond
       ? Number(lastSecond.close)
       : lastMinute
         ? Number(lastMinute.close)
         : basePrice;
+    if (!lastSecond && !lastMinute) {
+      try {
+        const day = dayStringUTC(new Date(now));
+        const seedRow = await prisma.serverSeed.findUnique({ where: { day } });
+        if (seedRow?.seed) {
+          const regimes = await prisma.pairVolRegime.findMany({ where: { pairId, day } });
+          const sigmaMults = new Map<number, number>();
+          for (const r of regimes) sigmaMults.set(r.hour, Number(r.sigmaMult));
+          const { computeCloseUpToNow } = await import("./pf-history");
+          const startSec = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
+          const upTo = Math.max(0, Math.min(SECONDS_PER_DAY, Math.floor(now / 1000) - startSec));
+          if (upTo > 0) {
+            startPrice = await computeCloseUpToNow({
+              pairId,
+              day,
+              basePrice,
+              volatility: Number(p.volatility),
+              category: p.category,
+              seed: seedRow.seed,
+              sigmaMults,
+              upToSecond: upTo,
+            });
+          }
+        }
+      } catch {}
+    }
     const state: PairState = {
       pairId: p.id,
       name: p.name,
@@ -243,13 +269,15 @@ export class OTCEngine {
     const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
     const fromSecond = startOfDay;
     for (const state of Array.from(this.pairs.values())) {
-      const lastRow = await prisma.secondCandle.findFirst({
+      const existingCount = await prisma.secondCandle.count({
         where: { pairId: state.pairId, timestamp: { gte: BigInt(startOfDay * 1000) } },
-        orderBy: { timestamp: "desc" },
-        select: { timestamp: true, close: true },
-      });
-      const resumeFrom = lastRow ? Number(lastRow.timestamp) / 1000 + 1 : startOfDay;
-      let prevClose = lastRow ? Number(lastRow.close) : state.basePrice;
+      }).catch(() => 0);
+      const expected = Math.max(0, currentSecond - startOfDay);
+      if (existingCount >= expected * 0.9 && expected > 60) {
+        console.log(`[OTC] Backfill skip ${state.pairId}: ${existingCount}/${expected} present`);
+        continue;
+      }
+      let prevClose = state.basePrice;
       const rows: Array<{
         pairId: string;
         timestamp: bigint;
@@ -259,7 +287,7 @@ export class OTCEngine {
         close: number;
         ticks: number;
       }> = [];
-      for (let s = Math.max(fromSecond, startOfDay, resumeFrom); s < currentSecond; s++) {
+      for (let s = Math.max(fromSecond, startOfDay); s < currentSecond; s++) {
         const secondOfDay = s % SECONDS_PER_DAY;
         const utcHour = new Date(s * 1000).getUTCHours();
         const r = computeSecond(
@@ -273,12 +301,17 @@ export class OTCEngine {
           open, high: r.high, low: r.low, close: r.close, ticks: TICKS_PER_SECOND,
         });
         prevClose = r.close;
+        if ((rows.length & 4095) === 4095) {
+          await new Promise((r2) => setImmediate(r2));
+        }
       }
       for (let i = 0; i < rows.length; i += 500) {
         const batch = rows.slice(i, i + 500);
         await prisma.secondCandle.createMany({ data: batch, skipDuplicates: true });
+        await new Promise((r2) => setImmediate(r2));
       }
       console.log(`[OTC] Backfilled ${rows.length} 1s candles for ${state.pairId}`);
+      this.secondCloses.set(state.pairId, prevClose);
     }
   }
 
@@ -476,6 +509,7 @@ export class OTCEngine {
   private async closeCandles() {
     const now = Date.now();
     const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
+    const closed = new Map<string, { timestamp: number; open: number; high: number; low: number; close: number; volume: number }>();
 
     for (const state of Array.from(this.pairs.values())) {
       const oldCandle = { ...state.candle };
@@ -499,12 +533,13 @@ export class OTCEngine {
       if (this.broadcast) {
         this.broadcast(closeMsg);
       }
+      closed.set(state.pairId, oldCandle);
     }
 
-    await this.rollupMinute(candleStart - CANDLE_INTERVAL_MS);
+    await this.rollupMinute(candleStart - CANDLE_INTERVAL_MS, closed);
   }
 
-  private async rollupMinute(minuteStart: number) {
+  private async rollupMinute(minuteStart: number, closed?: Map<string, { timestamp: number; open: number; high: number; low: number; close: number; volume: number }>) {
     // Wait briefly for the 60 second rows to land (persistSecond is async inside ticks).
     for (let attempt = 0; attempt < 3; attempt++) {
       const probe = await prisma.secondCandle.count({
@@ -525,7 +560,32 @@ export class OTCEngine {
           orderBy: { timestamp: "asc" },
           select: { open: true, high: true, low: true, close: true },
         });
-        if (rows.length === 0) continue;
+        if (rows.length === 0) {
+          const mem = closed?.get(state.pairId);
+          if (mem && Number.isFinite(mem.open) && Number.isFinite(mem.close)) {
+            const vol = 250 + (minuteStart % 7) * 40 + (state.pairId.charCodeAt(0) % 11) * 7 + 180;
+            await prisma.candle.upsert({
+              where: { pairId_timestamp: { pairId: state.pairId, timestamp: BigInt(minuteStart) } },
+              create: {
+                pairId: state.pairId,
+                timestamp: BigInt(minuteStart),
+                open: mem.open,
+                high: mem.high,
+                low: mem.low,
+                close: mem.close,
+                volume: BigInt(vol),
+              },
+              update: {
+                open: mem.open,
+                high: mem.high,
+                low: mem.low,
+                close: mem.close,
+                volume: BigInt(vol),
+              },
+            });
+          }
+          continue;
+        }
         let high = Number(rows[0].high);
         let low = Number(rows[0].low);
         for (const r of rows) {

@@ -28,15 +28,17 @@ export async function generateDayCandles(params: {
   category: string;
   seed: string;
   sigmaMults: Map<number, number>;
+  upToSecond?: number;
 }): Promise<PfCandle[]> {
-  const { pairId, day, intervalMs, basePrice, volatility, category, seed, sigmaMults } = params;
+  const { pairId, day, intervalMs, basePrice, volatility, category, seed, sigmaMults, upToSecond } = params;
   const startSec = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
+  const endSec = upToSecond !== undefined ? Math.min(upToSecond, SECONDS_PER_DAY) : SECONDS_PER_DAY;
   const candles: PfCandle[] = [];
   let prevClose = basePrice;
   let bucket: PfCandle | null = null;
   let bucketStart = -1;
 
-  for (let s = 0; s < SECONDS_PER_DAY; s++) {
+  for (let s = 0; s < endSec; s++) {
     const secOfDay = s;
     const tsMs = (startSec + s) * 1000;
     const hour = new Date(tsMs).getUTCHours();
@@ -58,9 +60,40 @@ export async function generateDayCandles(params: {
     }
     if (bucket) bucket.volume += 1;
     prevClose = price;
+    if ((s & 4095) === 4095) {
+      await new Promise((r2) => setImmediate(r2));
+    }
   }
   if (bucket) candles.push(bucket);
   return candles;
+}
+
+export async function computeCloseUpToNow(params: {
+  pairId: string;
+  day: string;
+  basePrice: number;
+  volatility: number;
+  category: string;
+  seed: string;
+  sigmaMults: Map<number, number>;
+  upToSecond: number;
+}): Promise<number> {
+  const { pairId, day, basePrice, volatility, category, seed, sigmaMults, upToSecond } = params;
+  const startSec = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
+  let prevClose = basePrice;
+  const endSec = Math.min(upToSecond, SECONDS_PER_DAY);
+  for (let s = 0; s < endSec; s++) {
+    const tsMs = (startSec + s) * 1000;
+    const hour = new Date(tsMs).getUTCHours();
+    const sigmaMult = sigmaMults.get(hour) ?? 1;
+    const effVol = volatility * sigmaMult;
+    const r = computeSecond(seed, pairId, day, s, prevClose, basePrice, effVol, category, hour);
+    prevClose = r.close;
+    if ((s & 4095) === 4095) {
+      await new Promise((r2) => setImmediate(r2));
+    }
+  }
+  return prevClose;
 }
 
 export async function getDayCandlesWithCache(opts: {
@@ -155,6 +188,13 @@ export async function getDayCandlesWithCache(opts: {
   const regimes = await prisma.pairVolRegime.findMany({ where: { pairId, day } });
   const sigmaMults = new Map<number, number>();
   for (const r of regimes) sigmaMults.set(r.hour, Number(r.sigmaMult));
+  const todayStr = dayStringUTC(new Date());
+  let upToSecond: number | undefined;
+  if (day === todayStr) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const startSec = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
+    upToSecond = Math.max(0, Math.min(SECONDS_PER_DAY, nowSec - startSec));
+  }
   const candles = await generateDayCandles({
     pairId,
     day,
@@ -164,6 +204,7 @@ export async function getDayCandlesWithCache(opts: {
     category: pair.category,
     seed: seedRow.seed,
     sigmaMults,
+    upToSecond,
   });
   dayCache.set(cacheKey, { candles, ts: Date.now() });
   return { candles, verified: false, source: 'generated' };
