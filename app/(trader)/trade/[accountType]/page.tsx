@@ -12,7 +12,7 @@ import { TradingPanel } from '../../../components/TradingPanel';
 import { usePairWS, type CandleData } from '@/lib/use-ws';
 import { getServerNow, syncWithServer } from '@/lib/server-time';
 import {
-  TrendingUp, BarChart3, Square, ArrowUpRight,
+  TrendingUp, Square, ArrowUpRight,
   Minus, MoveHorizontal, ChevronRight,
   GitBranch, Pencil, Activity, Trash2, Maximize2, CandlestickChart,
   PenLine, ArrowRight, Eye, EyeOff, Settings, X,
@@ -45,12 +45,6 @@ interface Trade {
   payoutPercent?: number;
   expiresAt?: number;
 }
-
-const drawingGroups = [
-  { name: 'Line', icon: 'line', items: ['Trend Line', 'Horizontal Line', 'Horizontal Ray', 'Horizontal Segment', 'Ray Line', 'Extended Line'] },
-  { name: 'Fib', icon: 'fib', items: ['Fibonacci Retracement'] },
-  { name: 'Shapes', icon: 'shapes', items: ['Rectangle', 'Brush'] },
-];
 
 const TF_MS: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
 
@@ -210,7 +204,7 @@ function TopBar({
 }
 
 function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChange, onIndToggle, onDrawTool, onRemoveDrawings }: { timeframe: string; onTimeframeChange: (tf: string) => void; chartType: 'candle' | 'line' | 'area'; onChartTypeChange: (t: 'candle' | 'line' | 'area') => void; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void }) {
-  const [activeDrawGroup, setActiveDrawGroup] = useState<string | null>(null);
+  const [drawOpen, setDrawOpen] = useState(false);
   const [ctOpen, setCtOpen] = useState(false);
   const [tfOpen, setTfOpen] = useState(false);
 
@@ -227,34 +221,36 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
     'Arrow Marker': <ArrowUpRight size={14} />,
   };
 
-  const drawGroups = [
-    { name: 'Line', icon: <PenLine size={20} /> },
-    { name: 'Fib', icon: <BarChart3 size={20} /> },
-    { name: 'Shapes', icon: <Square size={20} /> },
+  const drawSections = [
+    { name: 'Line', items: ['Trend Line', 'Horizontal Line', 'Horizontal Ray', 'Horizontal Segment', 'Ray Line', 'Extended Line'] },
+    { name: 'Fibonacci', items: ['Fibonacci Retracement'] },
+    { name: 'Shapes', items: ['Rectangle', 'Brush', 'Arrow Marker'] },
   ];
 
   return (
-    <div className="w-11 bg-[#1a1e28] border-r border-[#242a38] flex-shrink-0 flex flex-col items-center py-2 gap-1 z-40 relative">
-      {drawGroups.map(g => (
-        <div key={g.name} className="relative">
-          <button title={g.name} onClick={() => setActiveDrawGroup(activeDrawGroup === g.name ? null : g.name)}
-            className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${activeDrawGroup === g.name ? 'bg-[#2a3142] text-white' : 'text-[#93a0b5] hover:bg-[#2a3142] hover:text-white'}`}>
-            {g.icon}
-          </button>
-          {activeDrawGroup === g.name && (
-            <div className="absolute left-full top-0 ml-1 w-52 bg-[#242a38] border border-[#31394c] rounded-xl shadow-2xl p-1.5 z-50">
-              <div className="px-2.5 py-1.5 text-[9px] font-bold text-[#5c677f] uppercase tracking-wider mb-1">{g.name} Tools</div>
-              {drawingGroups.find(dg => dg.name === g.name)?.items.map(item => (
-                <button key={item} onClick={() => { setActiveDrawGroup(null); onDrawTool(item); }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[11px] font-medium text-[#93a0b5] hover:text-white hover:bg-[#2a3142] rounded-lg transition-colors text-left">
-                  <span className="text-[#5c677f]">{toolIcons[item]}</span>
-                  {item}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+    <div className="w-11 bg-[#1a1e28] border-r border-[#242a38] flex-shrink-0 flex flex-col items-center py-2 gap-1 z-40 relative overflow-visible">
+      <div className="relative">
+        <button title="Drawing Tools" onClick={() => setDrawOpen(!drawOpen)}
+          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${drawOpen ? 'bg-[#2a3142] text-white' : 'text-[#93a0b5] hover:bg-[#2a3142] hover:text-white'}`}>
+          <PenLine size={20} />
+        </button>
+        {drawOpen && (
+          <div className="absolute left-full top-0 ml-1 w-52 max-h-[320px] overflow-y-auto bg-[#242a38] border border-[#31394c] rounded-xl shadow-2xl p-1.5 z-50">
+            {drawSections.map(sec => (
+              <div key={sec.name} className="mb-1 last:mb-0">
+                <div className="px-2.5 py-1.5 text-[9px] font-bold text-[#5c677f] uppercase tracking-wider">{sec.name}</div>
+                {sec.items.map(item => (
+                  <button key={item} onClick={() => { setDrawOpen(false); onDrawTool(item); }}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[11px] font-medium text-[#93a0b5] hover:text-white hover:bg-[#2a3142] rounded-lg transition-colors text-left">
+                    <span className="text-[#5c677f]">{toolIcons[item]}</span>
+                    {item}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="w-6 h-px bg-[#31394c] my-1" />
 
