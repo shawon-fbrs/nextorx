@@ -317,6 +317,66 @@ function SideToolbar({ timeframe, onTimeframeChange, onIndToggle, onDrawTool, on
   );
 }
 
+function InsufficientDialog({ open, isDemo, onClose }: { open: boolean; isDemo: boolean; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  if (!open) return null;
+
+  const topUpDemo = async () => {
+    setBusy(true);
+    setMsg('');
+    try {
+      const res = await fetch('/api/trade/demo-balance', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ balance: 10000 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(data.error || 'Top-up failed. Please try again.');
+        return;
+      }
+      window.dispatchEvent(new Event('balance-refresh'));
+      onClose();
+    } catch {
+      setMsg('Top-up failed. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
+      <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[380px] max-w-[calc(100%-2rem)] p-6 text-center" onClick={e => e.stopPropagation()}>
+        <div className="w-14 h-14 rounded-2xl bg-red/10 border border-red/20 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-7 h-7 text-red" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12 8v4m0 4h.01" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h3 className="text-base font-bold text-white mb-1.5">Insufficient balance</h3>
+        <p className="text-xs text-text-dark mb-5">
+          {isDemo ? 'Your demo balance is too low for this trade. Top up to $10,000 instantly and keep practicing.' : 'Your real balance is too low for this trade. Deposit funds to continue trading.'}
+        </p>
+        {msg && <p className="text-xs text-red font-semibold mb-3">{msg}</p>}
+        {isDemo ? (
+          <button onClick={topUpDemo} disabled={busy}
+            className="w-full bg-green hover:bg-green-hover disabled:opacity-50 text-white text-sm font-bold py-3 rounded-xl transition-colors mb-2">
+            {busy ? 'Topping up…' : 'Top up demo to $10,000'}
+          </button>
+        ) : (
+          <Link href="/deposit" className="block w-full bg-green hover:bg-green-hover text-white text-sm font-bold py-3 rounded-xl transition-colors mb-2 text-center">
+            Deposit now
+          </Link>
+        )}
+        <button onClick={onClose} className="w-full text-text hover:text-white text-xs font-semibold py-2 transition-colors">
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function IndDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [search, setSearch] = useState('');
   if (!open) return null;
@@ -428,7 +488,8 @@ export default function TradingPage() {
   const [timeSeconds, setTimeSeconds] = useState(0);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [tradeError, setTradeError] = useState('');
-  const [expiryMarks, setExpiryMarks] = useState<Array<{ id: string; x: number; y: number; left: string }>>([]);
+  const [insufficientOpen, setInsufficientOpen] = useState(false);
+  const [expiryMarks, setExpiryMarks] = useState<Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number }>>([]);
   const markerRef = useRef<Map<string, string[]>>(new Map());
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -637,7 +698,7 @@ export default function TradingPage() {
       prevActiveRef.current = nowActive;
       const activeIds = new Set(mapped.filter((t) => t.status === 'active').map((t) => t.id));
       for (const t of mapped) {
-        if (t.status === 'active' && !markerRef.current.has(t.id) && t.openPrice != null && t.expiresAt != null) {
+        if (t.status === 'active' && !markerRef.current.has(t.id) && t.openPrice != null && t.expiresAt != null && (!activePair || !t.pairId || t.pairId === activePair.id)) {
           try {
             const ids = chartRef.current?.drawTradeMarkers({
               entryPrice: t.openPrice,
@@ -659,7 +720,7 @@ export default function TradingPage() {
         }
       }
     } catch {}
-  }, [accountType]);
+  }, [accountType, activePair]);
 
   useEffect(() => {
     refreshTrades();
@@ -760,23 +821,32 @@ export default function TradingPage() {
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const updateMarks = () => {
       const now = getServerNow();
+      const marks: Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number }> = [];
       const nextCloseMs = now + (intervalMs - (now % intervalMs));
       const anchor = chartRef.current?.chartPixel(nextCloseMs, price) ?? chartRef.current?.chartPixel(now + intervalMs, price) ?? null;
-      if (!anchor) {
-        setExpiryMarks([]);
-        return;
+      if (anchor) {
+        const leftMs = intervalMs - (now % intervalMs);
+        const leftSec = Math.ceil(leftMs / 1000);
+        const mm = String(Math.floor(leftSec / 60)).padStart(2, '0');
+        const ss = String(leftSec % 60).padStart(2, '0');
+        marks.push({ id: 'candle', x: anchor.x, y: anchor.y, left: `${mm}:${ss}` });
       }
-      const leftMs = intervalMs - (now % intervalMs);
-      const leftSec = Math.ceil(leftMs / 1000);
-      const mm = String(Math.floor(leftSec / 60)).padStart(2, '0');
-      const ss = String(leftSec % 60).padStart(2, '0');
-      const label = `${mm}:${ss}`;
-      setExpiryMarks([{ id: 'candle', x: anchor.x, y: anchor.y, left: label }]);
+      const liveTrades = trades.filter((t) => t.status === 'active' && t.openPrice != null && t.expiresAt != null && (!activePair || !t.pairId || t.pairId === activePair.id));
+      liveTrades.forEach((t, i) => {
+        const pt = chartRef.current?.chartPixel(t.timestamp, t.openPrice as number) ?? null;
+        if (!pt) return;
+        const remainSec = Math.max(0, Math.ceil(((t.expiresAt as number) - now) / 1000));
+        const mm = String(Math.floor(remainSec / 60)).padStart(2, '0');
+        const ss = String(remainSec % 60).padStart(2, '0');
+        const amt = Number.isInteger(t.amount) ? `$${t.amount}` : `$${t.amount.toFixed(2)}`;
+        marks.push({ id: `trade:${t.id}`, x: pt.x, y: pt.y, left: `${mm}:${ss}`, amount: amt, dir: t.type, stack: i });
+      });
+      setExpiryMarks(marks);
     };
     updateMarks();
     const timer = setInterval(updateMarks, 250);
     return () => clearInterval(timer);
-  }, [price, timeframe]);
+  }, [price, timeframe, trades, activePair]);
 
   const handleTrade = useCallback(async (type: 'up' | 'down') => {
     if (!activePair) return;
@@ -798,7 +868,12 @@ export default function TradingPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setTradeError(data.error || 'Trade failed. Please try again.');
+        const msg = data.error || 'Trade failed. Please try again.';
+        if (/insufficient balance/i.test(msg)) {
+          setInsufficientOpen(true);
+        } else {
+          setTradeError(msg);
+        }
         return;
       }
 
@@ -851,6 +926,7 @@ export default function TradingPage() {
       <div className="flex-1 flex min-w-0 overflow-hidden">
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
+          <InsufficientDialog open={insufficientOpen} isDemo={accountType === 'demo'} onClose={() => setInsufficientOpen(false)} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={handleSelectPair} onClose={handleClosePair} />
             {!activePair ? (
@@ -885,14 +961,25 @@ export default function TradingPage() {
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
                 {expiryMarks.map((m) => (
-                  <div
-                    key={m.id}
-                    className="absolute z-40 pointer-events-none px-1.5 py-0.5 rounded bg-blue text-white text-[10px] font-mono font-bold tabular-nums whitespace-nowrap"
-                    style={{ left: Math.max(4, m.x + 10), top: m.y - 10 }}
-                    title="Time to candle close"
-                  >
-                    {m.left}
-                  </div>
+                  m.id === 'candle' ? (
+                    <div
+                      key={m.id}
+                      className="absolute z-40 pointer-events-none px-1.5 py-0.5 rounded bg-blue text-white text-[10px] font-mono font-bold tabular-nums whitespace-nowrap"
+                      style={{ left: Math.max(4, m.x + 10), top: m.y - 10 }}
+                      title="Time to candle close"
+                    >
+                      {m.left}
+                    </div>
+                  ) : (
+                    <div
+                      key={m.id}
+                      className={`absolute z-40 pointer-events-none px-1.5 py-0.5 rounded text-white text-[10px] font-mono font-bold tabular-nums whitespace-nowrap ${m.dir === 'down' ? 'bg-red' : 'bg-green'}`}
+                      style={{ left: Math.max(4, m.x + 6), top: m.y - 10 + (m.stack ?? 0) * 18 }}
+                      title={`Expires in ${m.left}`}
+                    >
+                      {m.amount} • {m.left}
+                    </div>
+                  )
                 ))}
 
                 {isComingSoon && (
