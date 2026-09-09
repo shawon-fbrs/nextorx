@@ -833,14 +833,17 @@ export default function TradingPage() {
       }
       const liveTrades = trades.filter((t) => t.status === 'active' && t.openPrice != null && t.expiresAt != null && (!activePair || !t.pairId || t.pairId === activePair.id));
       liveTrades.forEach((t, i) => {
-        const backTs = t.timestamp - 2 * intervalMs;
-        const pt = chartRef.current?.chartPixel(backTs, t.openPrice as number) ?? null;
-        if (!pt) return;
+        const entryPt = chartRef.current?.chartPixel(t.timestamp, t.openPrice as number) ?? null;
+        if (!entryPt) return;
+        const prevPt = chartRef.current?.chartPixel(t.timestamp - intervalMs, t.openPrice as number) ?? null;
+        const pxCandle = prevPt && Math.abs(entryPt.x - prevPt.x) > 0 ? Math.abs(entryPt.x - prevPt.x) : 8;
+        const labelW = 104;
+        const x = entryPt.x - 2 * pxCandle - i * (labelW + 8);
         const remainSec = Math.max(0, Math.ceil(((t.expiresAt as number) - now) / 1000));
         const mm = String(Math.floor(remainSec / 60)).padStart(2, '0');
         const ss = String(remainSec % 60).padStart(2, '0');
         const amt = Number.isInteger(t.amount) ? `$${t.amount}` : `$${t.amount.toFixed(2)}`;
-        marks.push({ id: `trade:${t.id}`, x: pt.x, y: pt.y, left: `${mm}:${ss}`, amount: amt, dir: t.type, stack: i });
+        marks.push({ id: `trade:${t.id}`, x, y: entryPt.y, left: `${mm}:${ss}`, amount: amt, dir: t.type, stack: i });
       });
       setExpiryMarks(marks);
     };
@@ -975,7 +978,7 @@ export default function TradingPage() {
                     <div
                       key={m.id}
                       className={`absolute z-40 pointer-events-none px-1.5 py-0.5 rounded text-white text-[10px] font-mono font-bold tabular-nums whitespace-nowrap ${m.dir === 'down' ? 'bg-red' : 'bg-green'}`}
-                      style={{ left: Math.max(4, m.x + 6), top: m.y - 10 + (m.stack ?? 0) * 18 }}
+                      style={{ left: m.x >= 4 ? m.x : 4 + (m.stack ?? 0) * 112, top: m.y - 10 }}
                       title={`Expires in ${m.left}`}
                     >
                       {m.amount} • {m.left}
