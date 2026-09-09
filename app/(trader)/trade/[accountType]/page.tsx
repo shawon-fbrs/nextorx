@@ -517,7 +517,7 @@ export default function TradingPage() {
   const [hoverDir, setHoverDir] = useState<'up' | 'down' | null>(null);
   const [viewSeq, setViewSeq] = useState(0);
   const handleViewChange = useCallback(() => setViewSeq((s) => (s + 1) % 1000000), []);
-  const [expiryMarks, setExpiryMarks] = useState<Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number; kind?: 'pill' | 'dot' }>>([]);
+  const [expiryMarks, setExpiryMarks] = useState<Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number; kind?: 'pill' | 'dot'; ex?: number }>>([]);
   const [results, setResults] = useState<Array<{ id: string; x: number; y: number; text: string; atPrice: string; won: boolean }>>([]);
   const priceRef = useRef(0);
   const markerRef = useRef<Map<string, string[]>>(new Map());
@@ -863,7 +863,7 @@ export default function TradingPage() {
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const updateMarks = () => {
       const now = getServerNow();
-      const marks: Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number; kind?: 'pill' | 'dot' }> = [];
+      const marks: Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number; kind?: 'pill' | 'dot'; ex?: number }> = [];
       const nextCloseMs = now + (intervalMs - (now % intervalMs));
       const anchor = chartRef.current?.chartPixel(nextCloseMs, price) ?? chartRef.current?.chartPixel(now + intervalMs, price) ?? null;
       if (anchor) {
@@ -896,7 +896,7 @@ export default function TradingPage() {
         const mm = String(Math.floor(remainSec / 60)).padStart(2, '0');
         const ss = String(remainSec % 60).padStart(2, '0');
         const amt = Number.isInteger(t.amount) ? `$${t.amount}` : `$${t.amount.toFixed(2)}`;
-        marks.push({ id: `trade:${t.id}`, x, y: entryPt.y, left: `${mm}:${ss}`, amount: amt, dir: t.type, stack: i, kind: 'pill' });
+        marks.push({ id: `trade:${t.id}`, x, y: entryPt.y, left: `${mm}:${ss}`, amount: amt, dir: t.type, stack: i, kind: 'pill', ex: entryPt.x });
         marks.push({ id: `dot-start:${t.id}`, x: entryPt.x, y: entryPt.y, left: '', dir: t.type, stack: i, kind: 'dot' });
         const lineEnd = markerEndMs(t.timestamp, t.expiresAt as number, timeframe);
         const endPt = chartRef.current?.chartPixel(lineEnd, openPrice) ?? null;
@@ -1050,6 +1050,19 @@ export default function TradingPage() {
                     </>
                   );
                 })()}
+                {expiryMarks.filter((m) => m.id !== 'candle' && m.kind !== 'dot' && m.ex != null && Math.abs(m.ex - (m.x + 104)) > 4).map((m) => (
+                  <div
+                    key={`line:${m.id}`}
+                    className="absolute z-30 pointer-events-none"
+                    style={{
+                      left: Math.min(m.x + 104, m.ex as number),
+                      top: m.y,
+                      width: Math.abs((m.ex as number) - (m.x + 104)),
+                      height: 1,
+                      backgroundColor: m.dir === 'down' ? 'rgba(255,73,84,0.55)' : 'rgba(0,195,101,0.55)',
+                    }}
+                  />
+                ))}
                 {expiryMarks.map((m) => (
                   m.id === 'candle' ? (
                     <div
