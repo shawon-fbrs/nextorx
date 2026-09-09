@@ -876,22 +876,21 @@ export default function TradingPage() {
       const liveTrades = trades.filter((t) => t.status === 'active' && t.openPrice != null && t.expiresAt != null && (!activePair || !t.pairId || t.pairId === activePair.id));
       const labelW = 104;
       const gap = 2;
-      const edge = 16;
-      const livePt = chartRef.current?.chartPixel(now, price) ?? null;
+      const placed: Array<{ x: number; y: number }> = [];
       liveTrades.forEach((t, i) => {
         const openPrice = t.openPrice as number;
         const entryPt = chartRef.current?.chartPixel(t.timestamp, openPrice) ?? null;
         if (!entryPt) return;
-        let x: number;
-        if (livePt) {
-          x = livePt.x - edge - (i + 1) * labelW - i * gap;
-        } else if (anchor) {
-          x = anchor.x - edge - (i + 1) * labelW - i * gap;
-        } else {
-          const prevPt = chartRef.current?.chartPixel(t.timestamp - intervalMs, openPrice) ?? null;
-          const pxCandle = prevPt && Math.abs(entryPt.x - prevPt.x) > 0 ? Math.abs(entryPt.x - prevPt.x) : 8;
-          x = entryPt.x - 2 * pxCandle - i * (labelW + gap);
+        const prevPt = chartRef.current?.chartPixel(t.timestamp - intervalMs, openPrice) ?? null;
+        const pxCandle = prevPt && Math.abs(entryPt.x - prevPt.x) > 0 ? Math.abs(entryPt.x - prevPt.x) : 8;
+        let x = entryPt.x - 2 * pxCandle;
+        let guard = 0;
+        while (guard++ < 12) {
+          const hit = placed.find((p) => Math.abs(p.y - entryPt.y) < 16 && Math.abs(p.x - x) < labelW + gap);
+          if (!hit) break;
+          x = hit.x - (labelW + gap);
         }
+        placed.push({ x, y: entryPt.y });
         const remainSec = Math.max(0, Math.ceil(((t.expiresAt as number) - now) / 1000));
         const mm = String(Math.floor(remainSec / 60)).padStart(2, '0');
         const ss = String(remainSec % 60).padStart(2, '0');
@@ -1089,7 +1088,7 @@ export default function TradingPage() {
                     <div
                       key={m.id}
                       className={`absolute z-40 pointer-events-none px-1.5 py-0.5 rounded text-white text-[10px] font-mono font-bold tabular-nums whitespace-nowrap ${m.dir === 'down' ? 'bg-red' : 'bg-green'}`}
-                      style={{ left: m.x >= 4 ? m.x : 4 + (m.stack ?? 0) * 112, top: m.y - 10 }}
+                      style={{ left: Math.max(4, m.x), top: m.y - 10 }}
                       title={`Expires in ${m.left}`}
                     >
                       {m.amount} • {m.left}
