@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { LeaderboardDrawer } from './LeaderboardDrawer';
 
 interface SidebarProps {
   expanded: boolean;
@@ -16,7 +18,6 @@ function getAccountTypeFromPath(pathname: string): string {
 
 const getNavItems = (accountType: string): Array<{ icon: string; label: string; href: string }> => [
   { icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', label: 'Trade', href: `/trade/${accountType}` },
-  { icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z', label: 'Leaderboard', href: '/leaderboard' },
   { icon: 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', label: 'Support', href: '/support' },
   { icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', label: 'Account', href: '/account' },
 ];
@@ -35,11 +36,13 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useAuth();
+  const [boardOpen, setBoardOpen] = useState(false);
   const accountType = getAccountTypeFromPath(pathname);
   const navItems = getNavItems(accountType);
   const moreItems = getMoreItems();
 
   return (
+    <>
     <aside
       className={`bg-background border-r border-border flex flex-col justify-between flex-shrink-0 z-30 transition-all duration-300 ${
         expanded ? 'w-52' : 'w-[72px]'
@@ -93,6 +96,24 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
               </Link>
             );
           })}
+          <button
+            onClick={() => setBoardOpen(true)}
+            title={expanded ? undefined : 'Leaderboard'}
+            className={`flex items-center gap-3 rounded-xl transition-colors relative group w-full text-left ${
+              expanded ? 'px-4 py-2' : 'justify-center py-2.5 px-0 w-12'
+            } text-text hover:bg-surface hover:text-foreground`}
+          >
+            <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+            </svg>
+            {expanded ? (
+              <span className="text-sm font-medium">Leaderboard</span>
+            ) : (
+              <span className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 whitespace-nowrap bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs font-semibold text-foreground hidden group-hover:block z-50">
+                Leaderboard
+              </span>
+            )}
+          </button>
           {expanded && (
             <span className="text-[10px] font-bold text-text-dark uppercase tracking-wider px-4 pt-2">Wallet</span>
           )}
@@ -143,5 +164,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
         </button>
       </div>
     </aside>
+    <LeaderboardDrawer open={boardOpen} onClose={() => setBoardOpen(false)} />
+    </>
   );
 }
