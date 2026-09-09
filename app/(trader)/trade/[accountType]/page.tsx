@@ -1057,10 +1057,8 @@ export default function TradingPage() {
                     style={{
                       left: 0,
                       right: 0,
-                      top: m.y - 0.5,
-                      height: 2,
-                      backgroundColor: m.dir === 'down' ? 'rgba(255,73,84,0.9)' : 'rgba(0,195,101,0.9)',
-                      boxShadow: m.dir === 'down' ? '0 0 6px rgba(255,73,84,0.6)' : '0 0 6px rgba(0,195,101,0.6)',
+                      top: m.y,
+                      borderTop: m.dir === 'down' ? '1px dashed rgba(255,73,84,0.85)' : '1px dashed rgba(0,195,101,0.85)',
                     }}
                   />
                 ))}
