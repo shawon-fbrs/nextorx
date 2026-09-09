@@ -281,7 +281,7 @@ function SideToolbar({ timeframe, onTimeframeChange, onIndToggle, onDrawTool, on
           <div className="absolute left-full top-0 ml-1 w-40 bg-[#242a38] border border-[#31394c] rounded-lg shadow-2xl p-1.5 z-50">
             <div className="text-[9px] font-bold text-[#5c677f] uppercase tracking-wider mb-1.5 px-1">Timeframe</div>
             <div className="grid grid-cols-3 gap-1">
-              {['5s', '30s', '1m', '5m', '15m', '30m', '1h', '4h', '1d'].map(tf => (
+              {['5s', '30s', '1m', '5m', '15m', '30m', '1h', '4h'].map(tf => (
                 <button key={tf} onClick={() => { onTimeframeChange(tf); setTfOpen(false); }}
                   className={`py-1.5 text-[11px] font-semibold rounded-md transition-all ${timeframe === tf ? 'bg-blue-500 text-white' : 'text-[#93a0b5] hover:bg-[#2a3142] hover:text-white'}`}>
                   {tf}
@@ -740,7 +740,7 @@ export default function TradingPage() {
   }, []);
 
   useEffect(() => {
-    const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
+    const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const update = () => {
       const now = getServerNow();
@@ -756,7 +756,7 @@ export default function TradingPage() {
   }, [timeframe]);
 
   useEffect(() => {
-    const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
+    const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const updateMarks = () => {
       const now = getServerNow();

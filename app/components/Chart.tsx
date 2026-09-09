@@ -98,7 +98,7 @@ const CUSTOM_OVERLAYS: Array<{
 
 CUSTOM_OVERLAYS.forEach(o => registerOverlay(o));
 
-const PERIOD_MAP: Record<string, { span: number; type: 'second' | 'minute' | 'hour' | 'day' }> = {
+const PERIOD_MAP: Record<string, { span: number; type: 'second' | 'minute' | 'hour' }> = {
   '5s': { span: 5, type: 'second' },
   '30s': { span: 30, type: 'second' },
   '1m': { span: 1, type: 'minute' },
@@ -107,7 +107,6 @@ const PERIOD_MAP: Record<string, { span: number; type: 'second' | 'minute' | 'ho
   '30m': { span: 30, type: 'minute' },
   '1h': { span: 1, type: 'hour' },
   '4h': { span: 4, type: 'hour' },
-  '1d': { span: 1, type: 'day' },
 };
 
 const INTERVAL_MS_MAP: Record<string, number> = {
@@ -119,7 +118,6 @@ const INTERVAL_MS_MAP: Record<string, number> = {
   '30m': 1_800_000,
   '1h': 3_600_000,
   '4h': 14_400_000,
-  '1d': 86_400_000,
 };
 
 function storageKey(pairId: string, timeframe: string): string {
