@@ -68,7 +68,7 @@ export default function ReportsPage() {
                 <tbody>
                   {exposure.map((a) => (
                     <tr key={a.pairId} className="border-b border-border/50">
-                      <td className="px-3 py-2 text-sm font-medium text-white">{a.pairName}</td>
+                      <td className="px-3 py-2 text-sm font-medium text-foreground">{a.pairName}</td>
                       <td className="px-3 py-2 text-sm text-green text-right">${(a.up / 100).toFixed(2)}</td>
                       <td className="px-3 py-2 text-sm text-red text-right">${(a.down / 100).toFixed(2)}</td>
                       <td className={`px-3 py-2 text-sm text-right font-semibold ${a.net >= 0 ? 'text-green' : 'text-red'}`}>
@@ -100,7 +100,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Reports & Analytics</h1>
+        <h1 className="text-xl font-bold text-foreground">Reports & Analytics</h1>
         <p className="text-sm text-textDark">Platform performance and analytics</p>
       </div>
 
@@ -137,7 +137,7 @@ export default function ReportsPage() {
                     <tbody>
                       {pnl.byPair.map((a) => (
                         <tr key={a.pairId} className="border-b border-border/50">
-                          <td className="px-3 py-2 text-sm font-medium text-white">{a.pairName}</td>
+                          <td className="px-3 py-2 text-sm font-medium text-foreground">{a.pairName}</td>
                           <td className="px-3 py-2 text-sm text-text text-right">{a.trades}</td>
                           <td className="px-3 py-2 text-sm text-text text-right">${(a.volume / 100).toFixed(2)}</td>
                           <td className={`px-3 py-2 text-sm text-right font-semibold ${a.gross >= 0 ? 'text-green' : 'text-red'}`}>${(a.gross / 100).toFixed(2)}</td>
@@ -237,7 +237,7 @@ export default function ReportsPage() {
                 <tbody>
                   {stats.topAssets.map((a) => (
                     <tr key={a.name} className="border-b border-border/50">
-                      <td className="px-3 py-2 text-sm font-medium text-white">{a.name}</td>
+                      <td className="px-3 py-2 text-sm font-medium text-foreground">{a.name}</td>
                       <td className="px-3 py-2 text-sm text-text text-right">{a.trades}</td>
                       <td className="px-3 py-2 text-sm text-text text-right">${(a.volume / 100).toFixed(2)}</td>
                       <td className="px-3 py-2 text-sm text-right"><span className={a.winRate >= 49 ? 'text-green' : 'text-orange'}>{a.winRate}%</span></td>

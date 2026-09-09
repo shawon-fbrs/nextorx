@@ -1,21 +1,57 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #eef1f6;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-hover: #e8edf4;
+  --border: #dbe2ec;
+  --text: #475569;
+  --text-light: #0f172a;
+  --text-dark: #94a3b8;
+  --green: #00c365;
+  --green-hover: #00a955;
+  --red: #ff4954;
+  --red-hover: #e63e48;
+  --blue: #007aff;
+  --orange: #ff8c00;
+}
+
+.dark {
+  --background: #1a1e28;
+  --foreground: #e4e8f0;
+  --surface: #242a38;
+  --surface-hover: #2a3142;
+  --border: #31394c;
+  --text: #93a0b5;
+  --text-light: #e4e8f0;
+  --text-dark: #5c677f;
+  --green: #00c365;
+  --green-hover: #00d66f;
+  --red: #ff4954;
+  --red-hover: #ff5a64;
+  --blue: #007aff;
+  --orange: #ff8c00;
+}
+
 @theme inline {
-  --color-background: #1a1e28;
-  --color-foreground: #e4e8f0;
-  --color-surface: #242a38;
-  --color-surface-hover: #2a3142;
-  --color-border: #31394c;
-  --color-text: #93a0b5;
-  --color-text-light: #e4e8f0;
-  --color-text-dark: #5c677f;
-  --color-green: #00c365;
-  --color-green-hover: #00d66f;
-  --color-red: #ff4954;
-  --color-red-hover: #ff5a64;
-  --color-blue: #007aff;
-  --color-orange: #ff8c00;
-  --color-surfaceHover: #2a3142;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-light: var(--text-light);
+  --color-text-dark: var(--text-dark);
+  --color-green: var(--green);
+  --color-green-hover: var(--green-hover);
+  --color-red: var(--red);
+  --color-red-hover: var(--red-hover);
+  --color-blue: var(--blue);
+  --color-orange: var(--orange);
+  --color-surfaceHover: var(--surface-hover);
   --font-sans: 'Roboto', Arial, Helvetica, sans-serif;
 }
 
@@ -26,8 +62,8 @@
 html, body {
   height: 100%;
   width: 100%;
-  background-color: #1a1e28;
-  color: #93a0b5;
+  background-color: var(--background);
+  color: var(--text);
   font-family: 'Roboto', Arial, Helvetica, sans-serif;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
@@ -38,14 +74,14 @@ html, body {
   width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #1a1e28;
+  background: var(--background);
 }
 ::-webkit-scrollbar-thumb {
-  background: #31394c;
+  background: var(--border);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #5c677f;
+  background: var(--text-dark);
 }
 
 input[type="text"]:focus,

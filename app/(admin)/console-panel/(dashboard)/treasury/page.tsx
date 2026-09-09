@@ -60,7 +60,7 @@ export default function TreasuryPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">Treasury</h1>
+          <h1 className="text-xl font-bold text-foreground">Treasury</h1>
           <p className="text-sm text-textDark">Real-time financial overview</p>
         </div>
         <Badge variant={reservePercent > 30 ? 'success' : reservePercent > 20 ? 'warning' : 'danger'}>
@@ -73,7 +73,7 @@ export default function TreasuryPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <p className="text-[11px] text-textDark uppercase tracking-wider mb-1">Total Treasury Balance</p>
-              <p className="text-4xl font-bold text-white mb-4">${(snap.totalBalance / 100).toFixed(2)}</p>
+              <p className="text-4xl font-bold text-foreground mb-4">${(snap.totalBalance / 100).toFixed(2)}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-[11px] text-textDark uppercase">User Liabilities</p>
@@ -96,7 +96,7 @@ export default function TreasuryPage() {
                   <circle cx="50" cy="50" r="40" fill="none" stroke={reservePercent > 30 ? '#00c365' : reservePercent > 20 ? '#ff8c00' : '#ff4954'} strokeWidth="8" strokeDasharray={`${reservePercent * 2.51} 251`} strokeLinecap="round" transform="rotate(-90 50 50)" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-2xl font-bold text-white">{reservePercent}%</p>
+                  <p className="text-2xl font-bold text-foreground">{reservePercent}%</p>
                   <p className="text-[10px] text-textDark">Reserve</p>
                 </div>
               </div>

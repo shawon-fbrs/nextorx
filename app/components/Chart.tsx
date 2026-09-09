@@ -35,6 +35,9 @@ export interface ActiveIndicator {
 
 export interface ChartHandle {
   setChartType: (t: 'candle' | 'line' | 'area') => void;
+  setTheme: (mode: 'dark' | 'light') => void;
+  isAtRealTime: () => boolean;
+  scrollToRealTime: (duration?: number) => void;
   getSupportedIndicators: () => string[];
   addIndicator: (name: string, overlay: boolean) => string | null;
   getActiveIndicators: () => ActiveIndicator[];
@@ -130,6 +133,10 @@ const CUSTOM_OVERLAYS: Array<{
       const x1 = Math.max(c0.x, c1.x);
       if (x1 - x0 < 2) return [];
       const precision = chart?.getSymbol?.()?.pricePrecision ?? 5;
+      let labelColor = '#e4e8f0';
+      try {
+        if (typeof document !== 'undefined' && !document.documentElement.classList.contains('dark')) labelColor = '#0f172a';
+      } catch {}
       const percents = [1, 0.786, 0.618, 0.5, 0.382, 0.236, 0];
       const yDif = c0.y - c1.y;
       const valueDif = v0 - v1;
@@ -143,7 +150,7 @@ const CUSTOM_OVERLAYS: Array<{
         const y = c1.y + yDif * percent;
         const value = (v1 + valueDif * percent).toFixed(precision);
         figs.push({ type: 'line', key: `fib-line-${i}`, attrs: { coordinates: [{ x: x0, y }, { x: x1, y }] }, styles: { style: 'solid', size: 1, color: 'rgba(0,122,255,0.9)' } });
-        figs.push({ type: 'text', key: `fib-text-${i}`, attrs: { x: x1 - 4, y, text: `${value} (${(percent * 100).toFixed(1)}%)`, align: 'right', baseline: 'bottom' }, styles: { color: '#e4e8f0', size: 10 } });
+        figs.push({ type: 'text', key: `fib-text-${i}`, attrs: { x: x1 - 4, y, text: `${value} (${(percent * 100).toFixed(1)}%)`, align: 'right', baseline: 'bottom' }, styles: { color: labelColor, size: 10 } });
       });
       return figs;
     },
@@ -194,6 +201,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     try { onViewChangeRef.current?.(); } catch {}
   }, []);
   const subscribeBarCallbackRef = useRef<((data: KLineData) => void) | null>(null);
+  const chartTypeRef = useRef<'candle' | 'line' | 'area'>('candle');
   const barsCacheRef = useRef<Map<string, KLineData[]>>(new Map());
   const bucketStartRef = useRef<number | null>(null);
   const bucketBaseRef = useRef<KLineData | null>(null);
@@ -346,6 +354,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   const applyChartType = useCallback((t: string) => {
     const chart = chartRef.current;
     if (!chart) return;
+    if (t === 'candle' || t === 'line' || t === 'area') chartTypeRef.current = t;
     try {
       if (t === 'line') {
         chart.setStyles({
@@ -410,8 +419,56 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     }
   }, []);
 
+  const applyTooltipTemplate = useCallback(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    try {
+      chart.setStyles({
+        candle: {
+          tooltip: {
+            legend: {
+              template: [
+                { title: 'time', value: '{time}' },
+                { title: 'open', value: '{open}' },
+                { title: 'high', value: '{high}' },
+                { title: 'low', value: '{low}' },
+                { title: 'close', value: '{close}' },
+              ],
+            },
+          },
+        },
+      } as never);
+    } catch {}
+  }, []);
+
   useImperativeHandle(ref, () => ({
     setChartType: (t: 'candle' | 'line' | 'area') => { applyChartType(t); },
+    setTheme: (mode: 'dark' | 'light') => {
+      const chart = chartRef.current;
+      if (!chart) return;
+      try {
+        chart.setStyles(mode === 'light' ? 'light' : 'dark' as never);
+      } catch {}
+      applyChartType(chartTypeRef.current);
+      applyTooltipTemplate();
+    },
+    isAtRealTime: () => {
+      try {
+        const chart = chartRef.current;
+        if (!chart) return true;
+        const vr = chart.getVisibleRange() as unknown as { realTo?: number };
+        const n = chart.getDataList()?.length ?? 0;
+        if (!n) return true;
+        return (vr?.realTo ?? n) >= n - 1;
+      } catch {
+        return true;
+      }
+    },
+    scrollToRealTime: (duration?: number) => {
+      try {
+        chartRef.current?.scrollToRealTime(duration ?? 200);
+      } catch {}
+    },
     getSupportedIndicators: () => {
       try {
         return getLibSupportedIndicators() ?? [];
@@ -646,22 +703,10 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         if (stored === 'line' || stored === 'area') applyChartType(stored);
       } catch {}
       try {
-        chart.setStyles({
-          candle: {
-            tooltip: {
-              legend: {
-                template: [
-                  { title: 'time', value: '{time}' },
-                  { title: 'open', value: '{open}' },
-                  { title: 'high', value: '{high}' },
-                  { title: 'low', value: '{low}' },
-                  { title: 'close', value: '{close}' },
-                ],
-              },
-            },
-          },
-        } as never);
+        const storedTheme = localStorage.getItem('nextorx:theme');
+        if (storedTheme === 'light') chart.setStyles('light' as never);
       } catch {}
+      applyTooltipTemplate();
       try {
         const inds = chart.getIndicators({}) as unknown as Array<{ id?: string; name?: string }>;
         for (const ind of inds) {
@@ -828,7 +873,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   }, [currentCandle, currentPrice, timeframe, serverTime]);
 
   return (
-    <div className="absolute inset-0 bg-[#161a22] overflow-hidden">
+    <div className="absolute inset-0 bg-background overflow-hidden">
       <div ref={chartContainerRef} id={chartIdRef.current} className="absolute inset-0" />
     </div>
   );

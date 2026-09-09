@@ -78,7 +78,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Dashboard</h1>
+        <h1 className="text-xl font-bold text-foreground">Dashboard</h1>
         <p className="text-sm text-textDark">Overview of your platform</p>
       </div>
 
@@ -211,7 +211,7 @@ export default function DashboardPage() {
                 ) : (
                   stats.topAssets.map((asset) => (
                     <tr key={asset.name} className="border-b border-border/50 hover:bg-surface-hover/50">
-                      <td className="px-4 py-3 text-sm font-medium text-white">{asset.name}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-foreground">{asset.name}</td>
                       <td className="px-4 py-3 text-sm text-text">{asset.trades.toLocaleString()}</td>
                       <td className="px-4 py-3 text-sm text-text">${(asset.volume / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="px-4 py-3 text-sm">

@@ -82,7 +82,7 @@ export function TradingPanel({
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => onTimeChange(-10)}
-              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-white hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -97,9 +97,9 @@ export function TradingPanel({
                 }}
                 min={0}
                 max={60}
-                className="w-12 bg-surface border border-border rounded-lg px-1 py-1 text-white font-bold text-lg text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-12 bg-surface border border-border rounded-lg px-1 py-1 text-foreground font-bold text-lg text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-              <span className="text-white font-bold">:</span>
+              <span className="text-foreground font-bold">:</span>
               <input
                 type="number"
                 value={String(timeSeconds).padStart(2, '0')}
@@ -110,11 +110,11 @@ export function TradingPanel({
                 }}
                 min={0}
                 max={59}
-                className="w-12 bg-surface border border-border rounded-lg px-1 py-1 text-white font-bold text-lg text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-12 bg-surface border border-border rounded-lg px-1 py-1 text-foreground font-bold text-lg text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
             <button onClick={() => onTimeChange(10)}
-              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-white hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -127,8 +127,8 @@ export function TradingPanel({
                 <button key={t} onClick={() => onTimeSet(m, s)}
                   className={`flex-1 py-1 text-[9px] font-semibold rounded-md transition-all border ${
                     currentQuick === t
-                      ? 'text-white bg-blue/15 border-blue/40'
-                      : 'text-textDark bg-surface border-transparent hover:text-white hover:bg-surface-hover hover:border-border'
+                      ? 'text-foreground bg-blue/15 border-blue/40'
+                      : 'text-textDark bg-surface border-transparent hover:text-foreground hover:bg-surface-hover hover:border-border'
                   }`}>
                   {t}
                 </button>
@@ -145,14 +145,14 @@ export function TradingPanel({
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setInvestment(Math.max(1, investment - 1))}
-              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-white hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
             <div className="flex-1 flex flex-col items-center">
               <div className="flex items-center gap-1">
-                <span className="text-white font-bold text-lg">$</span>
+                <span className="text-foreground font-bold text-lg">$</span>
                 <input
                   type="number"
                   value={investment}
@@ -163,13 +163,13 @@ export function TradingPanel({
                   }}
                   min={1}
                   max={1000}
-                  className="w-16 bg-surface border border-border rounded-lg px-2 py-1 text-white font-bold text-lg text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-16 bg-surface border border-border rounded-lg px-2 py-1 text-foreground font-bold text-lg text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
               <span className="text-[9px] text-textDark mt-0.5">amount</span>
             </div>
             <button onClick={() => setInvestment(Math.min(1000, investment + 1))}
-              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-white hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -180,8 +180,8 @@ export function TradingPanel({
               <button key={amt} onClick={() => setInvestment(amt)}
                 className={`flex-1 py-1 text-[9px] font-semibold rounded-md transition-all border ${
                   investment === amt
-                    ? 'text-white bg-blue/15 border-blue/40'
-                    : 'text-textDark bg-surface border-transparent hover:text-white hover:bg-surface-hover hover:border-border'
+                    ? 'text-foreground bg-blue/15 border-blue/40'
+                    : 'text-textDark bg-surface border-transparent hover:text-foreground hover:bg-surface-hover hover:border-border'
                 }`}>
                 ${amt}
               </button>
@@ -272,7 +272,7 @@ export function TradingPanel({
                           </svg>
                         </div>
                         <div>
-                          <span className="text-white text-[11px] font-semibold block leading-tight">{t.symbol}</span>
+                          <span className="text-foreground text-[11px] font-semibold block leading-tight">{t.symbol}</span>
                           <span className="text-[9px] text-textDark">{isActive ? `${t.amount > 0 ? `$${t.amount}` : ''} · ${t.payoutPercent ?? symbol.payoutPercent ?? symbol.payout}%` : t.time}</span>
                         </div>
                       </div>
@@ -306,12 +306,12 @@ export function TradingPanel({
                         <div className="space-y-2.5">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-textDark">Open Price</span>
-                            <span className="text-[11px] text-white font-mono font-semibold">{t.openPrice?.toFixed(5) ?? '—'}</span>
+                            <span className="text-[11px] text-foreground font-mono font-semibold">{t.openPrice?.toFixed(5) ?? '—'}</span>
                           </div>
                           {!isActive && (
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] text-textDark">Close Price</span>
-                              <span className="text-[11px] text-white font-mono font-semibold">{t.closePrice?.toFixed(5) ?? '—'}</span>
+                              <span className="text-[11px] text-foreground font-mono font-semibold">{t.closePrice?.toFixed(5) ?? '—'}</span>
                             </div>
                           )}
                           {isActive && t.expiresAt && (
@@ -323,7 +323,7 @@ export function TradingPanel({
                           <div className="h-px bg-border/40"></div>
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-textDark">Investment</span>
-                            <span className="text-[11px] text-white font-semibold">${t.amount}</span>
+                            <span className="text-[11px] text-foreground font-semibold">${t.amount}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-textDark">Payout</span>

@@ -4,6 +4,7 @@ import { useState, useEffect, ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { useTheme } from '@/lib/theme';
 
 export type AccountType = 'demo' | 'real' | 'funded' | 'tournament';
 
@@ -57,6 +58,7 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
   const accountTypeMatch = pathname.match(/\/trade\/(\w+)/);
   const accountType = (accountTypeMatch ? accountTypeMatch[1] : 'real') as AccountType;
   const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -121,21 +123,37 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
     <header className="h-16 min-w-full bg-background border-b border-border flex items-center z-[100] flex-shrink-0 px-4 gap-4">
       <div className="flex items-center gap-4">
         <Link href={`/trade/${accountType}`} className="flex items-center gap-4">
-          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24">
+          <svg className="w-7 h-7 text-foreground" fill="none" viewBox="0 0 24 24">
             <rect fill="currentColor" height="12" rx="1" width="3" x="2" y="6" />
             <rect fill="currentColor" height="18" rx="1" width="3" x="7" y="3" />
             <rect fill="currentColor" height="8" rx="1" width="3" x="12" y="8" />
             <rect fill="currentColor" height="14" rx="1" width="3" x="17" y="5" />
           </svg>
-          <span className="text-white font-bold text-xl tracking-wide">NEXTORX</span>
+          <span className="text-foreground font-bold text-xl tracking-wide">NEXTORX</span>
         </Link>
       </div>
 
       <div className="flex items-center gap-5 ml-auto">
+        <button
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="p-2.5 text-text hover:text-foreground transition-colors rounded-lg hover:bg-surface"
+        >
+          {theme === 'dark' ? (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+
         <div className="relative">
           <button
             onClick={() => { setNotifOpen(!notifOpen); setExpanded(false); }}
-            className="relative p-2.5 text-text hover:text-white transition-colors rounded-lg hover:bg-surface"
+            className="relative p-2.5 text-text hover:text-foreground transition-colors rounded-lg hover:bg-surface"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
@@ -150,7 +168,7 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
 
           <div className={`absolute top-full right-0 mt-2 w-80 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-[200] ${notifOpen ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
             <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-              <span className="text-sm text-white font-bold">Notifications</span>
+              <span className="text-sm text-foreground font-bold">Notifications</span>
               <button onClick={markAllRead} className="text-[11px] text-blue hover:text-blue-hover transition-colors font-semibold">Mark all read</button>
             </div>
             <div className="max-h-64 overflow-y-auto">
@@ -160,7 +178,7 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
                 notifications.map((n) => (
                   <div key={n.id} className={`px-4 py-3 hover:bg-surface-hover transition-colors border-l-2 ${n.readAt ? 'border-l-transparent opacity-60' : 'border-l-blue bg-blue/5'}`}>
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[11px] font-bold text-white">{n.title}</span>
+                      <span className="text-[11px] font-bold text-foreground">{n.title}</span>
                       <span className="text-[10px] text-text-dark">{new Date(n.createdAt).toLocaleString()}</span>
                     </div>
                     <p className="text-[11px] text-text leading-relaxed">{n.body}</p>
@@ -181,7 +199,7 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
             <span className={`${active.color} flex-shrink-0 flex items-center justify-center w-5 h-5`}>{active.icon}</span>
             <div className="flex flex-col justify-center">
               <span className="text-[10px] text-text font-semibold uppercase tracking-wide leading-tight">{active.label}</span>
-              <span className="text-white font-bold text-base leading-tight">{hidden ? '••••••' : `$${balance.toFixed(2)}`}</span>
+              <span className="text-foreground font-bold text-base leading-tight">{hidden ? '••••••' : `$${balance.toFixed(2)}`}</span>
             </div>
             <svg className={`w-4 h-4 text-text transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
@@ -194,7 +212,7 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
                 <span className="text-[11px] text-text font-bold uppercase tracking-wider">Accounts</span>
                 <button
                   onClick={() => setHidden(!hidden)}
-                  className="flex items-center gap-1 text-text hover:text-white transition-colors text-[10px] font-medium"
+                  className="flex items-center gap-1 text-text hover:text-foreground transition-colors text-[10px] font-medium"
                 >
                   {hidden ? (
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -246,7 +264,7 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
                         <span className={`${acc.color}`}>{acc.icon}</span>
                         <span className={`text-[11px] font-bold ${isActive ? 'text-green' : 'text-text'}`}>{acc.label}</span>
                       </div>
-                      <span className={`text-sm font-black ${isActive ? 'text-white' : 'text-text'}`}>
+                      <span className={`text-sm font-black ${isActive ? 'text-foreground' : 'text-text'}`}>
                         {hidden ? '••••••' : isDisabled ? '—' : `$${typeBalance.toFixed(2)}`}
                       </span>
                     </Link>
@@ -262,11 +280,11 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
               <div className="bg-background rounded-lg p-3 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] text-text-dark">Email</span>
-                  <span className="text-[11px] text-white font-semibold max-w-[160px] truncate">{user?.email || '—'}</span>
+                  <span className="text-[11px] text-foreground font-semibold max-w-[160px] truncate">{user?.email || '—'}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] text-text-dark">ID</span>
-                  <span className="text-[11px] text-white font-semibold font-mono">{user?.uid || '—'}</span>
+                  <span className="text-[11px] text-foreground font-semibold font-mono">{user?.uid || '—'}</span>
                 </div>
                 {accountType === 'demo' && (
                   <div className="flex justify-between items-center">
@@ -277,7 +295,7 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
                           type="number"
                           value={demoValue}
                           onChange={(e) => setDemoValue(e.target.value)}
-                          className="w-20 bg-surface border border-border rounded px-2 py-0.5 text-[11px] text-white focus:outline-none focus:border-blue"
+                          className="w-20 bg-surface border border-border rounded px-2 py-0.5 text-[11px] text-foreground focus:outline-none focus:border-blue"
                           min={100}
                           max={100000}
                           step={100}
@@ -331,7 +349,7 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
         </Link>
         <Link
           href="/withdraw"
-          className="border border-border hover:bg-surface-hover text-text hover:text-white font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors"
+          className="border border-border hover:bg-surface-hover text-text hover:text-foreground font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
