@@ -82,6 +82,7 @@ export class OTCEngine {
   private currentDay = "";
   private currentSeed = "";
   private secondCloses = new Map<string, number>();
+  private pendingSeconds = new Map<string, { timestamp: bigint; open: number; high: number; low: number; close: number }>();
   private lastPersistedSecond = 0;
   private ticking = false;
   private anchors = new Map<string, { price: number; fetchedAt: number }>();
@@ -311,7 +312,60 @@ export class OTCEngine {
         await new Promise((r2) => setImmediate(r2));
       }
       console.log(`[OTC] Backfilled ${rows.length} 1s candles for ${state.pairId}`);
-      this.secondCloses.set(state.pairId, prevClose);
+      await this.backfillMinutes(state.pairId, day, startOfDay, currentSecond);
+    }
+  }
+
+  private async backfillMinutes(pairId: string, day: string, startOfDaySec: number, currentSecond: number) {
+    try {
+      const fromMs = startOfDaySec * 1000;
+      const toMs = currentSecond * 1000;
+      const [secs, existing] = await Promise.all([
+        prisma.secondCandle.findMany({
+          where: { pairId, timestamp: { gte: BigInt(fromMs), lt: BigInt(toMs) } },
+          orderBy: { timestamp: "asc" },
+          select: { timestamp: true, open: true, high: true, low: true, close: true },
+        }),
+        prisma.candle.findMany({
+          where: { pairId, timestamp: { gte: BigInt(fromMs), lt: BigInt(toMs) } },
+          select: { timestamp: true },
+        }),
+      ]);
+      const have = new Set(existing.map((e: { timestamp: bigint }) => Number(e.timestamp)));
+      const buckets = new Map<number, { open: number; high: number; low: number; close: number; n: number }>();
+      for (const s of secs) {
+        const ts = Number(s.timestamp);
+        const bucket = Math.floor(ts / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
+        if (bucket + CANDLE_INTERVAL_MS > toMs) continue;
+        const ex = buckets.get(bucket);
+        const o = Number(s.open);
+        const h = Number(s.high);
+        const l = Number(s.low);
+        const c = Number(s.close);
+        if (!ex) buckets.set(bucket, { open: o, high: h, low: l, close: c, n: 1 });
+        else {
+          if (h > ex.high) ex.high = h;
+          if (l < ex.low) ex.low = l;
+          ex.close = c;
+          ex.n += 1;
+        }
+      }
+      let written = 0;
+      const state = this.pairs.get(pairId);
+      for (const [minuteStart, b] of buckets) {
+        if (have.has(minuteStart) || b.n < 55) continue;
+        const vol = 250 + (minuteStart % 7) * 40 + ((state?.pairId.charCodeAt(0) ?? 0) % 11) * 7 + b.n * 3;
+        await prisma.candle.upsert({
+          where: { pairId_timestamp: { pairId, timestamp: BigInt(minuteStart) } },
+          create: { pairId, timestamp: BigInt(minuteStart), open: b.open, high: b.high, low: b.low, close: b.close, volume: BigInt(vol) },
+          update: { open: b.open, high: b.high, low: b.low, close: b.close, volume: BigInt(vol) },
+        });
+        written++;
+        if ((written & 127) === 127) await new Promise((r2) => setImmediate(r2));
+      }
+      if (written > 0) console.log(`[OTC] Backfilled ${written} 1m candles for ${pairId}`);
+    } catch (e) {
+      console.error(`[OTC] Minute backfill failed for ${pairId}:`, e instanceof Error ? e.message : e);
     }
   }
 
@@ -397,12 +451,20 @@ export class OTCEngine {
 
       const secStart = Math.floor(now / 1000) * 1000;
       if (secStart !== this.lastPersistedSecond && this.lastPersistedSecond !== 0) {
-        await this.persistSecond(this.lastPersistedSecond, day);
+        await this.persistSecond(this.lastPersistedSecond);
       }
       if (secStart !== this.lastPersistedSecond) {
         this.lastPersistedSecond = secStart;
       }
       if (idx === TICKS_PER_SECOND - 1) {
+        const secStartMs = Math.floor(now / 1000) * 1000;
+        this.pendingSeconds.set(state.pairId, {
+          timestamp: BigInt(secStartMs),
+          open: prevClose,
+          high: r.high,
+          low: r.low,
+          close: r.close,
+        });
         this.secondCloses.set(state.pairId, r.close);
       }
 
@@ -417,32 +479,33 @@ export class OTCEngine {
     }
   }
 
-  private async persistSecond(secondStartMs: number, day: string) {
-    const secondOfDay = Math.floor(secondStartMs / 1000) % SECONDS_PER_DAY;
-    const utcHour = new Date(secondStartMs).getUTCHours();
-    const rows = [];
-    for (const state of Array.from(this.pairs.values())) {
-      const prevClose = this.secondCloses.get(state.pairId) ?? state.basePrice;
-      const r = computeSecond(
-        this.currentSeed, state.pairId, day, secondOfDay, prevClose,
-        state.basePrice, this.effVol(state, day, utcHour), state.category, utcHour,
-      );
+  private async persistSecond(secondStartMs: number) {
+    if (this.pendingSeconds.size === 0) return;
+    const rows: Array<{
+      pairId: string;
+      timestamp: bigint;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      ticks: number;
+    }> = [];
+    for (const [pairId, p] of Array.from(this.pendingSeconds.entries())) {
+      if (Number(p.timestamp) !== secondStartMs) continue;
       rows.push({
-        pairId: state.pairId,
-        timestamp: BigInt(secondStartMs),
-        open: prevClose,
-        high: r.high,
-        low: r.low,
-        close: r.close,
+        pairId,
+        timestamp: p.timestamp,
+        open: p.open,
+        high: p.high,
+        low: p.low,
+        close: p.close,
         ticks: TICKS_PER_SECOND,
       });
-      this.secondCloses.set(state.pairId, r.close);
+      this.pendingSeconds.delete(pairId);
     }
     if (rows.length > 0) {
       await prisma.secondCandle.createMany({ data: rows, skipDuplicates: true }).catch(() => {});
     }
-    // Ensure the second is flushed before any minute that depends on it rolls up.
-    // If the caller is a minute boundary, the rollup below will wait for this row.
   }
 
   private async rolloverDay(day: string) {
