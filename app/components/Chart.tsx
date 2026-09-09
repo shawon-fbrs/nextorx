@@ -26,6 +26,7 @@ interface ChartProps {
 }
 
 export interface ChartHandle {
+  setChartType: (t: 'candle' | 'line' | 'area') => void;
   createOverlay: (name: string, onSelected?: (id: string) => void, onDeselected?: () => void) => string | null;
   drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; endMs?: number; direction: 'up' | 'down' }) => string[];
   removeOverlay: (id?: string) => void;
@@ -329,7 +330,46 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     }
   };
 
+  const applyChartType = useCallback((t: string) => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    try {
+      if (t === 'line') {
+        chart.setStyles({
+          candle: {
+            type: 'area',
+            area: {
+              lineSize: 2,
+              lineColor: '#007aff',
+              backgroundColor: [
+                { offset: 0, color: 'rgba(0,122,255,0)' },
+                { offset: 1, color: 'rgba(0,122,255,0)' },
+              ],
+            },
+          },
+        } as never);
+      } else if (t === 'area') {
+        chart.setStyles({
+          candle: {
+            type: 'area',
+            area: {
+              lineSize: 2,
+              lineColor: '#007aff',
+              backgroundColor: [
+                { offset: 0, color: 'rgba(0,122,255,0.01)' },
+                { offset: 1, color: 'rgba(0,122,255,0.2)' },
+              ],
+            },
+          },
+        } as never);
+      } else {
+        chart.setStyles({ candle: { type: 'candle_solid' } } as never);
+      }
+    } catch {}
+  }, []);
+
   useImperativeHandle(ref, () => ({
+    setChartType: (t: 'candle' | 'line' | 'area') => { applyChartType(t); },
     createOverlay: (name: string, onSelected?: (id: string) => void, onDeselected?: () => void) => {
       const id = chartRef.current?.createOverlay({
         name,
@@ -501,6 +541,10 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       chart.resetData();
       chart.setBarSpace(6);
       chart.scrollToRealTime(0);
+      try {
+        const stored = localStorage.getItem('nextorx:chart-type');
+        if (stored === 'line' || stored === 'area') applyChartType(stored);
+      } catch {}
       try {
         chart.setStyles({
           candle: {

@@ -49,7 +49,6 @@ const drawingGroups = [
   { name: 'Line', icon: 'line', items: ['Trend Line', 'Horizontal Line', 'Horizontal Ray', 'Horizontal Segment', 'Ray Line', 'Extended Line'] },
   { name: 'Fib', icon: 'fib', items: ['Fibonacci Retracement'] },
   { name: 'Shapes', icon: 'shapes', items: ['Rectangle', 'Brush'] },
-  { name: 'Signals', icon: 'signals', items: ['Arrow Marker'] },
 ];
 
 const TF_MS: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
@@ -209,9 +208,8 @@ function TopBar({
   );
 }
 
-function SideToolbar({ timeframe, onTimeframeChange, onIndToggle, onDrawTool, onRemoveDrawings }: { timeframe: string; onTimeframeChange: (tf: string) => void; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void }) {
+function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChange, onIndToggle, onDrawTool, onRemoveDrawings }: { timeframe: string; onTimeframeChange: (tf: string) => void; chartType: 'candle' | 'line' | 'area'; onChartTypeChange: (t: 'candle' | 'line' | 'area') => void; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void }) {
   const [activeDrawGroup, setActiveDrawGroup] = useState<string | null>(null);
-  const [chartType, setChartType] = useState<'candle' | 'line' | 'area'>('candle');
   const [ctOpen, setCtOpen] = useState(false);
   const [tfOpen, setTfOpen] = useState(false);
 
@@ -232,7 +230,6 @@ function SideToolbar({ timeframe, onTimeframeChange, onIndToggle, onDrawTool, on
     { name: 'Line', icon: <PenLine size={20} /> },
     { name: 'Fib', icon: <BarChart3 size={20} /> },
     { name: 'Shapes', icon: <Square size={20} /> },
-    { name: 'Signals', icon: <ArrowUpRight size={20} /> },
   ];
 
   return (
@@ -268,7 +265,7 @@ function SideToolbar({ timeframe, onTimeframeChange, onIndToggle, onDrawTool, on
         {ctOpen && (
           <div className="absolute left-full top-0 ml-1 w-32 bg-[#242a38] border border-[#31394c] rounded-lg shadow-2xl p-1.5 z-50">
             {(['candle', 'line', 'area'] as const).map(t => (
-              <button key={t} onClick={() => { setChartType(t); setCtOpen(false); }}
+              <button key={t} onClick={() => { onChartTypeChange(t); setCtOpen(false); }}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-all capitalize ${chartType === t ? 'bg-blue-500 text-white' : 'text-[#93a0b5] hover:bg-[#2a3142] hover:text-white'}`}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
@@ -475,6 +472,21 @@ export default function TradingPage() {
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
   const [timeframe, setTimeframe] = useState('1m');
+  const [chartType, setChartType] = useState<'candle' | 'line' | 'area'>(() => {
+    try {
+      const v = localStorage.getItem('nextorx:chart-type');
+      return v === 'line' || v === 'area' ? v : 'candle';
+    } catch {
+      return 'candle';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nextorx:chart-type', chartType);
+    } catch {}
+    chartRef.current?.setChartType(chartType);
+  }, [chartType]);
   const prevActiveRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -878,6 +890,7 @@ export default function TradingPage() {
       const liveTrades = trades.filter((t) => t.status === 'active' && t.openPrice != null && t.expiresAt != null && (!activePair || !t.pairId || t.pairId === activePair.id));
       const labelW = 104;
       const gap = 2;
+      const liveEdgePt = chartRef.current?.chartPixel(now, price) ?? null;
       const placed: Array<{ x: number; y: number }> = [];
       liveTrades.forEach((t, i) => {
         const openPrice = t.openPrice as number;
@@ -886,6 +899,7 @@ export default function TradingPage() {
         const prevPt = chartRef.current?.chartPixel(t.timestamp - intervalMs, openPrice) ?? null;
         const pxCandle = prevPt && Math.abs(entryPt.x - prevPt.x) > 0 ? Math.abs(entryPt.x - prevPt.x) : 8;
         let x = entryPt.x - 2 * pxCandle;
+        if (liveEdgePt) x = Math.min(x, liveEdgePt.x - 140);
         let guard = 0;
         while (guard++ < 12) {
           const hit = placed.find((p) => Math.abs(p.y - entryPt.y) < 16 && Math.abs(p.x - x) < labelW + gap);
@@ -999,7 +1013,7 @@ export default function TradingPage() {
               </div>
             ) : (
             <div className="flex-1 flex min-w-0 overflow-hidden">
-              <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
+              <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} chartType={chartType} onChartTypeChange={setChartType} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} onViewChange={handleViewChange} />
                 <button
