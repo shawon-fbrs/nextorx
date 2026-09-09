@@ -131,7 +131,7 @@ const CUSTOM_OVERLAYS: Array<{
       if (w < 50 || h < 50) return [];
       const size = Math.max(48, Math.min(120, Math.floor(Math.min(w, h) / 5)));
       return [
-        { type: 'text', key: 'wm', attrs: { x: Math.floor(w / 2), y: Math.floor(h / 2), text: 'DEMO', align: 'center', baseline: 'middle' }, styles: { color: 'rgba(148,163,184,0.16)', size, family: 'Roboto, Arial, sans-serif', weight: 'bold' } },
+        { type: 'text', key: 'wm', attrs: { x: Math.floor(w / 2), y: Math.floor(h / 2), text: 'DEMO', align: 'center', baseline: 'middle' }, styles: { color: 'rgba(148,163,184,0.16)', size, family: 'Roboto, Arial, sans-serif', weight: 'bold', backgroundColor: 'transparent', borderSize: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0 } },
       ];
     },
   },
@@ -173,7 +173,7 @@ const CUSTOM_OVERLAYS: Array<{
         const y = c1.y + yDif * percent;
         const value = (v1 + valueDif * percent).toFixed(precision);
         figs.push({ type: 'line', key: `fib-line-${i}`, attrs: { coordinates: [{ x: x0, y }, { x: x1, y }] }, styles: { style: 'solid', size: 1, color: 'rgba(0,122,255,0.9)' } });
-        figs.push({ type: 'text', key: `fib-text-${i}`, attrs: { x: x1 - 4, y, text: `${value} (${(percent * 100).toFixed(1)}%)`, align: 'right', baseline: 'bottom' }, styles: { color: labelColor, size: 10 } });
+        figs.push({ type: 'text', key: `fib-text-${i}`, attrs: { x: x1 - 4, y, text: `${value} (${(percent * 100).toFixed(1)}%)`, align: 'right', baseline: 'bottom' }, styles: { color: labelColor, size: 10, backgroundColor: 'transparent', borderSize: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0 } });
       });
       return figs;
     },
