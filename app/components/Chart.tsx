@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
-import { init, dispose, registerOverlay, Chart as KLineChart, KLineData } from 'klinecharts';
+import { init, dispose, registerOverlay, getSupportedIndicators as getLibSupportedIndicators, Chart as KLineChart, KLineData } from 'klinecharts';
+import { readStoredIndicators } from '@/lib/indicator-store';
 import { getServerNow, syncWithServer } from '@/lib/server-time';
 
 export interface CandleData {
@@ -25,8 +26,20 @@ interface ChartProps {
   onViewChange?: () => void;
 }
 
+export interface ActiveIndicator {
+  id: string;
+  name: string;
+  calcParams: number[];
+  visible: boolean;
+}
+
 export interface ChartHandle {
   setChartType: (t: 'candle' | 'line' | 'area') => void;
+  getSupportedIndicators: () => string[];
+  addIndicator: (name: string, overlay: boolean) => string | null;
+  getActiveIndicators: () => ActiveIndicator[];
+  overrideIndicatorById: (id: string, patch: { calcParams?: number[]; visible?: boolean; colors?: string[] }) => boolean;
+  removeIndicatorById: (id: string) => boolean;
   createOverlay: (name: string, onSelected?: (id: string) => void, onDeselected?: () => void) => string | null;
   drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; endMs?: number; direction: 'up' | 'down' }) => string[];
   removeOverlay: (id?: string) => void;
@@ -368,8 +381,91 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     } catch {}
   }, []);
 
+  const mountStoredIndicators = useCallback(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const stored = readStoredIndicators();
+    if (stored.length === 0) return;
+    let existing: Array<{ id?: string; name?: string }> = [];
+    try {
+      existing = (chart.getIndicators({}) ?? []) as unknown as Array<{ id?: string; name?: string }>;
+    } catch {}
+    const haveNames = new Set(existing.map(e => e.name).filter((n): n is string => typeof n === 'string'));
+    for (const def of stored) {
+      if (!def.name || haveNames.has(def.name)) continue;
+      try {
+        const value: Record<string, unknown> = { name: def.name };
+        if (def.calcParams && def.calcParams.length > 0) value.calcParams = [...def.calcParams];
+        if (def.visible === false) value.visible = false;
+        const id = chart.createIndicator(value as never, def.overlay === true);
+        if (typeof id === 'string') {
+          haveNames.add(def.name);
+          if (def.colors && def.colors.length > 0) {
+            chart.overrideIndicator({ id, styles: { lines: def.colors.map(c => ({ color: c })) } } as never);
+          }
+        }
+      } catch {}
+    }
+  }, []);
+
   useImperativeHandle(ref, () => ({
     setChartType: (t: 'candle' | 'line' | 'area') => { applyChartType(t); },
+    getSupportedIndicators: () => {
+      try {
+        return getLibSupportedIndicators() ?? [];
+      } catch {
+        return [];
+      }
+    },
+    addIndicator: (name: string, overlay: boolean) => {
+      try {
+        const id = chartRef.current?.createIndicator({ name } as never, overlay);
+        return typeof id === 'string' ? id : null;
+      } catch {
+        return null;
+      }
+    },
+    getActiveIndicators: () => {
+      try {
+        const list = (chartRef.current?.getIndicators({}) ?? []) as unknown as Array<{ id?: string; name?: string; calcParams?: unknown; visible?: boolean }>;
+        return list
+          .filter(e => typeof e.id === 'string' && typeof e.name === 'string')
+          .map(e => ({
+            id: e.id as string,
+            name: e.name as string,
+            calcParams: Array.isArray(e.calcParams) ? (e.calcParams as unknown[]).filter((n): n is number => typeof n === 'number' && Number.isFinite(n)) : [],
+            visible: e.visible !== false,
+          }));
+      } catch {
+        return [];
+      }
+    },
+    overrideIndicatorById: (id: string, patch: { calcParams?: number[]; visible?: boolean; colors?: string[] }) => {
+      const chart = chartRef.current;
+      if (!chart || !id) return false;
+      try {
+        if (patch.calcParams !== undefined) {
+          chart.overrideIndicator({ id, calcParams: [...patch.calcParams] } as never);
+        }
+        if (patch.visible !== undefined) {
+          chart.overrideIndicator({ id, visible: patch.visible } as never);
+        }
+        if (patch.colors !== undefined && patch.colors.length > 0) {
+          chart.overrideIndicator({ id, styles: { lines: patch.colors.map(c => ({ color: c })) } } as never);
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    removeIndicatorById: (id: string) => {
+      try {
+        if (!id) return false;
+        return !!chartRef.current?.removeIndicator({ id });
+      } catch {
+        return false;
+      }
+    },
     createOverlay: (name: string, onSelected?: (id: string) => void, onDeselected?: () => void) => {
       const id = chartRef.current?.createOverlay({
         name,
@@ -573,6 +669,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         chart.subscribeAction('onScroll', notifyViewChange);
         chart.subscribeAction('onVisibleRangeChange', notifyViewChange);
       } catch {}
+      mountStoredIndicators();
     }
 
     const ro = new ResizeObserver(() => { chart?.resize(); });
@@ -595,7 +692,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       dispose(chartIdRef.current);
       chartRef.current = null;
     };
-  }, [notifyViewChange]);
+  }, [notifyViewChange, mountStoredIndicators]);
 
   useEffect(() => {
     if (!pairId) return;

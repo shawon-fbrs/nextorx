@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
-import type { ChartHandle } from '../../../components/Chart';
+import type { ChartHandle, ActiveIndicator } from '../../../components/Chart';
+import { readStoredIndicators, writeStoredIndicators, type StoredIndicator } from '@/lib/indicator-store';
 const Chart = dynamic(() => import('../../../components/Chart').then(m => m.Chart), { ssr: false });
 import { TradingPanel } from '../../../components/TradingPanel';
 import { usePairWS, type CandleData } from '@/lib/use-ws';
@@ -14,7 +15,7 @@ import {
   TrendingUp, BarChart3, Square, ArrowUpRight,
   Minus, MoveHorizontal, ChevronRight,
   GitBranch, Pencil, Activity, Trash2, Maximize2, CandlestickChart,
-  PenLine, ArrowRight,
+  PenLine, ArrowRight, Eye, EyeOff, Settings, X,
 } from 'lucide-react';
 
 interface PairDef {
@@ -399,21 +400,81 @@ function TradeFailDialog({ open, message, onClose }: { open: boolean; message: s
   );
 }
 
-function IndDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+interface CatalogInd {
+  label: string;
+  name: string;
+  overlay: boolean;
+  cat: string;
+}
+
+const INDICATOR_CATALOG: CatalogInd[] = [
+  { label: 'Moving Average', name: 'MA', overlay: true, cat: 'Trend' },
+  { label: 'Exponential MA', name: 'EMA', overlay: true, cat: 'Trend' },
+  { label: 'Smoothed MA', name: 'SMA', overlay: true, cat: 'Trend' },
+  { label: 'Bollinger Bands', name: 'BOLL', overlay: true, cat: 'Trend' },
+  { label: 'Parabolic SAR', name: 'SAR', overlay: true, cat: 'Trend' },
+  { label: 'VWAP', name: 'VWAP', overlay: true, cat: 'Trend' },
+  { label: 'TRIX', name: 'TRIX', overlay: false, cat: 'Trend' },
+  { label: 'DMA', name: 'DMA', overlay: false, cat: 'Trend' },
+  { label: 'MACD', name: 'MACD', overlay: false, cat: 'Oscillators' },
+  { label: 'RSI', name: 'RSI', overlay: false, cat: 'Oscillators' },
+  { label: 'KDJ', name: 'KDJ', overlay: false, cat: 'Oscillators' },
+  { label: 'Stochastic', name: 'STOCH', overlay: false, cat: 'Oscillators' },
+  { label: 'CCI', name: 'CCI', overlay: false, cat: 'Oscillators' },
+  { label: 'Williams %R', name: 'WR', overlay: false, cat: 'Oscillators' },
+  { label: 'BIAS', name: 'BIAS', overlay: false, cat: 'Oscillators' },
+  { label: 'ROC', name: 'ROC', overlay: false, cat: 'Oscillators' },
+  { label: 'Momentum', name: 'MTM', overlay: false, cat: 'Oscillators' },
+  { label: 'BRAR', name: 'BRAR', overlay: false, cat: 'Oscillators' },
+  { label: 'CR', name: 'CR', overlay: false, cat: 'Oscillators' },
+  { label: 'PSY', name: 'PSY', overlay: false, cat: 'Oscillators' },
+  { label: 'DMI', name: 'DMI', overlay: false, cat: 'Oscillators' },
+  { label: 'ATR', name: 'ATR', overlay: false, cat: 'Volatility' },
+  { label: 'Volume', name: 'VOL', overlay: false, cat: 'Volume' },
+  { label: 'OBV', name: 'OBV', overlay: false, cat: 'Volume' },
+  { label: 'EMV', name: 'EMV', overlay: false, cat: 'Volume' },
+  { label: 'PVT', name: 'PVT', overlay: false, cat: 'Volume' },
+  { label: 'VR', name: 'VR', overlay: false, cat: 'Volume' },
+];
+
+const DEFAULT_LINE_COLORS = ['#FF9600', '#935EBD', '#1677FF', '#E11D74', '#01C5C4'];
+
+interface PageActiveInd {
+  id: string;
+  name: string;
+  label: string;
+  calcParams: number[];
+  visible: boolean;
+  overlay: boolean;
+  colors: string[];
+}
+
+function IndDialog({ open, onClose, supported, active, onAdd, onToggle, onSettings, onRemove }: {
+  open: boolean;
+  onClose: () => void;
+  supported: string[];
+  active: PageActiveInd[];
+  onAdd: (name: string) => void;
+  onToggle: (id: string) => void;
+  onSettings: (ind: PageActiveInd) => void;
+  onRemove: (id: string) => void;
+}) {
   const [search, setSearch] = useState('');
   if (!open) return null;
 
-  const groups = [
-    { cat: 'Trend', items: ['Moving Average', 'Exponential MA', 'Parabolic SAR', 'Ichimoku Cloud', 'ADX', 'SuperTrend', 'VWMA'] },
-    { cat: 'Oscillators', items: ['RSI', 'MACD', 'Stochastic', 'CCI', 'Williams %R', 'Momentum', 'ROC', 'True Strength'] },
-    { cat: 'Volatility', items: ['Bollinger Bands', 'ATR', 'Keltner Channel', 'Donchian Channel', 'Historical Volatility'] },
-    { cat: 'Volume', items: ['Volume', 'OBV', 'VWAP', 'MFI', 'CMF', 'Accumulation/Distribution'] },
-  ];
-
-  const filtered = groups.map(g => ({
-    ...g,
-    items: g.items.filter(i => i.toLowerCase().includes(search.toLowerCase())),
-  })).filter(g => g.items.length > 0);
+  const allowed = supported.length > 0 ? new Set(supported) : null;
+  const activeNames = new Set(active.map(a => a.name));
+  const cats: Array<{ cat: string; items: CatalogInd[] }> = [];
+  for (const c of INDICATOR_CATALOG) {
+    if (allowed && !allowed.has(c.name)) continue;
+    if (!c.label.toLowerCase().includes(search.toLowerCase())) continue;
+    let g = cats.find(g => g.cat === c.cat);
+    if (!g) {
+      g = { cat: c.cat, items: [] };
+      cats.push(g);
+    }
+    g.items.push(c);
+  }
 
   return (
     <div className="absolute inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
@@ -436,25 +497,122 @@ function IndDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-5">
-          {filtered.map(group => (
-            <div key={group.cat} className="mb-3">
-              <div className="text-[10px] font-bold text-text-dark uppercase tracking-wider mb-1.5">{group.cat}</div>
+          {active.length > 0 && (
+            <div className="mb-3">
+              <div className="text-[10px] font-bold text-text-dark uppercase tracking-wider mb-1.5">Active ({active.length})</div>
               <div className="space-y-0.5">
-                {group.items.map(tool => (
-                  <button key={tool} onClick={onClose}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-hover transition-colors group">
-                    <div className="w-7 h-7 rounded-lg bg-background flex items-center justify-center flex-shrink-0">
-                      <svg className="w-3.5 h-3.5 text-text-dark group-hover:text-blue transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path d="M7 12l3-3 3 3 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                {active.map(a => (
+                  <div key={a.id} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-background border border-border/50">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: a.visible ? '#00c365' : '#5c677f' }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] font-semibold text-white truncate">{a.label}</div>
+                      {a.calcParams.length > 0 && <div className="text-[10px] text-text-dark font-mono truncate">{a.calcParams.join(' · ')}</div>}
                     </div>
-                    <span className="text-[12px] font-medium text-text group-hover:text-white transition-colors">{tool}</span>
-                  </button>
+                    <button title={a.visible ? 'Hide' : 'Show'} onClick={() => onToggle(a.id)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-text-dark hover:text-white hover:bg-surface-hover transition-colors">
+                      {a.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                    </button>
+                    <button title="Settings" onClick={() => onSettings(a)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-text-dark hover:text-white hover:bg-surface-hover transition-colors">
+                      <Settings size={14} />
+                    </button>
+                    <button title="Remove" onClick={() => onRemove(a.id)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-text-dark hover:text-red hover:bg-red/10 transition-colors">
+                      <X size={14} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
+          )}
+          {cats.map(group => (
+            <div key={group.cat} className="mb-3">
+              <div className="text-[10px] font-bold text-text-dark uppercase tracking-wider mb-1.5">{group.cat}</div>
+              <div className="space-y-0.5">
+                {group.items.map(item => {
+                  const added = activeNames.has(item.name);
+                  return (
+                    <button key={item.name} onClick={() => { if (!added) onAdd(item.name); }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-hover transition-colors group text-left">
+                      <div className="w-7 h-7 rounded-lg bg-background flex items-center justify-center flex-shrink-0">
+                        <svg className="w-3.5 h-3.5 text-text-dark group-hover:text-blue transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path d="M7 12l3-3 3 3 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                      <span className="flex-1 text-[12px] font-medium text-text group-hover:text-white transition-colors">{item.label}</span>
+                      {added && <span className="text-[10px] font-bold text-green">ADDED</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           ))}
-          {filtered.length === 0 && <div className="text-center py-8 text-text-dark text-sm">No indicators found</div>}
+          {cats.length === 0 && active.length === 0 && <div className="text-center py-8 text-text-dark text-sm">No indicators found</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IndSettingsDialog({ ind, onClose, onSave }: {
+  ind: PageActiveInd;
+  onClose: () => void;
+  onSave: (id: string, patch: { calcParams: number[]; colors: string[] }) => void;
+}) {
+  const [params, setParams] = useState<string[]>(ind.calcParams.map(String));
+  const [colors, setColors] = useState<string[]>(() =>
+    ind.calcParams.map((_, i) => ind.colors[i] ?? DEFAULT_LINE_COLORS[i % DEFAULT_LINE_COLORS.length]),
+  );
+  const [error, setError] = useState('');
+
+  const save = () => {
+    const nums = params.map(p => Number(p));
+    if (nums.length === 0 || nums.some(n => !Number.isFinite(n) || n <= 0)) {
+      setError('Periods must be positive numbers.');
+      return;
+    }
+    onSave(ind.id, { calcParams: nums, colors: colors.slice(0, nums.length) });
+  };
+
+  return (
+    <div className="absolute inset-0 z-[160] flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
+      <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[360px] max-w-[calc(100%-2rem)] max-h-[440px] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white">{ind.label} settings</h3>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center text-text hover:text-white rounded-lg hover:bg-surface-hover transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-4">
+          <div>
+            <div className="text-[10px] font-bold text-text-dark uppercase tracking-wider mb-2">Periods</div>
+            <div className="grid grid-cols-3 gap-2">
+              {params.map((p, i) => (
+                <div key={i}>
+                  <div className="text-[10px] text-text-dark mb-1">Length {i + 1}</div>
+                  <input type="number" value={p} min={1} step="any"
+                    onChange={e => setParams(prev => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                    className="w-full bg-background border border-border rounded-lg px-2 py-2 text-white font-mono text-sm text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold text-text-dark uppercase tracking-wider mb-2">Line colors</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {colors.map((c, i) => (
+                <div key={i} className="flex flex-col items-center gap-1">
+                  <input type="color" value={c} onChange={e => setColors(prev => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                    className="w-9 h-9 rounded-lg bg-background border border-border cursor-pointer p-1" />
+                  <span className="text-[9px] text-text-dark font-mono">L{i + 1}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {error && <p className="text-xs text-red font-semibold">{error}</p>}
+          <button onClick={save} className="w-full bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold py-2.5 rounded-xl transition-colors">
+            Apply
+          </button>
         </div>
       </div>
     </div>
@@ -465,6 +623,7 @@ export default function TradingPage() {
   const params = useParams();
   const accountType = (params.accountType as string) || 'demo';
   const [indOpen, setIndOpen] = useState(false);
+
   const [pairs, setPairs] = useState<PairDef[]>([]);
   const [activePair, setActivePair] = useState<PairDef | null>(null);
   const [effectivePayout, setEffectivePayout] = useState<number | null>(null);
@@ -538,6 +697,120 @@ export default function TradingPage() {
   const [panelPos, setPanelPos] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
   const chartRef = useRef<ChartHandle>(null);
+  const [supportedInds, setSupportedInds] = useState<string[]>([]);
+  const [activeInds, setActiveInds] = useState<PageActiveInd[]>(() => {
+    try {
+      return readStoredIndicators().map(s => {
+        const cat = INDICATOR_CATALOG.find(c => c.name === s.name);
+        return {
+          id: '',
+          name: s.name,
+          label: cat?.label ?? s.name,
+          calcParams: s.calcParams ?? [],
+          visible: s.visible !== false,
+          overlay: cat?.overlay ?? s.overlay ?? false,
+          colors: s.colors ?? [],
+        };
+      });
+    } catch {
+      return [];
+    }
+  });
+  const [indSettings, setIndSettings] = useState<PageActiveInd | null>(null);
+
+  const persistIndStore = useCallback((list: PageActiveInd[]) => {
+    const stored: StoredIndicator[] = list.map(a => ({
+      name: a.name,
+      calcParams: a.calcParams,
+      visible: a.visible,
+      colors: a.colors,
+      overlay: a.overlay,
+    }));
+    writeStoredIndicators(stored);
+  }, []);
+
+  const refreshActiveIndicators = useCallback(() => {
+    const live = chartRef.current?.getActiveIndicators() ?? [];
+    setActiveInds(prev => {
+      const prevByName = new Map(prev.map(p => [p.name, p]));
+      const next = live.map(l => {
+        const cat = INDICATOR_CATALOG.find(c => c.name === l.name);
+        const prevColors = prevByName.get(l.name)?.colors ?? [];
+        return {
+          id: l.id,
+          name: l.name,
+          label: cat?.label ?? l.name,
+          calcParams: l.calcParams,
+          visible: l.visible,
+          overlay: cat?.overlay ?? prevByName.get(l.name)?.overlay ?? false,
+          colors: prevColors,
+        };
+      });
+      persistIndStore(next);
+      return next;
+    });
+  }, [persistIndStore]);
+
+  const handleAddIndicator = useCallback((name: string) => {
+    const def = INDICATOR_CATALOG.find(c => c.name === name);
+    if (!def || !chartRef.current) return;
+    const cur = chartRef.current.getActiveIndicators();
+    if (cur.some(c => c.name === name)) {
+      toast.info(`${def.label} is already on the chart`);
+      return;
+    }
+    const subPanes = cur.filter(c => {
+      const d = INDICATOR_CATALOG.find(x => x.name === c.name);
+      return !(d?.overlay ?? false);
+    }).length;
+    if (!def.overlay && subPanes >= 4) {
+      toast.warning('Maximum 4 indicator panes reached. Remove one first.');
+      return;
+    }
+    const id = chartRef.current.addIndicator(name, def.overlay);
+    if (!id) {
+      toast.error(`Could not add ${def.label}`);
+      return;
+    }
+    refreshActiveIndicators();
+    toast.success(`${def.label} added`);
+  }, [refreshActiveIndicators]);
+
+  const handleToggleIndicator = useCallback((id: string) => {
+    const cur = chartRef.current?.getActiveIndicators().find(a => a.id === id);
+    if (!cur || !chartRef.current) return;
+    chartRef.current.overrideIndicatorById(id, { visible: !(cur.visible !== false) });
+    refreshActiveIndicators();
+  }, [refreshActiveIndicators]);
+
+  const handleRemoveIndicator = useCallback((id: string) => {
+    chartRef.current?.removeIndicatorById(id);
+    refreshActiveIndicators();
+  }, [refreshActiveIndicators]);
+
+  const handleSaveIndicatorSettings = useCallback((id: string, patch: { calcParams: number[]; colors: string[] }) => {
+    if (!chartRef.current?.overrideIndicatorById(id, patch)) {
+      toast.error('Could not apply settings');
+      return;
+    }
+    setActiveInds(prev => {
+      const next = prev.map(a => (a.id === id ? { ...a, calcParams: patch.calcParams, colors: patch.colors } : a));
+      persistIndStore(next);
+      return next;
+    });
+    setIndSettings(null);
+    toast.success('Indicator updated');
+  }, [persistIndStore]);
+
+  useEffect(() => {
+    if (!indOpen) return;
+    try {
+      setSupportedInds(chartRef.current?.getSupportedIndicators() ?? []);
+    } catch {
+      setSupportedInds([]);
+    }
+    refreshActiveIndicators();
+  }, [indOpen, refreshActiveIndicators]);
   const [selectedOverlay, setSelectedOverlay] = useState<{ id: string; name: string } | null>(null);
   const [editPanelPos, setEditPanelPos] = useState({ x: 0, y: 0 });
   const editDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
@@ -996,7 +1269,23 @@ export default function TradingPage() {
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <div className="flex-1 flex min-w-0 overflow-hidden">
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
-          <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
+          <IndDialog
+            open={indOpen}
+            onClose={() => setIndOpen(false)}
+            supported={supportedInds}
+            active={activeInds}
+            onAdd={handleAddIndicator}
+            onToggle={handleToggleIndicator}
+            onSettings={setIndSettings}
+            onRemove={handleRemoveIndicator}
+          />
+          {indSettings && (
+            <IndSettingsDialog
+              ind={indSettings}
+              onClose={() => setIndSettings(null)}
+              onSave={handleSaveIndicatorSettings}
+            />
+          )}
           <InsufficientDialog open={insufficientOpen} isDemo={accountType === 'demo'} onClose={() => setInsufficientOpen(false)} />
           <TradeFailDialog open={!!tradeError} message={tradeError} onClose={() => setTradeError('')} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
