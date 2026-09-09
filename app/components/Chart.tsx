@@ -131,7 +131,7 @@ const CUSTOM_OVERLAYS: Array<{
       if (w < 50 || h < 50) return [];
       const size = Math.max(48, Math.min(120, Math.floor(Math.min(w, h) / 5)));
       return [
-        { type: 'text', key: 'wm', attrs: { x: Math.floor(w / 2), y: Math.floor(h / 2), text: 'DEMO', align: 'center', baseline: 'middle' }, styles: { color: 'rgba(148,163,184,0.30)', size, family: 'Roboto, Arial, sans-serif', weight: 'bold' } },
+        { type: 'text', key: 'wm', attrs: { x: Math.floor(w / 2), y: Math.floor(h / 2), text: 'DEMO', align: 'center', baseline: 'middle' }, styles: { color: 'rgba(148,163,184,0.16)', size, family: 'Roboto, Arial, sans-serif', weight: 'bold' } },
       ];
     },
   },
