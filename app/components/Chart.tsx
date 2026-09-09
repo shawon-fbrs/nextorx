@@ -397,7 +397,9 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         const value: Record<string, unknown> = { name: def.name };
         if (def.calcParams && def.calcParams.length > 0) value.calcParams = [...def.calcParams];
         if (def.visible === false) value.visible = false;
-        const id = chart.createIndicator(value as never, def.overlay === true);
+        const overlay = def.overlay === true;
+        if (overlay) value.paneId = 'candle_pane';
+        const id = chart.createIndicator(value as never, overlay);
         if (typeof id === 'string') {
           haveNames.add(def.name);
           if (def.colors && def.colors.length > 0) {
@@ -419,7 +421,9 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     },
     addIndicator: (name: string, overlay: boolean) => {
       try {
-        const id = chartRef.current?.createIndicator({ name } as never, overlay);
+        const value: Record<string, unknown> = { name };
+        if (overlay) value.paneId = 'candle_pane';
+        const id = chartRef.current?.createIndicator(value as never, overlay);
         return typeof id === 'string' ? id : null;
       } catch {
         return null;
