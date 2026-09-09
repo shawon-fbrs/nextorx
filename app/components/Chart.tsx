@@ -22,6 +22,7 @@ interface ChartProps {
   timeframe?: string;
   serverTime?: number | null;
   onOverlaySelected?: (overlay: { id: string; name: string } | null) => void;
+  onViewChange?: () => void;
 }
 
 export interface ChartHandle {
@@ -124,7 +125,7 @@ function storageKey(pairId: string, timeframe: string): string {
   return `nextorx:drawings:${pairId}:${timeframe}`;
 }
 
-export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, seed, timeframe = '1m', serverTime = null, onOverlaySelected }, ref) {
+export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, seed, timeframe = '1m', serverTime = null, onOverlaySelected, onViewChange }, ref) {
   const chartIdRef = useRef(`kline-${Math.random().toString(36).slice(2)}`);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<KLineChart | null>(null);
@@ -134,6 +135,11 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   pairIdRef.current = pairId ?? pairIdRef.current;
   const onOverlaySelectedRef = useRef(onOverlaySelected);
   onOverlaySelectedRef.current = onOverlaySelected;
+  const onViewChangeRef = useRef(onViewChange);
+  onViewChangeRef.current = onViewChange;
+  const notifyViewChange = useCallback(() => {
+    try { onViewChangeRef.current?.(); } catch {}
+  }, []);
   const subscribeBarCallbackRef = useRef<((data: KLineData) => void) | null>(null);
   const barsCacheRef = useRef<Map<string, KLineData[]>>(new Map());
   const bucketStartRef = useRef<number | null>(null);
@@ -442,6 +448,11 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       chart.resetData();
       chart.setBarSpace(6);
       chart.scrollToRealTime(0);
+      try {
+        chart.subscribeAction('onZoom', notifyViewChange);
+        chart.subscribeAction('onScroll', notifyViewChange);
+        chart.subscribeAction('onVisibleRangeChange', notifyViewChange);
+      } catch {}
     }
 
     const ro = new ResizeObserver(() => { chart?.resize(); });
@@ -449,10 +460,15 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
 
     return () => {
       ro.disconnect();
+      try {
+        chartRef.current?.unsubscribeAction('onZoom', notifyViewChange);
+        chartRef.current?.unsubscribeAction('onScroll', notifyViewChange);
+        chartRef.current?.unsubscribeAction('onVisibleRangeChange', notifyViewChange);
+      } catch {}
       dispose(chartIdRef.current);
       chartRef.current = null;
     };
-  }, []);
+  }, [notifyViewChange]);
 
   useEffect(() => {
     if (!pairId) return;

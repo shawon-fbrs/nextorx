@@ -42,6 +42,7 @@ interface TradingPanelProps {
   onTimeChange: (delta: number) => void;
   onTimeSet: (m: number, s: number) => void;
   onTrade: (type: 'up' | 'down') => void;
+  onDirectionHover?: (dir: 'up' | 'down' | null) => void;
   payoutAmount: string;
   trades: TradeLike[];
 }
@@ -56,6 +57,7 @@ export function TradingPanel({
   onTimeChange,
   onTimeSet,
   onTrade,
+  onDirectionHover,
   payoutAmount,
   trades,
 }: TradingPanelProps) {
@@ -211,6 +213,8 @@ export function TradingPanel({
         <div className="flex flex-col gap-2 mt-auto">
           <button
             onClick={() => onTrade('up')}
+            onMouseEnter={() => onDirectionHover?.('up')}
+            onMouseLeave={() => onDirectionHover?.(null)}
             className="bg-green hover:bg-green-hover text-white font-bold text-base py-4 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_14px_0_rgba(0,195,101,0.25)] active:scale-[0.98]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -221,6 +225,8 @@ export function TradingPanel({
           </button>
           <button
             onClick={() => onTrade('down')}
+            onMouseEnter={() => onDirectionHover?.('down')}
+            onMouseLeave={() => onDirectionHover?.(null)}
             className="bg-red hover:bg-red-hover text-white font-bold text-base py-4 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_14px_0_rgba(255,73,84,0.25)] active:scale-[0.98]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>

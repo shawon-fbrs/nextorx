@@ -489,6 +489,9 @@ export default function TradingPage() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [tradeError, setTradeError] = useState('');
   const [insufficientOpen, setInsufficientOpen] = useState(false);
+  const [hoverDir, setHoverDir] = useState<'up' | 'down' | null>(null);
+  const [viewSeq, setViewSeq] = useState(0);
+  const handleViewChange = useCallback(() => setViewSeq((s) => (s + 1) % 1000000), []);
   const [expiryMarks, setExpiryMarks] = useState<Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number; kind?: 'pill' | 'dot' }>>([]);
   const markerRef = useRef<Map<string, string[]>>(new Map());
   const [mounted, setMounted] = useState(false);
@@ -834,13 +837,16 @@ export default function TradingPage() {
       const liveTrades = trades.filter((t) => t.status === 'active' && t.openPrice != null && t.expiresAt != null && (!activePair || !t.pairId || t.pairId === activePair.id));
       const labelW = 104;
       const gap = 4;
-      const edge = 12;
+      const edge = 16;
+      const livePt = chartRef.current?.chartPixel(now, price) ?? null;
       liveTrades.forEach((t, i) => {
         const openPrice = t.openPrice as number;
         const entryPt = chartRef.current?.chartPixel(t.timestamp, openPrice) ?? null;
         if (!entryPt) return;
         let x: number;
-        if (anchor) {
+        if (livePt) {
+          x = livePt.x - edge - (i + 1) * labelW - i * gap;
+        } else if (anchor) {
           x = anchor.x - edge - (i + 1) * labelW - i * gap;
         } else {
           const prevPt = chartRef.current?.chartPixel(t.timestamp - intervalMs, openPrice) ?? null;
@@ -861,7 +867,7 @@ export default function TradingPage() {
     updateMarks();
     const timer = setInterval(updateMarks, 250);
     return () => clearInterval(timer);
-  }, [price, timeframe, trades, activePair]);
+  }, [price, timeframe, trades, activePair, viewSeq]);
 
   const handleTrade = useCallback(async (type: 'up' | 'down') => {
     if (!activePair) return;
@@ -958,7 +964,7 @@ export default function TradingPage() {
             <div className="flex-1 flex min-w-0 overflow-hidden">
               <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
               <div className="flex-1 relative overflow-hidden">
-                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} />
+                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} onViewChange={handleViewChange} />
                 <button
                   onClick={() => {
                     if (!activePair) return;
@@ -975,6 +981,39 @@ export default function TradingPage() {
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
+                {(() => {
+                  if (!hoverDir) return null;
+                  const y = chartRef.current?.getYPixel(price) ?? null;
+                  if (y == null || !Number.isFinite(y)) return null;
+                  const isUp = hoverDir === 'up';
+                  const color = isUp ? '0,195,101' : '255,73,84';
+                  const px = activePair.id.includes('JPY') ? 3 : 5;
+                  return (
+                    <>
+                      <div
+                        className="absolute left-0 right-0 z-30 pointer-events-none"
+                        style={{
+                          top: isUp ? 0 : y,
+                          height: isUp ? Math.max(0, y) : undefined,
+                          bottom: isUp ? undefined : 0,
+                          background: isUp
+                            ? `linear-gradient(to bottom, rgba(${color},0.22), rgba(${color},0.02))`
+                            : `linear-gradient(to bottom, rgba(${color},0.02), rgba(${color},0.22))`,
+                        }}
+                      />
+                      <div
+                        className="absolute left-0 right-0 z-30 pointer-events-none"
+                        style={{ top: y, borderTop: `1px dashed rgba(${color},0.9)` }}
+                      />
+                      <div
+                        className={`absolute z-30 pointer-events-none px-1.5 py-0.5 rounded text-white text-[10px] font-mono font-bold tabular-nums whitespace-nowrap ${isUp ? 'bg-green' : 'bg-red'}`}
+                        style={{ right: 4, top: y - 10 }}
+                      >
+                        {price.toFixed(px)}
+                      </div>
+                    </>
+                  );
+                })()}
                 {expiryMarks.map((m) => (
                   m.id === 'candle' ? (
                     <div
@@ -1206,6 +1245,7 @@ export default function TradingPage() {
             onTimeChange={handleTimeChange}
             onTimeSet={handleTimeSet}
             onTrade={handleTrade}
+            onDirectionHover={setHoverDir}
             payoutAmount={payoutAmount}
             trades={trades}
           />
