@@ -19,6 +19,8 @@ function getSeedForDaySync(day: string): string | null {
   return null;
 }
 
+export interface SigmaSchedule extends Map<number, { mult: number; fromMs: number }> {}
+
 export async function generateDayCandles(params: {
   pairId: string;
   day: string;
@@ -27,7 +29,7 @@ export async function generateDayCandles(params: {
   volatility: number;
   category: string;
   seed: string;
-  sigmaMults: Map<number, number>;
+  sigmaMults: Map<number, number> | SigmaSchedule;
   upToSecond?: number;
 }): Promise<PfCandle[]> {
   const { pairId, day, intervalMs, basePrice, volatility, category, seed, sigmaMults, upToSecond } = params;
@@ -42,7 +44,10 @@ export async function generateDayCandles(params: {
     const secOfDay = s;
     const tsMs = (startSec + s) * 1000;
     const hour = new Date(tsMs).getUTCHours();
-    const sigmaMult = sigmaMults.get(hour) ?? 1;
+    const sched = sigmaMults.get(hour);
+    const schedMult = typeof sched === "number" ? sched : sched?.mult ?? 1;
+    const schedFrom = typeof sched === "number" ? -Infinity : sched?.fromMs ?? Infinity;
+    const sigmaMult = tsMs >= schedFrom ? schedMult : 1;
     const effVol = volatility * sigmaMult;
     const r = computeSecond(seed, pairId, day, secOfDay, prevClose, basePrice, effVol, category, hour);
     const price = r.close;
@@ -75,7 +80,7 @@ export async function computeCloseUpToNow(params: {
   volatility: number;
   category: string;
   seed: string;
-  sigmaMults: Map<number, number>;
+  sigmaMults: Map<number, number> | SigmaSchedule;
   upToSecond: number;
 }): Promise<number> {
   const { pairId, day, basePrice, volatility, category, seed, sigmaMults, upToSecond } = params;
@@ -85,7 +90,10 @@ export async function computeCloseUpToNow(params: {
   for (let s = 0; s < endSec; s++) {
     const tsMs = (startSec + s) * 1000;
     const hour = new Date(tsMs).getUTCHours();
-    const sigmaMult = sigmaMults.get(hour) ?? 1;
+    const sched = sigmaMults.get(hour);
+    const schedMult = typeof sched === "number" ? sched : sched?.mult ?? 1;
+    const schedFrom = typeof sched === "number" ? -Infinity : sched?.fromMs ?? Infinity;
+    const sigmaMult = tsMs >= schedFrom ? schedMult : 1;
     const effVol = volatility * sigmaMult;
     const r = computeSecond(seed, pairId, day, s, prevClose, basePrice, effVol, category, hour);
     prevClose = r.close;
@@ -173,21 +181,14 @@ export async function getDayCandlesWithCache(opts: {
     }
   }
 
-  let pair = await prisma.pair.findUnique({ where: { id: pairId } });
-  let seedRow = await prisma.serverSeed.findUnique({ where: { day } });
-  if (!seedRow) {
-    try {
-      const { randomBytes } = await import('crypto');
-      const { createHash } = await import('crypto');
-      const seed = randomBytes(32).toString('hex');
-      const seedHash = createHash('sha256').update(seed, 'utf8').digest('hex');
-      seedRow = await prisma.serverSeed.create({ data: { day, seedHash, seed, revealed: false } });
-    } catch {}
-  }
-  if (!pair || !seedRow?.seed) return { candles: [], verified: false, source: 'generated' };
+  const pair = await prisma.pair.findUnique({ where: { id: pairId } });
+  const { ensureSeedDay, getDaySeed } = await import('./seeds');
+  await ensureSeedDay(day).catch(() => {});
+  const seedValue = await getDaySeed(day);
+  if (!pair || !seedValue) return { candles: [], verified: false, source: 'generated' };
   const regimes = await prisma.pairVolRegime.findMany({ where: { pairId, day } });
-  const sigmaMults = new Map<number, number>();
-  for (const r of regimes) sigmaMults.set(r.hour, Number(r.sigmaMult));
+  const sigmaMults: SigmaSchedule = new Map();
+  for (const r of regimes) sigmaMults.set(r.hour, { mult: Number(r.sigmaMult), fromMs: new Date(r.measuredAt).getTime() });
   const todayStr = dayStringUTC(new Date());
   let upToSecond: number | undefined;
   if (day === todayStr) {
@@ -202,7 +203,7 @@ export async function getDayCandlesWithCache(opts: {
     basePrice: Number(pair.basePrice),
     volatility: Number(pair.volatility),
     category: pair.category,
-    seed: seedRow.seed,
+    seed: seedValue,
     sigmaMults,
     upToSecond,
   });

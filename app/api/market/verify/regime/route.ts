@@ -16,12 +16,12 @@ export async function GET(request: NextRequest) {
     const rows = await prisma.pairVolRegime.findMany({
       where: { pairId: asset, day: date },
       orderBy: { hour: "asc" },
-      select: { hour: true, sigmaMult: true },
+      select: { hour: true, sigmaMult: true, measuredAt: true },
     });
     return Response.json({
       asset,
       date,
-      regimes: rows.map((r) => ({ hour: r.hour, sigmaMult: Number(r.sigmaMult) })),
+      regimes: rows.map((r) => ({ hour: r.hour, sigmaMult: Number(r.sigmaMult), measuredAt: r.measuredAt.toISOString() })),
     });
   } catch (e) {
     return toJsonError(e);

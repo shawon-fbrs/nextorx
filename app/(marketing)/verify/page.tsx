@@ -32,11 +32,14 @@ function sessionMult(category: string, utcHour: number): number {
   return 0.5;
 }
 
-async function hmacSha512HexKey(seedHex: string, message: string): Promise<Uint8Array> {
-  const keyBytes = new Uint8Array(seedHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']);
+async function hmacSha512ServerKey(seedHex: string, message: string): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(seedHex.trim()), { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
   return new Uint8Array(sig);
+}
+
+function hexBytes(bytes: Uint8Array): string {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 function u64(d: Uint8Array, off: number): number {
@@ -91,15 +94,28 @@ export default function VerifyPage() {
       const base = Number(basePrice);
       const vol = Number(volatility);
       const jumps = JUMPS[category] ?? JUMPS.forex;
-      let regimeMap: Record<number, number> = {};
+      let regimeMap: Record<number, { mult: number; from: number }> = {};
       if (regimeJson.trim() !== '') {
         try {
-          const parsed = JSON.parse(regimeJson) as { regimes?: Array<{ hour: number; sigmaMult: number }> };
+          const parsed = JSON.parse(regimeJson) as { regimes?: Array<{ hour: number; sigmaMult: number; measuredAt?: string }> };
           for (const r of parsed.regimes ?? []) {
-            if (Number.isFinite(r.hour) && Number.isFinite(r.sigmaMult)) regimeMap[r.hour] = r.sigmaMult;
+            if (Number.isFinite(r.hour) && Number.isFinite(r.sigmaMult)) {
+              const from = r.measuredAt ? Date.parse(r.measuredAt) : NaN;
+              regimeMap[r.hour] = { mult: r.sigmaMult, from: Number.isFinite(from) ? from : -Infinity };
+            }
           }
         } catch {
           throw new Error('Volatility schedule is not valid JSON.');
+        }
+      }
+      const hashRes = await fetch(`/api/market/seed/hash?day=${encodeURIComponent(day)}`);
+      if (hashRes.ok) {
+        const hashInfo = await hashRes.json() as { seedHash?: string };
+        if (hashInfo.seedHash) {
+          const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed.trim()));
+          if (hexBytes(new Uint8Array(digest)) !== String(hashInfo.seedHash).toLowerCase()) {
+            throw new Error('Seed does not match the published commitment hash for this day. Aborted.');
+          }
         }
       }
       const tol = 1e-8;
@@ -108,8 +124,9 @@ export default function VerifyPage() {
       for (const row of rows) {
         const secondOfDay = Math.floor(row.timestamp / 1000) % SECONDS_PER_DAY;
         const utcHour = new Date(row.timestamp).getUTCHours();
-        const d = await hmacSha512HexKey(seed, `${pairId}:${day}:${secondOfDay}`);
-        const mult = regimeMap[utcHour] ?? 1;
+        const d = await hmacSha512ServerKey(seed, `${pairId}:${day}:${secondOfDay}`);
+        const sched = regimeMap[utcHour];
+        const mult = sched && row.timestamp >= sched.from ? sched.mult : 1;
         const sigma = vol * mult * sessionMult(category, utcHour) * SIGMA_PER_SECOND;
         const z = gauss(u64(d, 0), u64(d, 8));
         let exp = sigma * z;
@@ -160,8 +177,8 @@ export default function VerifyPage() {
         <div>
           <h1 className="text-2xl font-black text-white">Verify Fairness</h1>
           <p className="text-sm text-text-dark mt-1">
-            Re-run the market math in your own browser. This page makes zero network calls —
-            paste the revealed seed, upload the candle CSV, and check every candle.
+            Re-run the market math in your own browser. Paste the revealed seed, upload the candle CSV, and check every candle.
+            The page first compares your seed against the published commitment hash — mismatches abort.
             Trade entries include a half-spread (shown on each pair); exits are the committed candle closes verified here.
           </p>
         </div>

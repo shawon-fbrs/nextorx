@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { toJsonError, ApiError } from '@/lib/api';
 import { getDayCandlesWithCache, merkleRoot } from '@/lib/pf-history';
+import { getDaySeedReveal } from '@/lib/seeds';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,7 @@ export async function GET(request: NextRequest) {
     const intervalMs = INTERVAL_MS_MAP[interval];
     const seedRow = await prisma.serverSeed.findUnique({ where: { day } });
     if (!seedRow) throw new ApiError(404, 'Seed not found for day');
+    const reveal = await getDaySeedReveal(day);
     const { candles, verified, source } = await getDayCandlesWithCache({ pairId, day, intervalMs });
     const root = merkleRoot(candles);
     const archive = await prisma.candleDayArchive.findUnique({ where: { day_pairId_intervalMs: { day, pairId, intervalMs } } });
@@ -25,7 +27,7 @@ export async function GET(request: NextRequest) {
       intervalMs,
       seedHash: seedRow.seedHash,
       revealed: seedRow.revealed,
-      seed: seedRow.revealed ? seedRow.seed : null,
+      seed: reveal ? reveal.seed : null,
       candles,
       merkleRoot: root,
       archived: archive ? { s3Key: archive.s3Key, merkleRoot: archive.merkleRoot, rowCount: archive.rowCount } : null,

@@ -24,6 +24,7 @@ const PUBLIC_PATHS = [
   "/api/auth",
   "/api/health",
   "/api/market",
+  "/api/verify/day",
   "/api/trade/payment-methods",
   "/_next",
   "/favicon.ico",

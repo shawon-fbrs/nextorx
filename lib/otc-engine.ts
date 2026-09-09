@@ -1,4 +1,3 @@
-import { createHash, randomBytes } from "crypto";
 import { prisma } from "./db";
 import { fetchMirrorQuotes } from "./mirror-feed";
 import {
@@ -25,40 +24,21 @@ export interface SeedInfo {
 }
 
 export async function ensureSeedForDay(day: string): Promise<SeedInfo> {
-  const existing = await prisma.serverSeed.findUnique({ where: { day } });
-  if (existing) {
-    return { day, seedHash: existing.seedHash, revealed: existing.revealed };
-  }
-  const seed = randomBytes(32).toString("hex");
-  const seedHash = createHash("sha256").update(seed, "utf8").digest("hex");
-  const created = await prisma.serverSeed.create({
-    data: { day, seedHash, seed, revealed: false },
-  });
-  return { day, seedHash: created.seedHash, revealed: false };
+  const { ensureSeedDay } = await import("./seeds");
+  return ensureSeedDay(day);
 }
 
 async function getSeedValue(day: string): Promise<string> {
-  const info = await ensureSeedForDay(day);
-  if (!info) throw new Error("Seed unavailable");
-  const row = await prisma.serverSeed.findUnique({ where: { day } });
-  if (!row?.seed) throw new Error("Seed unavailable");
-  return row.seed;
+  const { getDaySeed } = await import("./seeds");
+  await ensureSeedForDay(day);
+  const seed = await getDaySeed(day);
+  if (!seed) throw new Error("Seed unavailable");
+  return seed;
 }
 
 export async function revealDueSeeds(now = new Date()): Promise<string[]> {
-  const today = dayStringUTC(now);
-  const revealed: string[] = [];
-  const pending = await prisma.serverSeed.findMany({ where: { revealed: false } });
-  for (const row of pending) {
-    if (row.day < today) {
-      await prisma.serverSeed.update({
-        where: { id: row.id },
-        data: { revealed: true, revealedAt: now },
-      });
-      revealed.push(row.day);
-    }
-  }
-  return revealed;
+  const { revealDueSeeds: reveal } = await import("./seeds");
+  return reveal(now);
 }
 
 export async function getSeedHash(day: string): Promise<SeedInfo> {
@@ -66,9 +46,8 @@ export async function getSeedHash(day: string): Promise<SeedInfo> {
 }
 
 export async function getSeedReveal(day: string): Promise<{ day: string; seed: string } | null> {
-  const row = await prisma.serverSeed.findUnique({ where: { day } });
-  if (!row || !row.revealed || !row.seed) return null;
-  return { day, seed: row.seed };
+  const { getDaySeedReveal } = await import("./seeds");
+  return getDaySeedReveal(day);
 }
 
 export class OTCEngine {
@@ -123,15 +102,32 @@ export class OTCEngine {
     for (const state of Array.from(this.pairs.values())) {
       if (state.feed !== "mirror") continue;
       try {
+        const stored = await prisma.pairVolRegime.findUnique({
+          where: { pairId_day_hour: { pairId: state.pairId, day, hour } },
+        }).catch(() => null);
+        if (stored) {
+          this.regimes.set(this.regimeKey(state.pairId, day, hour), Number(stored.sigmaMult));
+          continue;
+        }
         const realized = await measureRealizedSigma(state.pairId);
         if (realized == null || realized <= 0) continue;
         const typical = state.volatility * 0.00008 * 60;
         const mult = Math.max(0.5, Math.min(3, realized / typical));
-        await prisma.pairVolRegime.upsert({
-          where: { pairId_day_hour: { pairId: state.pairId, day, hour } },
-          create: { pairId: state.pairId, day, hour, sigmaMult: mult },
-          update: { sigmaMult: mult },
-        });
+        try {
+          await prisma.pairVolRegime.upsert({
+            where: { pairId_day_hour: { pairId: state.pairId, day, hour } },
+            create: { pairId: state.pairId, day, hour, sigmaMult: mult, measuredAt: now },
+            update: {},
+          });
+        } catch {
+          const winner = await prisma.pairVolRegime.findUnique({
+            where: { pairId_day_hour: { pairId: state.pairId, day, hour } },
+          }).catch(() => null);
+          if (winner) {
+            this.regimes.set(this.regimeKey(state.pairId, day, hour), Number(winner.sigmaMult));
+            continue;
+          }
+        }
         this.regimes.set(this.regimeKey(state.pairId, day, hour), mult);
         console.log(`[OTC] Regime ${state.pairId} ${day}h${hour}: x${mult.toFixed(2)}`);
       } catch (e) {
@@ -216,11 +212,12 @@ export class OTCEngine {
     if (!lastSecond && !lastMinute) {
       try {
         const day = dayStringUTC(new Date(now));
-        const seedRow = await prisma.serverSeed.findUnique({ where: { day } });
-        if (seedRow?.seed) {
+        const { getDaySeed } = await import("./seeds");
+        const seedValue = await getDaySeed(day);
+        if (seedValue) {
           const regimes = await prisma.pairVolRegime.findMany({ where: { pairId, day } });
-          const sigmaMults = new Map<number, number>();
-          for (const r of regimes) sigmaMults.set(r.hour, Number(r.sigmaMult));
+          const sigmaMults = new Map<number, { mult: number; fromMs: number }>();
+          for (const r of regimes) sigmaMults.set(r.hour, { mult: Number(r.sigmaMult), fromMs: new Date(r.measuredAt).getTime() });
           const { computeCloseUpToNow } = await import("./pf-history");
           const startSec = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
           const upTo = Math.max(0, Math.min(SECONDS_PER_DAY, Math.floor(now / 1000) - startSec));
@@ -231,7 +228,7 @@ export class OTCEngine {
               basePrice,
               volatility: Number(p.volatility),
               category: p.category,
-              seed: seedRow.seed,
+              seed: seedValue,
               sigmaMults,
               upToSecond: upTo,
             });
@@ -383,6 +380,9 @@ export class OTCEngine {
 
   start() {
     if (this.tickTimer) return;
+    if (!this.currentSeed) {
+      throw new Error("OTC engine has no seed — refusing to start rather than generating uncommitted prices");
+    }
     void this.refreshAnchors();
     this.mirrorTimer = setInterval(() => void this.refreshAnchors(), 60_000);
     this.tickTimer = setInterval(() => void this.generateTicks(), TICK_INTERVAL_MS);
@@ -532,8 +532,9 @@ export class OTCEngine {
     await this.measureRegimes(new Date());
     const revealed = await revealDueSeeds(new Date());
     for (const revealedDay of revealed) {
-      const row = await prisma.serverSeed.findUnique({ where: { day: revealedDay } });
-      if (row?.seed && this.onSeedRevealed) this.onSeedRevealed(revealedDay, row.seed);
+      const { getDaySeed } = await import("./seeds");
+      const seedValue = await getDaySeed(revealedDay);
+      if (seedValue && this.onSeedRevealed) this.onSeedRevealed(revealedDay, seedValue);
     }
   }
 
@@ -547,8 +548,9 @@ export class OTCEngine {
       }
       const revealed = await revealDueSeeds(now);
       for (const revealedDay of revealed) {
-        const row = await prisma.serverSeed.findUnique({ where: { day: revealedDay } });
-        if (row?.seed && this.onSeedRevealed) this.onSeedRevealed(revealedDay, row.seed);
+        const { getDaySeed } = await import("./seeds");
+        const seedValue = await getDaySeed(revealedDay);
+        if (seedValue && this.onSeedRevealed) this.onSeedRevealed(revealedDay, seedValue);
       }
       await this.measureRegimes(now);
       try {

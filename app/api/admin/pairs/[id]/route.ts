@@ -84,7 +84,14 @@ export async function PUT(
       }
     } catch {}
 
-    await logAudit(admin.id, "pair.update", "Pair", pair.id, data);
+    const before: Record<string, unknown> = {};
+    if (data.basePrice !== undefined) before.basePrice = Number(existing.basePrice);
+    if (data.volatility !== undefined) before.volatility = Number(existing.volatility);
+    if (data.category !== undefined) before.category = existing.category;
+    if (data.feed !== undefined) before.feed = (existing as { feed?: string }).feed;
+    if (data.spread !== undefined) before.spread = Number(existing.spread);
+    if (data.payoutPercent !== undefined) before.payoutPercent = Number(existing.payoutPercent);
+    await logAudit(admin.id, "pair.update", "Pair", pair.id, { before, after: data });
 
     return Response.json({ pair });
   } catch (e) {

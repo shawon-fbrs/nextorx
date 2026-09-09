@@ -449,6 +449,7 @@ model ServerSeed {
   day        String    @unique
   seedHash   String
   seed       String?
+  seedEnc    String?
   revealed   Boolean   @default(false)
   revealedAt DateTime?
   createdAt  DateTime  @default(now())
@@ -471,12 +472,13 @@ model SecondCandle {
 }
 
 model PairVolRegime {
-  id        String   @id @default(uuid())
-  pairId    String
-  day       String
-  hour      Int
-  sigmaMult Decimal  @db.Decimal(8, 4)
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  pairId     String
+  day        String
+  hour       Int
+  sigmaMult  Decimal  @db.Decimal(8, 4)
+  measuredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   @@unique([pairId, day, hour])
   @@index([day, hour])
