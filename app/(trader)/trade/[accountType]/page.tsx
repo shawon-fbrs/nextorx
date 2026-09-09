@@ -489,7 +489,7 @@ export default function TradingPage() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [tradeError, setTradeError] = useState('');
   const [insufficientOpen, setInsufficientOpen] = useState(false);
-  const [expiryMarks, setExpiryMarks] = useState<Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number }>>([]);
+  const [expiryMarks, setExpiryMarks] = useState<Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number; kind?: 'pill' | 'dot' }>>([]);
   const markerRef = useRef<Map<string, string[]>>(new Map());
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -821,7 +821,7 @@ export default function TradingPage() {
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const updateMarks = () => {
       const now = getServerNow();
-      const marks: Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number }> = [];
+      const marks: Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number; kind?: 'pill' | 'dot' }> = [];
       const nextCloseMs = now + (intervalMs - (now % intervalMs));
       const anchor = chartRef.current?.chartPixel(nextCloseMs, price) ?? chartRef.current?.chartPixel(now + intervalMs, price) ?? null;
       if (anchor) {
@@ -829,21 +829,32 @@ export default function TradingPage() {
         const leftSec = Math.ceil(leftMs / 1000);
         const mm = String(Math.floor(leftSec / 60)).padStart(2, '0');
         const ss = String(leftSec % 60).padStart(2, '0');
-        marks.push({ id: 'candle', x: anchor.x, y: anchor.y, left: `${mm}:${ss}` });
+        marks.push({ id: 'candle', x: anchor.x, y: anchor.y, left: `${mm}:${ss}`, kind: 'pill' });
       }
       const liveTrades = trades.filter((t) => t.status === 'active' && t.openPrice != null && t.expiresAt != null && (!activePair || !t.pairId || t.pairId === activePair.id));
+      const labelW = 104;
+      const gap = 4;
+      const edge = 12;
       liveTrades.forEach((t, i) => {
-        const entryPt = chartRef.current?.chartPixel(t.timestamp, t.openPrice as number) ?? null;
+        const openPrice = t.openPrice as number;
+        const entryPt = chartRef.current?.chartPixel(t.timestamp, openPrice) ?? null;
         if (!entryPt) return;
-        const prevPt = chartRef.current?.chartPixel(t.timestamp - intervalMs, t.openPrice as number) ?? null;
-        const pxCandle = prevPt && Math.abs(entryPt.x - prevPt.x) > 0 ? Math.abs(entryPt.x - prevPt.x) : 8;
-        const labelW = 104;
-        const x = entryPt.x - 2 * pxCandle - i * (labelW + 8);
+        let x: number;
+        if (anchor) {
+          x = anchor.x - edge - (i + 1) * labelW - i * gap;
+        } else {
+          const prevPt = chartRef.current?.chartPixel(t.timestamp - intervalMs, openPrice) ?? null;
+          const pxCandle = prevPt && Math.abs(entryPt.x - prevPt.x) > 0 ? Math.abs(entryPt.x - prevPt.x) : 8;
+          x = entryPt.x - 2 * pxCandle - i * (labelW + gap);
+        }
         const remainSec = Math.max(0, Math.ceil(((t.expiresAt as number) - now) / 1000));
         const mm = String(Math.floor(remainSec / 60)).padStart(2, '0');
         const ss = String(remainSec % 60).padStart(2, '0');
         const amt = Number.isInteger(t.amount) ? `$${t.amount}` : `$${t.amount.toFixed(2)}`;
-        marks.push({ id: `trade:${t.id}`, x, y: entryPt.y, left: `${mm}:${ss}`, amount: amt, dir: t.type, stack: i });
+        marks.push({ id: `trade:${t.id}`, x, y: entryPt.y, left: `${mm}:${ss}`, amount: amt, dir: t.type, stack: i, kind: 'pill' });
+        marks.push({ id: `dot-start:${t.id}`, x: entryPt.x, y: entryPt.y, left: '', dir: t.type, stack: i, kind: 'dot' });
+        const endPt = chartRef.current?.chartPixel(t.timestamp + 3600000, openPrice) ?? null;
+        if (endPt) marks.push({ id: `dot-end:${t.id}`, x: endPt.x, y: endPt.y, left: '', dir: t.type, stack: i, kind: 'dot' });
       });
       setExpiryMarks(marks);
     };
@@ -974,6 +985,19 @@ export default function TradingPage() {
                     >
                       {m.left}
                     </div>
+                  ) : m.kind === 'dot' ? (
+                    <div
+                      key={m.id}
+                      className="absolute z-40 pointer-events-none rounded-full"
+                      style={{
+                        left: m.x - 4,
+                        top: m.y - 4,
+                        width: 8,
+                        height: 8,
+                        backgroundColor: m.dir === 'down' ? '#ff4954' : '#00c365',
+                        boxShadow: '0 0 0 2px rgba(255,255,255,0.9), 0 1px 4px rgba(0,0,0,0.5)',
+                      }}
+                    />
                   ) : (
                     <div
                       key={m.id}
