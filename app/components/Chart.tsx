@@ -24,6 +24,7 @@ interface ChartProps {
   serverTime?: number | null;
   onOverlaySelected?: (overlay: { id: string; name: string } | null) => void;
   onViewChange?: () => void;
+  watermark?: string | null;
 }
 
 export interface ActiveIndicator {
@@ -113,6 +114,28 @@ const CUSTOM_OVERLAYS: Array<{
     },
   },
   {
+    name: 'demoWatermark',
+    totalStep: 1,
+    needDefaultPointFigure: false,
+    needDefaultXAxisFigure: false,
+    needDefaultYAxisFigure: false,
+    createPointFigures: ({ bounding }: {
+      coordinates: Array<{ x: number; y: number }>;
+      overlay: { points?: Array<{ value?: number; timestamp?: number; dataIndex?: number }> };
+      bounding?: { width: number; height: number };
+      chart?: { getSymbol?: () => { pricePrecision?: number } | null };
+    }) => {
+      const b = (bounding ?? {}) as { width?: number; height?: number };
+      const w = typeof b.width === 'number' ? b.width : 0;
+      const h = typeof b.height === 'number' ? b.height : 0;
+      if (w < 50 || h < 50) return [];
+      const size = Math.max(48, Math.min(120, Math.floor(Math.min(w, h) / 5)));
+      return [
+        { type: 'text', key: 'wm', attrs: { x: Math.floor(w / 2), y: Math.floor(h / 2), text: 'DEMO', align: 'center', baseline: 'middle' }, styles: { color: 'rgba(148,163,184,0.30)', size, family: 'Roboto, Arial, sans-serif', weight: 'bold' } },
+      ];
+    },
+  },
+  {
     name: 'fibBox',
     totalStep: 3,
     needDefaultPointFigure: true,
@@ -185,7 +208,7 @@ function storageKey(pairId: string, timeframe: string): string {
   return `nextorx:drawings:${pairId}:${timeframe}`;
 }
 
-export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, seed, timeframe = '1m', serverTime = null, onOverlaySelected, onViewChange }, ref) {
+export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId, pairName, currentPrice, currentCandle, seed, timeframe = '1m', serverTime = null, onOverlaySelected, onViewChange, watermark = null }, ref) {
   const chartIdRef = useRef(`kline-${Math.random().toString(36).slice(2)}`);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<KLineChart | null>(null);
@@ -208,6 +231,36 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const watermarkIdRef = useRef<string | null>(null);
+
+  const ensureWatermark = useCallback((text: string | null) => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    try {
+      const found = (chart.getOverlays({}) ?? []).find(o => o.name === 'demoWatermark');
+      if (text) {
+        if (found && found.id) {
+          watermarkIdRef.current = found.id;
+          return;
+        }
+        const id = chart.createOverlay({
+          name: 'demoWatermark',
+          lock: true,
+          visible: true,
+          points: [{ timestamp: Date.now(), value: 0 }],
+          needDefaultPointFigure: false,
+          needDefaultXAxisFigure: false,
+          needDefaultYAxisFigure: false,
+        } as never);
+        if (typeof id === 'string') watermarkIdRef.current = id;
+      } else if (found && found.id) {
+        try {
+          chart.removeOverlay({ id: found.id });
+        } catch {}
+        watermarkIdRef.current = null;
+      }
+    } catch {}
+  }, []);
 
   const cleanPoints = useCallback((pts: unknown): Array<{ timestamp?: number; value?: number }> => {
     const arr = pts as unknown as Array<{ timestamp?: number; value?: number; dataIndex?: number }> | null | undefined;
@@ -224,7 +277,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     try {
       const chart = chartRef.current;
       if (!chart || !pid) return;
-      const overlays = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
+      const overlays = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment' && o.name !== 'demoWatermark');
       const toSave = overlays.map(o => ({
         name: o.name,
         points: (() => {
@@ -419,6 +472,22 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     }
   }, []);
 
+  const applyGridForTheme = useCallback((mode: string) => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    try {
+      if (mode === 'light') {
+        chart.setStyles({
+          grid: {
+            show: true,
+            horizontal: { show: true, size: 1, color: '#c3cedb', style: 'dashed', dashedValue: [2, 2] },
+            vertical: { show: true, size: 1, color: '#c3cedb', style: 'dashed', dashedValue: [2, 2] },
+          },
+        } as never);
+      }
+    } catch {}
+  }, []);
+
   const applyTooltipTemplate = useCallback(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -451,6 +520,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       } catch {}
       applyChartType(chartTypeRef.current);
       applyTooltipTemplate();
+      applyGridForTheme(mode);
     },
     isAtRealTime: () => {
       try {
@@ -559,7 +629,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     removeAllOverlays: () => {
       const chart = chartRef.current;
       if (chart) {
-        const toRemove = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
+        const toRemove = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment' && o.name !== 'demoWatermark');
         for (const o of toRemove) { if (o.id) chart.removeOverlay({ id: o.id }); }
         if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
         try {
@@ -614,7 +684,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     },
     getOverlays: () => {
       const chart = chartRef.current;
-      return chart ? chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment').map(o => ({ id: o.id ?? '', name: o.name ?? '' })) : [];
+      return chart ? chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment' && o.name !== 'demoWatermark').map(o => ({ id: o.id ?? '', name: o.name ?? '' })) : [];
     },
     getChart: () => chartRef.current,
     drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; endMs?: number; direction: 'up' | 'down' }) => {
@@ -708,6 +778,10 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       } catch {}
       applyTooltipTemplate();
       try {
+        const storedTheme = localStorage.getItem('nextorx:theme');
+        applyGridForTheme(storedTheme === 'light' ? 'light' : 'dark');
+      } catch {}
+      try {
         const inds = chart.getIndicators({}) as unknown as Array<{ id?: string; name?: string }>;
         for (const ind of inds) {
           if (ind.name === 'VOL' && ind.id) chart.removeIndicator({ id: ind.id });
@@ -742,6 +816,15 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       chartRef.current = null;
     };
   }, [notifyViewChange, mountStoredIndicators]);
+
+  useEffect(() => {
+    ensureWatermark(watermark);
+    if (!watermark) return;
+    const timer = setInterval(() => {
+      ensureWatermark(watermark);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [watermark, ensureWatermark]);
 
   useEffect(() => {
     if (!pairId) return;

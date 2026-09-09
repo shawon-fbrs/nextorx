@@ -86,7 +86,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                 {expanded ? (
                   <span className="text-sm font-medium">{item.label}</span>
                 ) : (
-                  <span className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 whitespace-nowrap bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs font-semibold text-foreground opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                  <span className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 whitespace-nowrap bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs font-semibold text-foreground hidden group-hover:block z-50">
                     {item.label}
                   </span>
                 )}
@@ -120,7 +120,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                 {expanded ? (
                   <span className="text-sm font-medium">{item.label}</span>
                 ) : (
-                  <span className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 whitespace-nowrap bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs font-semibold text-foreground opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                  <span className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 whitespace-nowrap bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs font-semibold text-foreground hidden group-hover:block z-50">
                     {item.label}
                   </span>
                 )}
