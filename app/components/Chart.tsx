@@ -27,7 +27,7 @@ interface ChartProps {
 
 export interface ChartHandle {
   createOverlay: (name: string, onSelected?: (id: string) => void, onDeselected?: () => void) => string | null;
-  drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; direction: 'up' | 'down' }) => string[];
+  drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; endMs?: number; direction: 'up' | 'down' }) => string[];
   removeOverlay: (id?: string) => void;
   removeAllOverlays: () => void;
   overrideOverlay: (id: string, overlay: Record<string, unknown>) => void;
@@ -368,19 +368,20 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       return chart ? chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment').map(o => ({ id: o.id ?? '', name: o.name ?? '' })) : [];
     },
     getChart: () => chartRef.current,
-    drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; direction: 'up' | 'down' }) => {
+    drawTradeMarkers: (opts: { entryPrice: number; entryMs: number; endMs?: number; direction: 'up' | 'down' }) => {
       const ids: string[] = [];
       try {
         const chart = chartRef.current;
         if (!chart) return ids;
         const color = opts.direction === 'up' ? '#00c365' : '#ff4954';
+        const endMs = opts.endMs && opts.endMs > opts.entryMs ? opts.endMs : opts.entryMs + 900000;
         const entryId = chart.createOverlay({
           name: 'horizontalSegment',
           lock: true,
           visible: true,
           points: [
             { timestamp: opts.entryMs, value: opts.entryPrice },
-            { timestamp: opts.entryMs + 3600000, value: opts.entryPrice },
+            { timestamp: endMs, value: opts.entryPrice },
           ],
           styles: {
             line: { color, size: 2 },

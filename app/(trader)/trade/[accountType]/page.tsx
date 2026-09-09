@@ -377,6 +377,26 @@ function InsufficientDialog({ open, isDemo, onClose }: { open: boolean; isDemo: 
   );
 }
 
+function TradeFailDialog({ open, message, onClose }: { open: boolean; message: string; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="absolute inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
+      <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[380px] max-w-[calc(100%-2rem)] p-6 text-center" onClick={e => e.stopPropagation()}>
+        <div className="w-14 h-14 rounded-2xl bg-red/10 border border-red/20 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-7 h-7 text-red" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h3 className="text-base font-bold text-white mb-1.5">Trade failed</h3>
+        <p className="text-xs text-text-dark mb-5">{message || 'Trade failed. Please try again.'}</p>
+        <button onClick={onClose} className="w-full bg-surface-hover hover:bg-border text-white text-sm font-bold py-3 rounded-xl transition-colors">
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function IndDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [search, setSearch] = useState('');
   if (!open) return null;
@@ -493,6 +513,7 @@ export default function TradingPage() {
   const [viewSeq, setViewSeq] = useState(0);
   const handleViewChange = useCallback(() => setViewSeq((s) => (s + 1) % 1000000), []);
   const [expiryMarks, setExpiryMarks] = useState<Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number; kind?: 'pill' | 'dot' }>>([]);
+  const [results, setResults] = useState<Array<{ id: string; x: number; y: number; text: string; won: boolean }>>([]);
   const markerRef = useRef<Map<string, string[]>>(new Map());
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -696,6 +717,14 @@ export default function TradingPage() {
             toast.error(`Lost $${t.amount.toFixed(2)} on ${t.symbol || 'trade'}`);
           }
           window.dispatchEvent(new Event('balance-refresh'));
+          try {
+            const pt = chartRef.current?.chartPixel(Date.now(), t.closePrice ?? t.openPrice ?? price) ?? null;
+            if (pt) {
+              const rid = `res:${t.id}`;
+              setResults((prev) => [...prev.slice(-2), { id: rid, x: pt.x, y: pt.y, text: profitText, won: t.status === 'won' }]);
+              setTimeout(() => setResults((prev) => prev.filter((r) => r.id !== rid)), 4000);
+            }
+          } catch {}
         }
       }
       prevActiveRef.current = nowActive;
@@ -706,6 +735,7 @@ export default function TradingPage() {
             const ids = chartRef.current?.drawTradeMarkers({
               entryPrice: t.openPrice,
               entryMs: t.timestamp,
+              endMs: t.expiresAt,
               direction: t.type,
             }) ?? [];
             if (ids.length > 0) markerRef.current.set(t.id, ids);
@@ -836,7 +866,7 @@ export default function TradingPage() {
       }
       const liveTrades = trades.filter((t) => t.status === 'active' && t.openPrice != null && t.expiresAt != null && (!activePair || !t.pairId || t.pairId === activePair.id));
       const labelW = 104;
-      const gap = 4;
+      const gap = 2;
       const edge = 16;
       const livePt = chartRef.current?.chartPixel(now, price) ?? null;
       liveTrades.forEach((t, i) => {
@@ -859,7 +889,7 @@ export default function TradingPage() {
         const amt = Number.isInteger(t.amount) ? `$${t.amount}` : `$${t.amount.toFixed(2)}`;
         marks.push({ id: `trade:${t.id}`, x, y: entryPt.y, left: `${mm}:${ss}`, amount: amt, dir: t.type, stack: i, kind: 'pill' });
         marks.push({ id: `dot-start:${t.id}`, x: entryPt.x, y: entryPt.y, left: '', dir: t.type, stack: i, kind: 'dot' });
-        const endPt = chartRef.current?.chartPixel(t.timestamp + 3600000, openPrice) ?? null;
+        const endPt = chartRef.current?.chartPixel(t.expiresAt as number, openPrice) ?? null;
         if (endPt) marks.push({ id: `dot-end:${t.id}`, x: endPt.x, y: endPt.y, left: '', dir: t.type, stack: i, kind: 'dot' });
       });
       setExpiryMarks(marks);
@@ -905,6 +935,7 @@ export default function TradingPage() {
           const ids = chartRef.current?.drawTradeMarkers({
             entryPrice: Number(t.openPrice),
             entryMs: createdAt,
+            endMs: createdAt + Number(t.durationSeconds || 0) * 1000,
             direction: type,
           }) ?? [];
           if (ids.length > 0) markerRef.current.set(String(t.id), ids);
@@ -938,16 +969,11 @@ export default function TradingPage() {
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
-      {tradeError && (
-        <div className="mx-3 mt-2 px-4 py-2.5 bg-red/10 border border-red/30 rounded-xl text-red text-xs font-semibold flex items-center justify-between flex-shrink-0">
-          <span>{tradeError}</span>
-          <button onClick={() => setTradeError('')} className="ml-3 text-red/70 hover:text-red font-bold">✕</button>
-        </div>
-      )}
       <div className="flex-1 flex min-w-0 overflow-hidden">
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog open={indOpen} onClose={() => setIndOpen(false)} />
           <InsufficientDialog open={insufficientOpen} isDemo={accountType === 'demo'} onClose={() => setInsufficientOpen(false)} />
+          <TradeFailDialog open={!!tradeError} message={tradeError} onClose={() => setTradeError('')} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={handleSelectPair} onClose={handleClosePair} />
             {!activePair ? (
@@ -1047,6 +1073,15 @@ export default function TradingPage() {
                       {m.amount} • {m.left}
                     </div>
                   )
+                ))}
+                {results.map((r) => (
+                  <div
+                    key={r.id}
+                    className={`absolute z-40 pointer-events-none px-2.5 py-1 rounded-xl text-white text-xs font-black tabular-nums whitespace-nowrap shadow-lg ${r.won ? 'bg-green' : 'bg-red'}`}
+                    style={{ left: r.x, top: r.y - 36, transform: 'translateX(-50%)' }}
+                  >
+                    {r.text}
+                  </div>
                 ))}
 
                 {isComingSoon && (
