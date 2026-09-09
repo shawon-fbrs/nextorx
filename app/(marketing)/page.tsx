@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSession } from '@/lib/auth-client';
 
 const candles = [
   { x: 0, top: 90, bottom: 210, bodyTop: 100, bodyH: 80, up: true },
@@ -56,6 +57,8 @@ const stats = [
 ];
 
 export default function LandingPage() {
+  const { data: session } = useSession();
+  const user = session?.user ?? null;
   return (
     <div className="min-h-screen bg-background text-text">
       {/* Navbar */}
@@ -78,12 +81,34 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm font-semibold text-text hover:text-white transition-colors px-4 py-2">
-              Log In
-            </Link>
-            <Link href="/register" className="bg-green hover:bg-green-hover text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors shadow-lg shadow-green/20">
-              Sign Up
-            </Link>
+            {user ? (
+              <>
+                <Link href="/verify" className="text-sm font-semibold text-text hover:text-white transition-colors px-4 py-2">
+                  Verify
+                </Link>
+                <Link href="/trade/demo" className="bg-green hover:bg-green-hover text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors shadow-lg shadow-green/20">
+                  Trade
+                </Link>
+                <Link href="/account" title={user.name || user.email || 'Account'}>
+                  {user.image ? (
+                    <img src={user.image} alt="" className="w-9 h-9 rounded-full object-cover border border-border" />
+                  ) : (
+                    <span className="w-9 h-9 rounded-full bg-blue/20 border border-blue/30 flex items-center justify-center text-sm font-bold text-white">
+                      {(user.name || user.email || 'T').charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="text-sm font-semibold text-text hover:text-white transition-colors px-4 py-2">
+                  Log In
+                </Link>
+                <Link href="/register" className="bg-green hover:bg-green-hover text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors shadow-lg shadow-green/20">
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>

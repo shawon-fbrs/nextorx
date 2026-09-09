@@ -191,6 +191,36 @@ export default function VerifyPage() {
           <div>
             <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Revealed Server Seed (hex)</label>
             <input value={seed} onChange={(e) => setSeed(e.target.value.trim())} placeholder="a1b2c3..." className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-blue" />
+            <button
+              type="button"
+              onClick={async () => {
+                setResult('');
+                setOk(null);
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+                  setResult('Enter the day first (YYYY-MM-DD).');
+                  setOk(false);
+                  return;
+                }
+                try {
+                  const res = await fetch(`/api/market/seed/reveal?day=${encodeURIComponent(day)}`);
+                  const data = await res.json() as { seed?: string; error?: string };
+                  if (!res.ok || !data.seed) {
+                    setResult(data.error || 'Seed for this day is not revealed yet — reveals shortly after the day ends (UTC).');
+                    setOk(false);
+                    return;
+                  }
+                  setSeed(data.seed);
+                  setResult('Revealed seed loaded. Attach the CSV and run verification.');
+                  setOk(true);
+                } catch {
+                  setResult('Could not load the seed. Please try again.');
+                  setOk(false);
+                }
+              }}
+              className="mt-2 text-xs font-semibold text-blue hover:text-white transition-colors"
+            >
+              Load revealed seed for this day →
+            </button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
