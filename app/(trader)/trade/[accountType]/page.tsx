@@ -1050,14 +1050,14 @@ export default function TradingPage() {
                     </>
                   );
                 })()}
-                {expiryMarks.filter((m) => m.id !== 'candle' && m.kind !== 'dot' && m.ex2 != null && Math.abs(m.ex2 - (m.x + 104)) > 4).map((m) => (
+                {expiryMarks.filter((m) => m.id !== 'candle' && m.kind !== 'dot').map((m) => (
                   <div
                     key={`line:${m.id}`}
                     className="absolute z-30 pointer-events-none"
                     style={{
-                      left: Math.min(m.x + 104, m.ex2 as number),
+                      left: 0,
+                      right: 0,
                       top: m.y - 0.5,
-                      width: Math.abs((m.ex2 as number) - (m.x + 104)),
                       height: 2,
                       backgroundColor: m.dir === 'down' ? 'rgba(255,73,84,0.9)' : 'rgba(0,195,101,0.9)',
                       boxShadow: m.dir === 'down' ? '0 0 6px rgba(255,73,84,0.6)' : '0 0 6px rgba(0,195,101,0.6)',
