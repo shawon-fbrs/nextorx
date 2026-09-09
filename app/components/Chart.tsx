@@ -185,32 +185,51 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   const bucketBaseRef = useRef<KLineData | null>(null);
   const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const persistDrawings = useCallback(() => {
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cleanPoints = useCallback((pts: unknown): Array<{ timestamp?: number; value?: number }> => {
+    const arr = pts as unknown as Array<{ timestamp?: number; value?: number; dataIndex?: number }> | null | undefined;
+    if (!Array.isArray(arr)) return [];
+    return arr.map(p => {
+      const q: { timestamp?: number; value?: number } = {};
+      if (typeof p?.timestamp === 'number' && Number.isFinite(p.timestamp)) q.timestamp = p.timestamp;
+      if (typeof p?.value === 'number' && Number.isFinite(p.value)) q.value = p.value;
+      return q;
+    }).filter(p => p.timestamp !== undefined || p.value !== undefined);
+  }, []);
+
+  const writeDrawings = useCallback((pid: string | null, tf: string) => {
     try {
       const chart = chartRef.current;
-      const pid = pairIdRef.current;
-      const tf = timeframeRef.current;
       if (!chart || !pid) return;
       const overlays = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
-      const toSave = overlays.map(o => {
-        const rawPoints = (o as unknown as { points?: Array<{ timestamp?: number; value?: number; dataIndex?: number }> }).points ?? [];
-        const points = rawPoints.map(p => {
-          const q: Record<string, unknown> = {};
-          if (typeof p.timestamp === 'number' && Number.isFinite(p.timestamp)) q.timestamp = p.timestamp;
-          if (typeof p.value === 'number' && Number.isFinite(p.value)) q.value = p.value;
-          return q;
-        }).filter(p => p.timestamp !== undefined || p.value !== undefined);
-        return {
-          name: o.name,
-          points: points.length ? points : o.points,
-          styles: o.styles,
-          lock: (o as unknown as { lock?: boolean }).lock,
-          visible: (o as unknown as { visible?: boolean }).visible,
-        };
-      });
-      localStorage.setItem(storageKey(pid, tf), JSON.stringify(toSave));
+      const toSave = overlays.map(o => ({
+        name: o.name,
+        points: (() => {
+          const cleaned = cleanPoints((o as unknown as { points?: unknown }).points);
+          return cleaned.length ? cleaned : (o as unknown as { points?: unknown }).points;
+        })(),
+        styles: o.styles,
+        lock: (o as unknown as { lock?: boolean }).lock,
+        visible: (o as unknown as { visible?: boolean }).visible,
+      }));
+      const key = storageKey(pid, tf);
+      if (toSave.length === 0) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw && (JSON.parse(raw) as unknown[]).length > 0) return;
+        } catch {}
+      }
+      localStorage.setItem(key, JSON.stringify(toSave));
     } catch {}
-  }, []);
+  }, [cleanPoints]);
+
+  const persistDrawings = useCallback(() => {
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      writeDrawings(pairIdRef.current, timeframeRef.current);
+    }, 250);
+  }, [writeDrawings]);
 
   const restoreDrawings = useCallback(() => {
     try {
@@ -223,28 +242,18 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       const arr = JSON.parse(raw) as Array<{ name: string; points: unknown; styles: unknown; lock?: boolean; visible?: boolean }>;
       if (!Array.isArray(arr) || arr.length === 0) return;
       const existing = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
-      if (existing.length > 0) {
-        const existingSig = new Set(existing.map(o => `${o.name}:${JSON.stringify(o.points)}`));
-        const toRestoreSig = new Set(arr.filter(o => o.name && o.points).map(o => {
-          const pts = o.points as unknown as Array<{ timestamp?: number; value?: number }>;
-          const clean = Array.isArray(pts) ? pts.map(p => ({ timestamp: p?.timestamp, value: p?.value })) : [];
-          return `${o.name}:${JSON.stringify(clean)}`;
-        }));
-        const already = [...toRestoreSig].every(s => existingSig.has(s)) && existing.length === arr.length;
-        if (already) return;
-        for (const o of existing) { if (o.id) try { chart.removeOverlay({ id: o.id }); } catch {} }
-      }
+      const existingSig = new Set(existing.map(o => {
+        const cleaned = cleanPoints((o as unknown as { points?: unknown }).points);
+        return `${o.name}:${JSON.stringify(cleaned)}`;
+      }));
       for (const o of arr) {
         if (!o.name || !o.points) continue;
         try {
-          const rawPts = o.points as unknown as Array<{ timestamp?: number; value?: number; dataIndex?: number }>;
-          const pts = Array.isArray(rawPts) ? rawPts.map(p => {
-            const q: Record<string, unknown> = {};
-            if (typeof p?.timestamp === 'number' && Number.isFinite(p.timestamp)) q.timestamp = p.timestamp;
-            if (typeof p?.value === 'number' && Number.isFinite(p.value)) q.value = p.value;
-            return q;
-          }).filter(p => p.timestamp !== undefined || p.value !== undefined) : rawPts as unknown;
-          const points = (pts as unknown as Array<Record<string,unknown>>).length ? pts : rawPts;
+          const pts = cleanPoints(o.points);
+          if (pts.length === 0) continue;
+          if (existingSig.has(`${o.name}:${JSON.stringify(pts)}`)) continue;
+          existingSig.add(`${o.name}:${JSON.stringify(pts)}`);
+          const points = pts;
           chart.createOverlay({
             name: o.name,
             points: points as never,
@@ -355,7 +364,11 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       if (chart) {
         const toRemove = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
         for (const o of toRemove) { if (o.id) chart.removeOverlay({ id: o.id }); }
-        setTimeout(persistDrawings, 50);
+        if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+        try {
+          const pid = pairIdRef.current;
+          if (pid) localStorage.setItem(storageKey(pid, timeframeRef.current), JSON.stringify([]));
+        } catch {}
       }
     },
     overrideOverlay: (id: string, overlay: Record<string, unknown>) => {
@@ -521,7 +534,14 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     const ro = new ResizeObserver(() => { chart?.resize(); });
     ro.observe(chartContainerRef.current);
 
+    const onPageHide = () => {
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+      writeDrawings(pairIdRef.current, timeframeRef.current);
+    };
+    window.addEventListener('pagehide', onPageHide);
+
     return () => {
+      window.removeEventListener('pagehide', onPageHide);
       ro.disconnect();
       try {
         chartRef.current?.unsubscribeAction('onZoom', notifyViewChange);
@@ -537,10 +557,8 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     if (!pairId) return;
     const prevPid = pairIdRef.current;
     const prevTf = timeframeRef.current;
-    if (prevPid && prevPid !== pairId) {
-      persistDrawings();
-    } else if (prevTf !== timeframe) {
-      persistDrawings();
+    if ((prevPid && prevPid !== pairId) || prevTf !== timeframe) {
+      writeDrawings(prevPid, prevTf);
     }
     pairIdRef.current = pairId;
     timeframeRef.current = timeframe;
@@ -587,7 +605,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     return () => {
       if (restoreTimerRef.current) clearTimeout(restoreTimerRef.current);
     };
-  }, [pairId, seed, timeframe, restoreDrawings, persistDrawings]);
+  }, [pairId, seed, timeframe, restoreDrawings, writeDrawings]);
 
   useEffect(() => {
     if (!currentCandle) return;

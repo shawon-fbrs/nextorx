@@ -726,7 +726,9 @@ export default function TradingPage() {
           window.dispatchEvent(new Event('balance-refresh'));
           try {
             const live = priceRef.current || price;
-            const pt = chartRef.current?.chartPixel(Date.now(), live) ?? null;
+            const pt = (!activePair || !t.pairId || t.pairId === activePair.id)
+              ? (chartRef.current?.chartPixel(Date.now(), live) ?? null)
+              : null;
             if (pt) {
               const rid = `res:${t.id}`;
               const px = activePair && activePair.id.includes('JPY') ? 3 : 5;
