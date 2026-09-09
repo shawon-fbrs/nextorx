@@ -72,7 +72,7 @@ export default function SetPasswordPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24">
+            <svg className="w-8 h-8 text-foreground" fill="none" viewBox="0 0 24 24">
               <rect fill="currentColor" height="12" rx="1" width="3" x="2" y="6" />
               <rect fill="currentColor" height="18" rx="1" width="3" x="12" y="3" />
               <rect fill="currentColor" height="8" rx="1" width="3" x="12" y="8" />
@@ -80,7 +80,7 @@ export default function SetPasswordPage() {
             </svg>
             <span className="text-white font-bold text-xl tracking-wide">NEXTORX</span>
           </Link>
-          <h1 className="text-2xl font-black text-white mb-2">Secure your account</h1>
+          <h1 className="text-2xl font-black text-foreground mb-2">Secure your account</h1>
           <p className="text-sm text-text-dark">You signed in with Google. Set a password so you can always recover access and confirm sensitive actions.</p>
         </div>
 
@@ -100,7 +100,7 @@ export default function SetPasswordPage() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Min. 12 characters"
                 required
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
               />
               {newPassword && (
                 <div className="mt-2">
@@ -128,7 +128,7 @@ export default function SetPasswordPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repeat your password"
                 required
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
               />
             </div>
             <button

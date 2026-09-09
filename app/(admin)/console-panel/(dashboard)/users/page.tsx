@@ -34,7 +34,7 @@ const columns = [
           <span className="text-xs font-bold text-blue">{user.name.charAt(0).toUpperCase()}</span>
         </div>
         <div>
-          <p className="text-sm font-medium text-white">{user.name}</p>
+          <p className="text-sm font-medium text-foreground">{user.name}</p>
           <p className="text-[11px] text-textDark">{user.email}</p>
         </div>
       </div>
@@ -51,7 +51,7 @@ const columns = [
     key: 'balance',
     header: 'Balance',
     render: (user: User): ReactNode => (
-      <span className="text-sm font-medium text-white">
+      <span className="text-sm font-medium text-foreground">
         ${(user.balance / 100).toFixed(2)}
       </span>
     ),
@@ -154,7 +154,7 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Users</h1>
+        <h1 className="text-xl font-bold text-foreground">Users</h1>
         <p className="text-sm text-textDark">Manage your platform users</p>
       </div>
 

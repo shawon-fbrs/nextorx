@@ -65,7 +65,7 @@ export default function AuditPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Audit Logs</h1>
+        <h1 className="text-xl font-bold text-foreground">Audit Logs</h1>
         <p className="text-sm text-textDark">Track all admin actions</p>
       </div>
 
@@ -99,7 +99,7 @@ export default function AuditPage() {
                   filtered.map((log) => (
                     <tr key={log.id} className="border-b border-border/50 hover:bg-surface-hover/50">
                       <td className="px-3 py-2 text-[11px] text-text">{new Date(log.createdAt).toLocaleString()}</td>
-                      <td className="px-3 py-2 text-sm font-medium text-white">{log.actor?.name ?? 'System'}</td>
+                      <td className="px-3 py-2 text-sm font-medium text-foreground">{log.actor?.name ?? 'System'}</td>
                       <td className="px-3 py-2">{getActionBadge(log.action)}</td>
                       <td className="px-3 py-2 text-sm text-text">{log.entity}:{log.entityId.slice(0, 8)}</td>
                       <td className="px-3 py-2 text-[11px] text-textDark font-mono">{log.ipAddress ?? '—'}</td>

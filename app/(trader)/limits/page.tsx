@@ -90,23 +90,23 @@ export default function LimitsPage() {
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6 max-w-xl mx-auto">
         <Link href="/trade/demo" className="text-xs text-blue font-semibold">← Back</Link>
-        <h1 className="text-xl font-bold text-white mt-2">Responsible Trading</h1>
+        <h1 className="text-xl font-bold text-foreground mt-2">Responsible Trading</h1>
         <p className="text-sm text-text-dark mt-1">Protect yourself with deposit limits and time-outs.</p>
         {message && <p className="text-xs text-orange mt-3">{message}</p>}
 
         <div className="mt-4 p-4 bg-surface border border-border rounded-xl space-y-3">
-          <h2 className="text-sm font-bold text-white">Daily Deposit Limit</h2>
+          <h2 className="text-sm font-bold text-foreground">Daily Deposit Limit</h2>
           <p className="text-xs text-text-dark">
             Current: {savedLimit != null ? `$${(savedLimit / 100).toFixed(2)}` : 'No limit'}
           </p>
-          <input value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="Amount in USD (empty = no limit)" inputMode="decimal" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue" />
+          <input value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="Amount in USD (empty = no limit)" inputMode="decimal" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-text-dark/50 focus:outline-none focus:border-blue" />
           <button onClick={handleSaveLimit} disabled={saving} className="w-full bg-blue text-white font-semibold rounded-xl py-3 text-sm disabled:opacity-50">
             Save Limit
           </button>
         </div>
 
         <div className="mt-4 p-4 bg-surface border border-red/30 rounded-xl space-y-3">
-          <h2 className="text-sm font-bold text-white">Self-Exclusion</h2>
+          <h2 className="text-sm font-bold text-foreground">Self-Exclusion</h2>
           {exclusion ? (
             <p className="text-xs text-red">Active until {new Date(exclusion.excludedUntil).toLocaleDateString()}. Trading and deposits are blocked.</p>
           ) : (

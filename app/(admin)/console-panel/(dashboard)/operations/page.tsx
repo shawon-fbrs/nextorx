@@ -89,7 +89,7 @@ export default function OperationsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">Operations</h1>
+          <h1 className="text-xl font-bold text-foreground">Operations</h1>
           <p className="text-sm text-textDark">Platform overview and health</p>
         </div>
         {settlement && (
@@ -129,7 +129,7 @@ export default function OperationsPage() {
               </div>
               <div>
                 <p className="text-[10px] text-textDark uppercase">Settlement</p>
-                <p className="text-lg font-bold text-white">
+                <p className="text-lg font-bold text-foreground">
                   {settlement ? (settlement.paused ? 'Paused' : settlement.backlog > 0 ? `${settlement.backlog} queued` : 'Caught up') : '—'}
                 </p>
               </div>
@@ -161,7 +161,7 @@ export default function OperationsPage() {
               </div>
               <div>
                 <p className="text-[10px] text-textDark uppercase">Today's Trades</p>
-                <p className="text-lg font-bold text-white">{stats.todayTrades}</p>
+                <p className="text-lg font-bold text-foreground">{stats.todayTrades}</p>
               </div>
             </div>
           </CardContent>
@@ -198,7 +198,7 @@ export default function OperationsPage() {
                 <div className="flex items-center gap-3">
                   <div className={`w-2.5 h-2.5 rounded-full ${service.ok === null ? 'bg-orange' : service.ok ? 'bg-green' : 'bg-red'}`} />
                   <div>
-                    <span className="text-sm font-medium text-white block">{service.name}</span>
+                    <span className="text-sm font-medium text-foreground block">{service.name}</span>
                     {service.detail && <span className="text-[11px] text-textDark">{service.detail}</span>}
                   </div>
                 </div>

@@ -74,12 +74,12 @@ export default function KycPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">KYC Verification</h1>
+        <h1 className="text-xl font-bold text-foreground">KYC Verification</h1>
         <p className="text-sm text-textDark">Review and verify user identity documents (Tier 1 manual review)</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <Card><CardContent><p className="text-[11px] text-textDark uppercase">Pending Review</p><p className="text-2xl font-bold text-white">{counts.PENDING ?? 0}</p></CardContent></Card>
+        <Card><CardContent><p className="text-[11px] text-textDark uppercase">Pending Review</p><p className="text-2xl font-bold text-foreground">{counts.PENDING ?? 0}</p></CardContent></Card>
         <Card><CardContent><p className="text-[11px] text-textDark uppercase">Approved</p><p className="text-2xl font-bold text-green">{counts.APPROVED ?? 0}</p></CardContent></Card>
         <Card><CardContent><p className="text-[11px] text-textDark uppercase">Rejected</p><p className="text-2xl font-bold text-red">{counts.REJECTED ?? 0}</p></CardContent></Card>
       </div>
@@ -105,7 +105,7 @@ export default function KycPage() {
               {submissions.map((s) => (
                 <div key={s.id} className="flex items-center gap-4 p-3 bg-background rounded-lg border border-border">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{s.user?.email ?? s.userId}</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{s.user?.email ?? s.userId}</p>
                     <p className="text-[11px] text-textDark">{s.idType?.replace('_', ' ') ?? '—'} · {new Date(s.createdAt).toLocaleString()}</p>
                   </div>
                   <Badge variant={s.status === 'APPROVED' ? 'success' : s.status === 'REJECTED' ? 'danger' : 'warning'}>{s.status}</Badge>

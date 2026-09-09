@@ -244,7 +244,7 @@ export default function PaymentMethodsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Payment Methods</h1>
+        <h1 className="text-xl font-bold text-foreground">Payment Methods</h1>
         <p className="text-sm text-textDark">Rails, limits, wallets, and artwork. Amounts in USD.</p>
       </div>
 
@@ -293,10 +293,10 @@ export default function PaymentMethodsPage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={m.logoUrl} alt={m.label} className="w-9 h-9 rounded-full object-contain bg-white" />
                     ) : (
-                      <span className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-sm font-bold text-white">{m.label.slice(0, 1)}</span>
+                      <span className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-sm font-bold text-foreground">{m.label.slice(0, 1)}</span>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white">{m.label} <span className="text-textDark font-mono text-xs">({m.name}{m.networkName ? ` · ${m.networkName}` : ''})</span></p>
+                      <p className="text-sm font-bold text-foreground">{m.label} <span className="text-textDark font-mono text-xs">({m.name}{m.networkName ? ` · ${m.networkName}` : ''})</span></p>
                       <p className="text-[11px] text-textDark">{m.region} · dep ${(m.minDeposit / 100).toFixed(0)}–${(m.maxDeposit / 100).toFixed(0)} · wd ${(m.minWithdraw / 100).toFixed(0)}–${(m.maxWithdraw / 100).toFixed(0)}</p>
                     </div>
                     <Badge variant={m.active ? 'success' : 'neutral'}>{m.active ? 'active' : 'off'}</Badge>
@@ -390,7 +390,7 @@ function ResourcePicker({
   return (
     <Dialog open onClose={onClose}>
       <DialogHeader onClose={onClose}>
-        <h2 className="text-lg font-bold text-white">{title}</h2>
+        <h2 className="text-lg font-bold text-foreground">{title}</h2>
       </DialogHeader>
       <DialogContent className="space-y-3">
         <div className="flex gap-2 flex-wrap">
@@ -398,7 +398,7 @@ function ResourcePicker({
             <button
               key={c.id}
               onClick={() => setCatId(c.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${catId === c.id ? 'border-blue/50 bg-blue/10 text-white' : 'border-border text-textDark'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${catId === c.id ? 'border-blue/50 bg-blue/10 text-foreground' : 'border-border text-textDark'}`}
             >
               {c.name}
             </button>

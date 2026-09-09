@@ -90,7 +90,7 @@ export default function SupportPage() {
       <div className="px-6 py-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-white">Support Center</h1>
+            <h1 className="text-xl font-bold text-foreground">Support Center</h1>
             <p className="text-sm text-text-dark mt-1">Find answers or contact our team</p>
           </div>
         </div>
@@ -130,7 +130,7 @@ export default function SupportPage() {
                       placeholder="Search questions..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-surface border border-border rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-text-dark focus:outline-none focus:border-blue transition-colors"
+                      className="w-full bg-surface border border-border rounded-xl pl-10 pr-4 py-3 text-sm text-foreground placeholder:text-text-dark focus:outline-none focus:border-blue transition-colors"
                     />
                   </div>
                 </div>
@@ -148,7 +148,7 @@ export default function SupportPage() {
                           </svg>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="text-sm font-semibold text-white block">{category.title}</span>
+                          <span className="text-sm font-semibold text-foreground block">{category.title}</span>
                           <span className="text-[11px] text-text-dark">{category.items.length} questions</span>
                         </div>
                         <svg
@@ -196,7 +196,7 @@ export default function SupportPage() {
             {activeTab === 'contact' && (
               <div className="bg-surface border border-border rounded-xl p-6 space-y-4">
                 <div>
-                  <h3 className="text-sm font-bold text-white mb-1">Email support</h3>
+                  <h3 className="text-sm font-bold text-foreground mb-1">Email support</h3>
                   <p className="text-xs text-text-dark leading-relaxed">
                     Write to <span className="text-white font-semibold">support@nextorx.247play.win</span> from
                     your account email. Include your UID (shown on the Account page) and screenshots
@@ -204,7 +204,7 @@ export default function SupportPage() {
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white mb-1">Urgent: locked out?</h3>
+                  <h3 className="text-sm font-bold text-foreground mb-1">Urgent: locked out?</h3>
                   <p className="text-xs text-text-dark leading-relaxed">
                     Use a recovery code first. If those are lost, email us with your ID document attached —
                     2FA resets require manual identity verification.

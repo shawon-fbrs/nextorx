@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24">
+            <svg className="w-8 h-8 text-foreground" fill="none" viewBox="0 0 24 24">
               <rect fill="currentColor" height="12" rx="1" width="3" x="2" y="6" />
               <rect fill="currentColor" height="18" rx="1" width="3" x="7" y="3" />
               <rect fill="currentColor" height="8" rx="1" width="3" x="12" y="8" />
@@ -49,7 +49,7 @@ export default function ForgotPasswordPage() {
             </svg>
             <span className="text-white font-bold text-xl tracking-wide">NEXTORX</span>
           </Link>
-          <h1 className="text-2xl font-black text-white mb-2">Reset your password</h1>
+          <h1 className="text-2xl font-black text-foreground mb-2">Reset your password</h1>
           <p className="text-sm text-text-dark">
             Enter your email and we&apos;ll send you a reset link
           </p>
@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@email.com"
                     required
-                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
                   />
                 </div>
                 <button

@@ -125,7 +125,7 @@ export default function ResourcesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Resources</h1>
+        <h1 className="text-xl font-bold text-foreground">Resources</h1>
         <p className="text-sm text-textDark">Media library for payment logos and QR codes. Click a file to copy its URL.</p>
       </div>
 
@@ -140,7 +140,7 @@ export default function ResourcesPage() {
             ) : (
               categories.map((c) => (
                 <div key={c.id} className={`flex items-center gap-2 p-2 rounded-lg border ${selectedId === c.id ? 'border-blue/50 bg-blue/5' : 'border-border'}`}>
-                  <button onClick={() => setSelectedId(c.id)} className="flex-1 text-left text-sm font-semibold text-white truncate">
+                  <button onClick={() => setSelectedId(c.id)} className="flex-1 text-left text-sm font-semibold text-foreground truncate">
                     {c.name} <span className="text-textDark font-normal">({c._count.assets})</span>
                   </button>
                   <button onClick={() => deleteCategory(c)} className="text-[11px] text-red hover:text-red-hover font-bold px-1">✕</button>

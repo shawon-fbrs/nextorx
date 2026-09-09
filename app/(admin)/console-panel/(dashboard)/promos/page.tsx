@@ -103,7 +103,7 @@ export default function PromosPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">Promo Codes</h1>
+          <h1 className="text-xl font-bold text-foreground">Promo Codes</h1>
           <p className="text-sm text-textDark">Deposit bonuses. Amounts in USD. 0 = unlimited.</p>
         </div>
         <Button onClick={() => { setForm(EMPTY); setError(''); setDialogOpen(true); }}>+ New Promo</Button>
@@ -122,7 +122,7 @@ export default function PromosPage() {
                 <div key={p.id} className="flex items-center gap-4 p-3 bg-background rounded-lg border border-border">
                   <Toggle checked={p.active} onChange={() => handleToggle(p)} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-mono font-bold text-white">{p.code}</p>
+                    <p className="text-sm font-mono font-bold text-foreground">{p.code}</p>
                     <p className="text-[11px] text-textDark">
                       {p.percent}% bonus · max ${(p.maxBonus / 100).toFixed(2)} · min dep ${(p.minDeposit / 100).toFixed(2)} · used {p._count.uses}{p.maxUses > 0 ? `/${p.maxUses}` : ''}
                     </p>
@@ -137,7 +137,7 @@ export default function PromosPage() {
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)}>
         <DialogHeader onClose={() => setDialogOpen(false)}>
-          <h2 className="text-lg font-bold text-white">New Promo Code</h2>
+          <h2 className="text-lg font-bold text-foreground">New Promo Code</h2>
         </DialogHeader>
         <DialogContent className="space-y-4">
           {error && <p className="text-xs text-red font-semibold">{error}</p>}

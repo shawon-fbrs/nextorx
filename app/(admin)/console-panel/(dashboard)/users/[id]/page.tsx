@@ -174,7 +174,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               <span className="text-lg font-bold text-blue">{user.name.charAt(0).toUpperCase()}</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">{user.name}</h1>
+              <h1 className="text-xl font-bold text-foreground">{user.name}</h1>
               <p className="text-sm text-textDark">{user.email}</p>
             </div>
             <Badge variant={user.banned ? 'danger' : 'success'}>{user.banned ? 'blocked' : 'active'}</Badge>
@@ -215,16 +215,16 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
         <CardHeader><CardTitle>User Information</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4">
-            <div><p className="text-[11px] text-textDark uppercase">UID</p><p className="text-sm text-white font-mono">{user.uid}</p></div>
+            <div><p className="text-[11px] text-textDark uppercase">UID</p><p className="text-sm text-foreground font-mono">{user.uid}</p></div>
             <div>
               <p className="text-[11px] text-textDark uppercase mb-1">Role</p>
               <Select value={role} onChange={(e) => handleRoleChange(e.target.value)} options={ROLES} />
             </div>
             <div><p className="text-[11px] text-textDark uppercase">KYC</p><Badge variant={user.kycStatus === 'TIER_1' ? 'success' : 'warning'}>{user.kycStatus.toLowerCase()}</Badge></div>
-            <div><p className="text-[11px] text-textDark uppercase">Referral Code</p><p className="text-sm text-white font-mono">{user.referralCode}</p></div>
-            <div><p className="text-[11px] text-textDark uppercase">Phone</p><p className="text-sm text-white">{user.phone ?? '—'}</p></div>
-            <div><p className="text-[11px] text-textDark uppercase">Country</p><p className="text-sm text-white">{user.country ?? '—'}</p></div>
-            <div><p className="text-[11px] text-textDark uppercase">Joined</p><p className="text-sm text-white">{new Date(user.createdAt).toLocaleDateString()}</p></div>
+            <div><p className="text-[11px] text-textDark uppercase">Referral Code</p><p className="text-sm text-foreground font-mono">{user.referralCode}</p></div>
+            <div><p className="text-[11px] text-textDark uppercase">Phone</p><p className="text-sm text-foreground">{user.phone ?? '—'}</p></div>
+            <div><p className="text-[11px] text-textDark uppercase">Country</p><p className="text-sm text-foreground">{user.country ?? '—'}</p></div>
+            <div><p className="text-[11px] text-textDark uppercase">Joined</p><p className="text-sm text-foreground">{new Date(user.createdAt).toLocaleDateString()}</p></div>
             {user.banned && user.banReason && (
               <div><p className="text-[11px] text-textDark uppercase">Ban Reason</p><p className="text-sm text-red">{user.banReason}</p></div>
             )}
@@ -255,7 +255,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
       <Dialog open={adjustBalanceOpen} onClose={() => setAdjustBalanceOpen(false)}>
         <DialogHeader onClose={() => setAdjustBalanceOpen(false)}>
-          <h2 className="text-lg font-bold text-white">Adjust Balance</h2>
+          <h2 className="text-lg font-bold text-foreground">Adjust Balance</h2>
         </DialogHeader>
         <DialogContent className="space-y-4">
           <p className="text-sm text-orange">Current: ${(user.balance / 100).toFixed(2)}</p>
@@ -274,7 +274,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
       <Dialog open={banOpen} onClose={() => { setBanOpen(false); setBanReason(''); }}>
         <DialogHeader onClose={() => { setBanOpen(false); setBanReason(''); }}>
-          <h2 className="text-lg font-bold text-white">{user.banned ? 'Unban User' : 'Ban User'}</h2>
+          <h2 className="text-lg font-bold text-foreground">{user.banned ? 'Unban User' : 'Ban User'}</h2>
         </DialogHeader>
         <DialogContent className="space-y-4">
           {user.banned ? (

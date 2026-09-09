@@ -137,12 +137,12 @@ export default function FinancePage() {
     {
       key: 'userName',
       header: 'User',
-      render: (t: Txn) => <span className="font-medium text-white">{t.userName}</span>,
+      render: (t: Txn) => <span className="font-medium text-foreground">{t.userName}</span>,
     },
     {
       key: 'amount',
       header: 'Amount',
-      render: (t: Txn) => <span className="font-medium text-white">${(t.amount / 100).toFixed(2)}</span>,
+      render: (t: Txn) => <span className="font-medium text-foreground">${(t.amount / 100).toFixed(2)}</span>,
     },
     {
       key: 'method',
@@ -183,7 +183,7 @@ export default function FinancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Finance</h1>
+        <h1 className="text-xl font-bold text-foreground">Finance</h1>
         <p className="text-sm text-textDark">Manage deposits and withdrawals</p>
       </div>
 
@@ -249,7 +249,7 @@ export default function FinancePage() {
         <Card className="border-blue/50 bg-blue/5">
           <CardContent>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-white">{selectedIds.size} item(s) selected</span>
+              <span className="text-sm font-medium text-foreground">{selectedIds.size} item(s) selected</span>
               <div className="flex items-center gap-2">
                 <Button variant="secondary" size="sm" onClick={() => setSelectedIds(new Set())}>Clear</Button>
               </div>
@@ -273,7 +273,7 @@ export default function FinancePage() {
 
       <Dialog open={!!selectedTxn} onClose={() => setSelectedTxn(null)}>
         <DialogHeader onClose={() => setSelectedTxn(null)}>
-          <h2 className="text-lg font-bold text-white">Transaction Details</h2>
+          <h2 className="text-lg font-bold text-foreground">Transaction Details</h2>
         </DialogHeader>
         <DialogContent>
           {selectedTxn && (
@@ -290,10 +290,10 @@ export default function FinancePage() {
                 </Badge>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><p className="text-[11px] text-textDark uppercase">ID</p><p className="text-sm text-white font-mono">{selectedTxn.id}</p></div>
-                <div><p className="text-[11px] text-textDark uppercase">User</p><p className="text-sm text-white">{selectedTxn.userName}</p></div>
-                <div><p className="text-[11px] text-textDark uppercase">Amount</p><p className="text-lg font-bold text-white">${(selectedTxn.amount / 100).toFixed(2)}</p></div>
-                <div><p className="text-[11px] text-textDark uppercase">Method</p><p className="text-sm text-white">{selectedTxn.method} {selectedTxn.network}</p></div>
+                <div><p className="text-[11px] text-textDark uppercase">ID</p><p className="text-sm text-foreground font-mono">{selectedTxn.id}</p></div>
+                <div><p className="text-[11px] text-textDark uppercase">User</p><p className="text-sm text-foreground">{selectedTxn.userName}</p></div>
+                <div><p className="text-[11px] text-textDark uppercase">Amount</p><p className="text-lg font-bold text-foreground">${(selectedTxn.amount / 100).toFixed(2)}</p></div>
+                <div><p className="text-[11px] text-textDark uppercase">Method</p><p className="text-sm text-foreground">{selectedTxn.method} {selectedTxn.network}</p></div>
                 {selectedTxn.txHash && <div className="col-span-2"><p className="text-[11px] text-textDark uppercase">{selectedTxn.type === 'deposit' ? 'Tx Hash' : 'Wallet Address'}</p><p className="text-sm text-text font-mono break-all">{selectedTxn.txHash}</p></div>}
                 <div><p className="text-[11px] text-textDark uppercase">Created</p><p className="text-sm text-text">{new Date(selectedTxn.createdAt).toLocaleString()}</p></div>
                 {selectedTxn.reviewedAt && <div><p className="text-[11px] text-textDark uppercase">Reviewed</p><p className="text-sm text-text">{new Date(selectedTxn.reviewedAt).toLocaleString()}</p></div>}

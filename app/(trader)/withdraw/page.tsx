@@ -86,13 +86,13 @@ export default function WithdrawPage() {
       <div className="px-6 py-6">
         <div className="mb-6">
           <Link href="/trade/demo" className="text-xs text-blue hover:text-blue-hover mb-2 inline-block">&larr; Back</Link>
-          <h1 className="text-xl font-bold text-white">Withdrawal</h1>
+          <h1 className="text-xl font-bold text-foreground">Withdrawal</h1>
           <p className="text-sm text-text-dark mt-1">Withdraw your earnings</p>
         </div>
 
         <div className="bg-surface border border-border rounded-xl p-5 mb-6">
           <p className="text-xs text-text-dark mb-1">Available Balance</p>
-          <p className="text-2xl font-bold text-white">${((user.balance || 0) / 100).toFixed(2)}</p>
+          <p className="text-2xl font-bold text-foreground">${((user.balance || 0) / 100).toFixed(2)}</p>
           <p className="text-[10px] text-text-dark mt-1">Withdrawals are processed within 24 hours</p>
         </div>
 
@@ -115,7 +115,7 @@ export default function WithdrawPage() {
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-sm font-semibold text-white">{method.label}</span>
+                        <span className="text-sm font-semibold text-foreground">{method.label}</span>
                         <span className="text-[11px] text-text-dark ml-2">({method.networkName})</span>
                       </div>
                       <span className="text-[10px] text-text-dark">
@@ -137,7 +137,7 @@ export default function WithdrawPage() {
               placeholder="0.00"
               min="1"
               max={(user.balance || 0) / 100}
-              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
             />
             <p className="text-[10px] text-text-dark mt-1">
               Max: ${((user.balance || 0) / 100).toFixed(2)}
@@ -151,7 +151,7 @@ export default function WithdrawPage() {
               value={walletAddress}
               onChange={(e) => setWalletAddress(e.target.value)}
               placeholder="Paste your wallet address"
-              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
             />
             <p className="text-[10px] text-text-dark mt-1">
               Double-check your address. Wrong addresses cannot be recovered.

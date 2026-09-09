@@ -63,7 +63,7 @@ export default function AnalysisPage() {
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6 max-w-2xl mx-auto">
         <Link href="/trade/demo" className="text-xs text-blue font-semibold">← Back</Link>
-        <h1 className="text-xl font-bold text-white mt-2">Analysis</h1>
+        <h1 className="text-xl font-bold text-foreground mt-2">Analysis</h1>
         <p className="text-sm text-text-dark mt-1">Your performance from settled trades.</p>
 
         <div className="grid grid-cols-2 gap-3 mt-4">
@@ -75,22 +75,22 @@ export default function AnalysisPage() {
           </div>
           <div className="p-4 bg-surface border border-border rounded-xl">
             <p className="text-xs text-text-dark uppercase tracking-wider">Win Rate</p>
-            <p className="text-2xl font-bold text-white">{winRate}%</p>
+            <p className="text-2xl font-bold text-foreground">{winRate}%</p>
             <p className="text-[11px] text-text-dark">{wins.length}/{settled.length} won</p>
           </div>
           <div className="p-4 bg-surface border border-border rounded-xl">
             <p className="text-xs text-text-dark uppercase tracking-wider">Volume</p>
-            <p className="text-2xl font-bold text-white">${(volume / 100).toFixed(2)}</p>
+            <p className="text-2xl font-bold text-foreground">${(volume / 100).toFixed(2)}</p>
           </div>
           <div className="p-4 bg-surface border border-border rounded-xl">
             <p className="text-xs text-text-dark uppercase tracking-wider">Trades</p>
-            <p className="text-2xl font-bold text-white">{settled.length}</p>
+            <p className="text-2xl font-bold text-foreground">{settled.length}</p>
           </div>
         </div>
 
         {dayRows.length > 0 && (
           <div className="mt-4 p-4 bg-surface border border-border rounded-xl">
-            <p className="text-xs font-bold text-white mb-3">Daily P&L (last 14 days)</p>
+            <p className="text-xs font-bold text-foreground mb-3">Daily P&L (last 14 days)</p>
             <div className="flex items-end gap-1 h-28">
               {dayRows.map(([day, v]) => (
                 <div key={day} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${day}: $${(v / 100).toFixed(2)}`}>
@@ -109,10 +109,10 @@ export default function AnalysisPage() {
 
         {pairRows.length > 0 && (
           <div className="mt-4 p-4 bg-surface border border-border rounded-xl">
-            <p className="text-xs font-bold text-white mb-2">Best & Worst Assets</p>
+            <p className="text-xs font-bold text-foreground mb-2">Best & Worst Assets</p>
             {pairRows.map(([name, r]) => (
               <div key={name} className="flex justify-between py-1.5 border-b border-border/50 last:border-b-0">
-                <span className="text-xs text-white font-semibold">{name} <span className="text-textDark font-normal">· {r.trades}</span></span>
+                <span className="text-xs text-foreground font-semibold">{name} <span className="text-textDark font-normal">· {r.trades}</span></span>
                 <span className={`text-xs font-bold ${r.profit >= 0 ? 'text-green' : 'text-red'}`}>
                   {r.profit >= 0 ? '+' : '−'}${(Math.abs(r.profit) / 100).toFixed(2)}
                 </span>

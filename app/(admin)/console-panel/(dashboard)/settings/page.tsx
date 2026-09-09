@@ -114,7 +114,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Settings</h1>
+        <h1 className="text-xl font-bold text-foreground">Settings</h1>
         <p className="text-sm text-textDark">Platform configuration and automation rules</p>
       </div>
 
@@ -175,7 +175,7 @@ export default function SettingsPage() {
                     <Toggle checked={rule.enabled} onChange={() => toggleRule(rule.id)} size="sm" />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white">{rule.condition}</span>
+                        <span className="text-sm font-medium text-foreground">{rule.condition}</span>
                         <Badge variant={rule.action === 'increase' ? 'success' : 'danger'}>
                           {rule.action} → {rule.payoutValue}%
                         </Badge>
@@ -210,7 +210,7 @@ export default function SettingsPage() {
                   <div key={rule.id} className="flex items-center gap-4 p-3 bg-background rounded-lg border border-border">
                     <Toggle checked={rule.enabled} onChange={() => toggleWRule(rule.id)} size="sm" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-white">{rule.name}</p>
+                      <p className="text-sm font-medium text-foreground">{rule.name}</p>
                       <p className="text-[11px] text-textDark">{rule.condition}</p>
                     </div>
                     <Badge

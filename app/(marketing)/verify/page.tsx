@@ -175,7 +175,7 @@ export default function VerifyPage() {
       <div className="max-w-xl mx-auto space-y-6">
         <Link href="/" className="text-xs text-blue font-semibold">← Home</Link>
         <div>
-          <h1 className="text-2xl font-black text-white">Verify Fairness</h1>
+          <h1 className="text-2xl font-black text-foreground">Verify Fairness</h1>
           <p className="text-sm text-text-dark mt-1">
             Re-run the market math in your own browser. Paste the revealed seed, upload the candle CSV, and check every candle.
             The page first compares your seed against the published commitment hash — mismatches abort.
@@ -190,7 +190,7 @@ export default function VerifyPage() {
         <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
           <div>
             <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Revealed Server Seed (hex)</label>
-            <input value={seed} onChange={(e) => setSeed(e.target.value.trim())} placeholder="a1b2c3..." className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-blue" />
+            <input value={seed} onChange={(e) => setSeed(e.target.value.trim())} placeholder="a1b2c3..." className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono focus:outline-none focus:border-blue" />
             <button
               type="button"
               onClick={async () => {
@@ -225,24 +225,24 @@ export default function VerifyPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Asset</label>
-              <input value={pairId} onChange={(e) => setPairId(e.target.value.trim().toUpperCase())} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-blue" />
+              <input value={pairId} onChange={(e) => setPairId(e.target.value.trim().toUpperCase())} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono focus:outline-none focus:border-blue" />
             </div>
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Day (UTC)</label>
-              <input value={day} onChange={(e) => setDay(e.target.value.trim())} placeholder="2026-09-04" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-blue" />
+              <input value={day} onChange={(e) => setDay(e.target.value.trim())} placeholder="2026-09-04" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono focus:outline-none focus:border-blue" />
             </div>
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Base Price</label>
-              <input value={basePrice} onChange={(e) => setBasePrice(e.target.value.trim())} inputMode="decimal" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-blue" />
+              <input value={basePrice} onChange={(e) => setBasePrice(e.target.value.trim())} inputMode="decimal" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono focus:outline-none focus:border-blue" />
             </div>
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Volatility</label>
-              <input value={volatility} onChange={(e) => setVolatility(e.target.value.trim())} inputMode="decimal" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-blue" />
+              <input value={volatility} onChange={(e) => setVolatility(e.target.value.trim())} inputMode="decimal" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono focus:outline-none focus:border-blue" />
             </div>
           </div>
           <div>
             <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue">
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-blue">
               <option value="forex">Forex</option>
               <option value="crypto">Crypto</option>
               <option value="commodities">Commodities</option>
@@ -261,7 +261,7 @@ export default function VerifyPage() {
               onChange={(e) => setRegimeJson(e.target.value)}
               placeholder='{"regimes": [{"hour": 10, "sigmaMult": 1.25}]}'
               rows={3}
-              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-text-dark/50 focus:outline-none focus:border-blue"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-xs text-foreground font-mono placeholder:text-text-dark/50 focus:outline-none focus:border-blue"
             />
             <p className="text-[11px] text-textDark mt-1">Paste the output of /api/market/verify/regime for mirrored assets. Empty means ×1.0 for every hour.</p>
           </div>

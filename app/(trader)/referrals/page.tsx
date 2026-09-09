@@ -54,13 +54,13 @@ export default function ReferralsPage() {
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6 max-w-xl mx-auto">
         <Link href="/trade/demo" className="text-xs text-blue font-semibold">← Back</Link>
-        <h1 className="text-xl font-bold text-white mt-2">Referrals</h1>
+        <h1 className="text-xl font-bold text-foreground mt-2">Referrals</h1>
         <p className="text-sm text-text-dark mt-1">Earn a bonus when a friend makes their first deposit.</p>
 
         <div className="mt-4 p-4 bg-surface border border-border rounded-xl">
           <p className="text-xs text-text-dark uppercase tracking-wider mb-1">Your invite link</p>
           <div className="flex gap-2">
-            <p className="flex-1 text-xs text-white font-mono bg-background border border-border rounded-lg px-3 py-2.5 truncate">{link || '—'}</p>
+            <p className="flex-1 text-xs text-foreground font-mono bg-background border border-border rounded-lg px-3 py-2.5 truncate">{link || '—'}</p>
             <button onClick={copy} className="px-4 bg-blue text-white text-xs font-bold rounded-lg">
               {copied ? 'Copied!' : 'Copy'}
             </button>
@@ -71,7 +71,7 @@ export default function ReferralsPage() {
         <div className="grid grid-cols-2 gap-3 mt-4">
           <div className="p-4 bg-surface border border-border rounded-xl">
             <p className="text-xs text-text-dark uppercase tracking-wider">Friends</p>
-            <p className="text-2xl font-bold text-white">{referrals.length}</p>
+            <p className="text-2xl font-bold text-foreground">{referrals.length}</p>
           </div>
           <div className="p-4 bg-surface border border-border rounded-xl">
             <p className="text-xs text-text-dark uppercase tracking-wider">Earned</p>
@@ -79,7 +79,7 @@ export default function ReferralsPage() {
           </div>
         </div>
 
-        <h2 className="text-sm font-bold text-white mt-6 mb-3">Referred Friends</h2>
+        <h2 className="text-sm font-bold text-foreground mt-6 mb-3">Referred Friends</h2>
         {referrals.length === 0 ? (
           <p className="text-xs text-text-dark">Nobody yet. Share your link to start earning.</p>
         ) : (
@@ -87,7 +87,7 @@ export default function ReferralsPage() {
             {referrals.map((r) => (
               <div key={r.id} className="p-3 bg-surface border border-border rounded-xl flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-white">{r.user?.nickname || r.user?.name || 'Friend'}</p>
+                  <p className="text-xs font-bold text-foreground">{r.user?.nickname || r.user?.name || 'Friend'}</p>
                   <p className="text-[10px] text-text-dark">{new Date(r.createdAt).toLocaleDateString()}</p>
                 </div>
                 <p className={`text-xs font-bold ${r.bonusPaid > 0 ? 'text-green' : 'text-textDark'}`}>

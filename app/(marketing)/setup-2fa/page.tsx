@@ -110,7 +110,7 @@ export default function Setup2FAPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24">
+            <svg className="w-8 h-8 text-foreground" fill="none" viewBox="0 0 24 24">
               <rect fill="currentColor" height="12" rx="1" width="3" x="2" y="6" />
               <rect fill="currentColor" height="18" rx="1" width="3" x="7" y="3" />
               <rect fill="currentColor" height="8" rx="1" width="3" x="12" y="8" />
@@ -123,7 +123,7 @@ export default function Setup2FAPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-black text-white mb-2">Set Up Two-Factor Authentication</h1>
+          <h1 className="text-2xl font-black text-foreground mb-2">Set Up Two-Factor Authentication</h1>
           <p className="text-sm text-text-dark">
             {step === 'password' && (hasPassword === false ? 'Confirm it is you to continue' : 'Enter your password to confirm your identity')}
             {step === 'qr' && 'Scan this QR code with your authenticator app'}
@@ -158,7 +158,7 @@ export default function Setup2FAPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     required
-                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
                   />
                 </div>
               )}
@@ -181,7 +181,7 @@ export default function Setup2FAPage() {
               </div>
               <div className="bg-background/50 rounded-xl px-4 py-3">
                 <p className="text-[11px] text-text-dark font-semibold uppercase tracking-wider mb-2">Manual entry key</p>
-                <p className="text-xs text-white font-mono break-all">
+                <p className="text-xs text-foreground font-mono break-all">
                   {totpUri.replace('otpauth://totp/', '').replace(/[?&].*$/, '')}
                 </p>
               </div>
@@ -209,7 +209,7 @@ export default function Setup2FAPage() {
                   placeholder="000000"
                   autoFocus
                   required
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white text-center tracking-[0.5em] font-mono placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground text-center tracking-[0.5em] font-mono placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
                 />
               </div>
               <button
@@ -227,7 +227,7 @@ export default function Setup2FAPage() {
                 <p className="text-[11px] text-text-dark font-semibold uppercase tracking-wider mb-2">Recovery codes — store somewhere safe</p>
                 <div className="grid grid-cols-2 gap-2">
                   {backupCodes.map((c) => (
-                    <p key={c} className="text-xs text-white font-mono bg-background rounded-lg px-3 py-2 text-center">{c}</p>
+                    <p key={c} className="text-xs text-foreground font-mono bg-background rounded-lg px-3 py-2 text-center">{c}</p>
                   ))}
                 </div>
                 <p className="text-[11px] text-text-dark mt-3 leading-relaxed">

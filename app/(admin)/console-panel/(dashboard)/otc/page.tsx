@@ -298,7 +298,7 @@ export default function OtcPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">OTC Pairs</h1>
+          <h1 className="text-xl font-bold text-foreground">OTC Pairs</h1>
           <p className="text-sm text-textDark">Manage trading pairs, payouts, and volatility</p>
         </div>
         <Button onClick={() => openAddDialog()} className="bg-blue hover:bg-blue/90 text-white">
@@ -360,7 +360,7 @@ export default function OtcPage() {
                   <tr key={pair.id} className="border-b border-border/50 hover:bg-surface-hover/50 transition-colors">
                     <td className="px-4 py-3">
                       <div>
-                        <p className="text-sm font-medium text-white">{pair.name}</p>
+                        <p className="text-sm font-medium text-foreground">{pair.name}</p>
                         <p className="text-[11px] text-textDark">{pair.id}</p>
                       </div>
                     </td>
@@ -369,9 +369,9 @@ export default function OtcPage() {
                         {pair.category}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-white font-mono">{Number(pair.basePrice).toFixed(pair.category === 'forex' && Number(pair.basePrice) < 10 ? 5 : 2)}</td>
-                    <td className="px-4 py-3 text-right text-sm text-white font-mono">{pair.volatility}</td>
-                    <td className="px-4 py-3 text-right text-sm text-white font-mono">{pair.spread}</td>
+                    <td className="px-4 py-3 text-right text-sm text-foreground font-mono">{Number(pair.basePrice).toFixed(pair.category === 'forex' && Number(pair.basePrice) < 10 ? 5 : 2)}</td>
+                    <td className="px-4 py-3 text-right text-sm text-foreground font-mono">{pair.volatility}</td>
+                    <td className="px-4 py-3 text-right text-sm text-foreground font-mono">{pair.spread}</td>
                     <td className="px-4 py-3 text-right text-sm font-mono">
                       <span className="text-green">{pair.payoutPercent}%</span>
                       {pair.weekendPayout && (
@@ -401,7 +401,7 @@ export default function OtcPage() {
 
       <Dialog open={showAddDialog} onClose={() => setShowAddDialog(false)} className="max-w-2xl">
         <DialogHeader onClose={() => setShowAddDialog(false)}>
-          <h2 className="text-lg font-bold text-white">Add New Pair</h2>
+          <h2 className="text-lg font-bold text-foreground">Add New Pair</h2>
         </DialogHeader>
         <DialogContent className="max-h-[70vh] overflow-y-auto">
           <div className="grid grid-cols-2 gap-4">
@@ -437,7 +437,7 @@ export default function OtcPage() {
 
       <Dialog open={!!editingPair} onClose={() => setEditingPair(null)} className="max-w-2xl">
         <DialogHeader onClose={() => setEditingPair(null)}>
-          <h2 className="text-lg font-bold text-white">Edit {editingPair?.name}</h2>
+          <h2 className="text-lg font-bold text-foreground">Edit {editingPair?.name}</h2>
         </DialogHeader>
         <DialogContent className="max-h-[70vh] overflow-y-auto">
           <div className="grid grid-cols-2 gap-4">

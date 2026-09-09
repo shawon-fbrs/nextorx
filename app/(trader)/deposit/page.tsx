@@ -28,7 +28,7 @@ function MethodLogo({ m, size = 44 }: { m: PaymentMethod; size?: number }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={m.logoUrl} alt={m.label} style={{ height: size, width: size }} className="absolute left-0 top-0 rounded-full object-contain bg-white border-2 border-background" />
       ) : (
-        <span className="absolute left-0 top-0 rounded-full bg-surface flex items-center justify-center text-sm font-black text-white" style={{ height: size, width: size }}>
+        <span className="absolute left-0 top-0 rounded-full bg-surface flex items-center justify-center text-sm font-black text-foreground" style={{ height: size, width: size }}>
           {m.label.slice(0, 1)}
         </span>
       )}
@@ -201,9 +201,9 @@ export default function DepositPage() {
           <div>
             <div className="mb-4">
               <p className="text-xs text-text-dark mb-1">Available Balance</p>
-              <p className="text-2xl font-bold text-white">${((user.balance || 0) / 100).toFixed(2)}</p>
+              <p className="text-2xl font-bold text-foreground">${((user.balance || 0) / 100).toFixed(2)}</p>
             </div>
-            <h2 className="text-base font-bold text-white mb-3">Choose a payment method</h2>
+            <h2 className="text-base font-bold text-foreground mb-3">Choose a payment method</h2>
             {loading ? (
               <div className="text-text-dark text-xs text-center py-10">Loading payment methods…</div>
             ) : methods.length === 0 ? (
@@ -222,7 +222,7 @@ export default function DepositPage() {
                   >
                     <MethodLogo m={m} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold text-white truncate">
+                      <div className="text-sm font-bold text-foreground truncate">
                         {m.label}
                         {m.networkName ? <span className="text-textDark font-normal"> ({m.networkName})</span> : null}
                       </div>
@@ -247,7 +247,7 @@ export default function DepositPage() {
             >
               <div className="flex items-center gap-3">
                 <MethodLogo m={selected} size={40} />
-                <div className="text-sm font-bold text-white">
+                <div className="text-sm font-bold text-foreground">
                   {selected.label}
                   {selected.networkName ? ` (${selected.networkName})` : ''}
                 </div>
@@ -258,7 +258,7 @@ export default function DepositPage() {
                   type="number" min={minUsd} max={maxUsd} step="any" required autoFocus
                   placeholder={`Min ${minUsd}`}
                   value={amount} onChange={(e) => setAmount(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-2xl font-bold text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue tabular-nums"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-2xl font-bold text-foreground placeholder:text-text-dark/50 focus:outline-none focus:border-blue tabular-nums"
                 />
                 <p className="text-[11px] text-textDark mt-1">Min ${minUsd.toFixed(2)}{maxUsd < 1000000 ? ` · Max $${maxUsd.toFixed(2)}` : ''}</p>
                 {amount.trim() !== '' && !validAmount && (
@@ -279,7 +279,7 @@ export default function DepositPage() {
                 <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Promo code (optional)</label>
                 <input
                   value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. WELCOME50" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white font-mono placeholder:text-text-dark/50 focus:outline-none focus:border-blue"
+                  placeholder="e.g. WELCOME50" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono placeholder:text-text-dark/50 focus:outline-none focus:border-blue"
                 />
                 {promoCode.trim() !== '' && (
                   <p className="text-[11px] text-textDark mt-1">Bonus is added when the deposit is verified, with wagering requirements.</p>
@@ -299,11 +299,11 @@ export default function DepositPage() {
               <div className="flex items-center gap-3">
                 <MethodLogo m={selected} />
                 <div>
-                  <div className="text-sm font-bold text-white">
+                  <div className="text-sm font-bold text-foreground">
                     {selected.label}
                     {selected.networkName ? ` (${selected.networkName})` : ''}
                   </div>
-                  <div className="text-sm text-textDark">Send <span className="font-bold text-white">${Number(amount).toFixed(2)}</span></div>
+                  <div className="text-sm text-textDark">Send <span className="font-bold text-foreground">${Number(amount).toFixed(2)}</span></div>
                 </div>
               </div>
 
@@ -332,7 +332,7 @@ export default function DepositPage() {
                 <div className="space-y-2">
                   <p className="text-[11px] text-textDark font-semibold uppercase tracking-wider">Send to this address</p>
                   <div className="flex items-center gap-2 rounded-xl border border-border bg-background p-3">
-                    <span className="min-w-0 flex-1 break-all font-mono text-xs text-white">{selected.accountAddress}</span>
+                    <span className="min-w-0 flex-1 break-all font-mono text-xs text-foreground">{selected.accountAddress}</span>
                     <button onClick={() => copy(selected.accountAddress!)} className="flex-shrink-0 border border-border text-[11px] font-bold px-3 py-1.5 rounded-lg text-text hover:text-white">
                       {copied ? 'Copied' : 'Copy'}
                     </button>
@@ -352,7 +352,7 @@ export default function DepositPage() {
                   <input
                     value={txHash} onChange={(e) => setTxHash(e.target.value)}
                     placeholder="Paste the hash after sending" required disabled={submitting}
-                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white font-mono placeholder:text-text-dark/50 placeholder:font-sans focus:outline-none focus:border-blue"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono placeholder:text-text-dark/50 placeholder:font-sans focus:outline-none focus:border-blue"
                   />
                 </div>
                 {error && <p className="text-xs text-red font-semibold">{error}</p>}
@@ -369,7 +369,7 @@ export default function DepositPage() {
           <div className="bg-surface border border-border rounded-2xl p-8 text-center">
             {status === 'REJECTED' ? (
               <>
-                <p className="text-xl font-bold text-white">Deposit rejected</p>
+                <p className="text-xl font-bold text-foreground">Deposit rejected</p>
                 <p className="text-sm text-textDark mt-2">{note ?? 'Our team could not confirm your payment. Contact support for help.'}</p>
                 <button
                   onClick={() => {
@@ -383,7 +383,7 @@ export default function DepositPage() {
               </>
             ) : (
               <>
-                <p className="text-xl font-bold text-white">Waiting for confirmation</p>
+                <p className="text-xl font-bold text-foreground">Waiting for confirmation</p>
                 <p className="text-sm text-textDark mt-2">
                   Your payment is being checked. You will be redirected automatically once approved.
                 </p>

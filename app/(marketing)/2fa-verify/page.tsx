@@ -58,7 +58,7 @@ export default function TwoFactorVerifyPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-black text-white mb-2">Two-Factor Authentication</h1>
+          <h1 className="text-2xl font-black text-foreground mb-2">Two-Factor Authentication</h1>
           <p className="text-sm text-text-dark">Enter the 6-digit code from your authenticator app</p>
         </div>
 
@@ -81,7 +81,7 @@ export default function TwoFactorVerifyPage() {
                 placeholder="000000"
                 autoFocus
                 required
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white text-center tracking-[0.5em] font-mono placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground text-center tracking-[0.5em] font-mono placeholder:text-text-dark/50 focus:outline-none focus:border-blue transition-colors"
               />
             </div>
             <button

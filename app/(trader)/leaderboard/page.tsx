@@ -89,7 +89,7 @@ export default async function LeaderboardPage() {
           <span className="text-xs font-bold text-blue">{initials(e.nickname || e.name)}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">
+          <p className="text-sm font-semibold text-foreground truncate">
             {e.nickname || e.name}
             {isMe && <span className="ml-1.5 text-[10px] font-bold text-blue">you</span>}
           </p>
@@ -108,7 +108,7 @@ export default async function LeaderboardPage() {
         <Link href="/trade/demo" className="text-xs text-blue font-semibold">← Back</Link>
         <div className="flex items-end justify-between mt-2 mb-6">
           <div>
-            <h1 className="text-xl font-bold text-white">Leaderboard</h1>
+            <h1 className="text-xl font-bold text-foreground">Leaderboard</h1>
             <p className="text-sm text-text-dark mt-1">Top earners by net profit today</p>
           </div>
           <span className="text-[10px] font-bold text-orange bg-orange/10 px-2.5 py-1 rounded-full">Resets at midnight</span>
@@ -117,7 +117,7 @@ export default async function LeaderboardPage() {
         {my && (
           <div className="bg-surface border border-blue/30 rounded-xl overflow-hidden mb-4">
             <div className="px-4 py-2 border-b border-border flex justify-between items-center">
-              <span className="text-xs font-bold text-white">Your position</span>
+              <span className="text-xs font-bold text-foreground">Your position</span>
               <span className="text-xs font-bold text-blue">Rank #{myRank}</span>
             </div>
             {renderRow(my, myRank - 1)}
@@ -126,7 +126,7 @@ export default async function LeaderboardPage() {
 
         <div className="bg-surface border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
-            <span className="text-xs font-bold text-white">Top {top.length}</span>
+            <span className="text-xs font-bold text-foreground">Top {top.length}</span>
           </div>
           {top.length === 0 ? (
             <p className="text-xs text-text-dark text-center py-10">

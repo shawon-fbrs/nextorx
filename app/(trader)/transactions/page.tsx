@@ -53,7 +53,7 @@ export default function TransactionsPage() {
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6 max-w-xl mx-auto">
         <Link href="/trade/demo" className="text-xs text-blue font-semibold">← Back</Link>
-        <h1 className="text-xl font-bold text-white mt-2">Transactions</h1>
+        <h1 className="text-xl font-bold text-foreground mt-2">Transactions</h1>
         <p className="text-sm text-text-dark mt-1">Every movement of your real balance.</p>
 
         <div className="mt-4 space-y-2">
@@ -63,7 +63,7 @@ export default function TransactionsPage() {
             entries.map((e) => (
               <div key={e.id} className="p-3 bg-surface border border-border rounded-xl flex items-center justify-between">
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-white">{TYPE_LABELS[e.type] ?? e.type}</p>
+                  <p className="text-xs font-bold text-foreground">{TYPE_LABELS[e.type] ?? e.type}</p>
                   <p className="text-[11px] text-text-dark truncate">{e.description ?? ''}</p>
                   <p className="text-[10px] text-text-dark">{new Date(e.createdAt).toLocaleString()}</p>
                 </div>

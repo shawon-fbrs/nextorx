@@ -53,12 +53,12 @@ export default function BonusPage() {
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6 max-w-xl mx-auto">
         <Link href="/trade/demo" className="text-xs text-blue font-semibold">← Back</Link>
-        <h1 className="text-xl font-bold text-white mt-2">Bonus Wallet</h1>
+        <h1 className="text-xl font-bold text-foreground mt-2">Bonus Wallet</h1>
         <p className="text-sm text-text-dark mt-1">Bonuses convert to real balance after wagering.</p>
 
         <div className="mt-4 p-4 bg-surface border border-border rounded-xl">
           <p className="text-xs text-text-dark uppercase tracking-wider">Bonus Balance</p>
-          <p className="text-3xl font-bold text-white">${(((data?.bonusBalance ?? 0)) / 100).toFixed(2)}</p>
+          <p className="text-3xl font-bold text-foreground">${(((data?.bonusBalance ?? 0)) / 100).toFixed(2)}</p>
           {(data?.turnoverRequired ?? 0) > 0 && (
             <div className="mt-3">
               <div className="flex justify-between text-[11px] text-text-dark mb-1">
@@ -75,7 +75,7 @@ export default function BonusPage() {
           )}
         </div>
 
-        <h2 className="text-sm font-bold text-white mt-6 mb-3">Bonus Activity</h2>
+        <h2 className="text-sm font-bold text-foreground mt-6 mb-3">Bonus Activity</h2>
         {(data?.history.length ?? 0) === 0 ? (
           <p className="text-xs text-text-dark">No bonus activity yet. Use a promo code on deposit or invite friends.</p>
         ) : (
@@ -83,7 +83,7 @@ export default function BonusPage() {
             {data?.history.map((e) => (
               <div key={e.id} className="p-3 bg-surface border border-border rounded-xl flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-white">{TYPE_LABELS[e.type] ?? e.type}</p>
+                  <p className="text-xs font-bold text-foreground">{TYPE_LABELS[e.type] ?? e.type}</p>
                   <p className="text-[11px] text-text-dark">{e.description ?? ''}</p>
                   <p className="text-[10px] text-text-dark">{new Date(e.createdAt).toLocaleString()}</p>
                 </div>

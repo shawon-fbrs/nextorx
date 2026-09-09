@@ -44,7 +44,7 @@ export default function AdminLoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
+          <h1 className="text-2xl font-bold text-foreground">Admin Panel</h1>
           <p className="text-sm text-textDark mt-2">Sign in to access the console</p>
         </div>
 

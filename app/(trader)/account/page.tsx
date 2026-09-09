@@ -240,7 +240,7 @@ export default function AccountPage() {
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6">
         <div className="mb-6">
-          <h1 className="text-xl font-bold text-white">Account Settings</h1>
+          <h1 className="text-xl font-bold text-foreground">Account Settings</h1>
           <p className="text-sm text-text-dark mt-1">Manage your profile and security</p>
         </div>
 
@@ -253,7 +253,7 @@ export default function AccountPage() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-base font-bold text-white">Profile</h2>
+                <h2 className="text-base font-bold text-foreground">Profile</h2>
                 <p className="text-xs text-text-dark">Update your personal details</p>
               </div>
             </div>
@@ -264,7 +264,7 @@ export default function AccountPage() {
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:border-blue transition-colors"
                 />
               </div>
               <div>
@@ -273,7 +273,7 @@ export default function AccountPage() {
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:border-blue transition-colors"
                 />
               </div>
               <div>
@@ -282,7 +282,7 @@ export default function AccountPage() {
                   type="text"
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:border-blue transition-colors"
                 />
               </div>
               <div>
@@ -291,7 +291,7 @@ export default function AccountPage() {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:border-blue transition-colors"
                 />
               </div>
               <div>
@@ -300,7 +300,7 @@ export default function AccountPage() {
                   type="text"
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:border-blue transition-colors"
                 />
               </div>
               <div>
@@ -342,7 +342,7 @@ export default function AccountPage() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white">Verification</h2>
+                <h2 className="text-sm font-bold text-foreground">Verification</h2>
                 <p className="text-[11px] text-text-dark">Status</p>
               </div>
             </div>
@@ -374,14 +374,14 @@ export default function AccountPage() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white">Security</h2>
+                <h2 className="text-sm font-bold text-foreground">Security</h2>
                 <p className="text-[11px] text-text-dark">Protect your account</p>
               </div>
             </div>
             <div className="space-y-2">
               <div className="bg-background rounded-lg p-3 flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-semibold text-white block">Two-Factor Authentication</span>
+                  <span className="text-xs font-semibold text-foreground block">Two-Factor Authentication</span>
                   <span className="text-[10px] text-text-dark">{twoFAEnabled ? 'Enabled — extra layer of security' : 'Add an extra layer of security'}</span>
                 </div>
                 <button
@@ -397,7 +397,7 @@ export default function AccountPage() {
               )}
               <div className="bg-background rounded-lg p-3 flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-semibold text-white block">Login Notifications</span>
+                  <span className="text-xs font-semibold text-foreground block">Login Notifications</span>
                   <span className="text-[10px] text-text-dark">Get alerted on new logins</span>
                 </div>
                 <button className="w-10 h-[22px] rounded-full relative transition-colors bg-green">
@@ -415,18 +415,18 @@ export default function AccountPage() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white">Account Info</h2>
+                <h2 className="text-sm font-bold text-foreground">Account Info</h2>
                 <p className="text-[11px] text-text-dark">Your account details</p>
               </div>
             </div>
             <div className="space-y-2">
               <div className="bg-background rounded-lg p-3 flex items-center justify-between">
                 <span className="text-[11px] text-text-dark">User ID</span>
-                <span className="text-xs font-semibold text-white font-mono">{user.uid || '—'}</span>
+                <span className="text-xs font-semibold text-foreground font-mono">{user.uid || '—'}</span>
               </div>
               <div className="bg-background rounded-lg p-3 flex items-center justify-between">
                 <span className="text-[11px] text-text-dark">Role</span>
-                <span className="text-xs font-semibold text-white capitalize">{user.role}</span>
+                <span className="text-xs font-semibold text-foreground capitalize">{user.role}</span>
               </div>
               <div className="bg-background rounded-lg p-3 flex items-center justify-between">
                 <span className="text-[11px] text-text-dark">Referral Code</span>
@@ -445,7 +445,7 @@ export default function AccountPage() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white">{hasPassword ? 'Change Password' : 'Set Password'}</h2>
+                <h2 className="text-sm font-bold text-foreground">{hasPassword ? 'Change Password' : 'Set Password'}</h2>
                 <p className="text-[11px] text-text-dark">{hasPassword ? 'Update your password regularly' : 'Add a password to secure your account'}</p>
               </div>
             </div>
@@ -458,7 +458,7 @@ export default function AccountPage() {
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     required
-                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:border-blue transition-colors"
                   />
                 </div>
               )}
@@ -470,7 +470,7 @@ export default function AccountPage() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Min. 12 characters"
                   required
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:border-blue transition-colors"
                 />
                 {newPassword && (
                   <div className="mt-2 space-y-1">
@@ -492,7 +492,7 @@ export default function AccountPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:border-blue transition-colors"
                 />
                 {confirmPassword && newPassword !== confirmPassword && (
                   <p className="text-[10px] text-red mt-1">Passwords do not match</p>
@@ -519,7 +519,7 @@ export default function AccountPage() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white">Delete Account</h2>
+                <h2 className="text-sm font-bold text-foreground">Delete Account</h2>
                 <p className="text-[11px] text-text-dark">Permanently remove your account</p>
               </div>
             </div>
@@ -545,7 +545,7 @@ export default function AccountPage() {
               </svg>
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Session</h2>
+              <h2 className="text-sm font-bold text-foreground">Session</h2>
               <p className="text-[11px] text-text-dark">Manage your session</p>
             </div>
           </div>
@@ -569,7 +569,7 @@ export default function AccountPage() {
                 {sessions.slice(0, 5).map((s) => (
                   <div key={s.id} className="flex items-center justify-between bg-background border border-border rounded-lg px-3 py-2">
                     <div className="min-w-0">
-                      <p className="text-[11px] text-white truncate">{s.userAgent?.split(' ').slice(-1)[0] ?? 'Session'}</p>
+                      <p className="text-[11px] text-foreground truncate">{s.userAgent?.split(' ').slice(-1)[0] ?? 'Session'}</p>
                       <p className="text-[10px] text-text-dark">{s.ipAddress ?? 'unknown IP'} · {new Date(s.createdAt).toLocaleDateString()}</p>
                     </div>
                     <button
@@ -591,7 +591,7 @@ export default function AccountPage() {
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setDisableModal(false); setTwoFAMsg(''); }}>
           <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[400px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5 border-b border-border">
-              <h3 className="text-base font-bold text-white">Disable Two-Factor Authentication</h3>
+              <h3 className="text-base font-bold text-foreground">Disable Two-Factor Authentication</h3>
               <p className="text-xs text-text-dark mt-1">{hasPassword ? 'Enter your password and current TOTP code' : 'Enter your current TOTP code'}</p>
             </div>
             <form onSubmit={handleDisable2FA} className="px-6 py-5 space-y-4">
@@ -603,7 +603,7 @@ export default function AccountPage() {
                     value={disablePassword}
                     onChange={(e) => setDisablePassword(e.target.value)}
                     required
-                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:border-blue transition-colors"
                   />
                 </div>
               )}
@@ -618,7 +618,7 @@ export default function AccountPage() {
                   placeholder="000000"
                   autoFocus
                   required
-                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white text-center tracking-widest font-mono focus:outline-none focus:border-blue transition-colors"
+                  className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground text-center tracking-widest font-mono focus:outline-none focus:border-blue transition-colors"
                 />
               </div>
               {twoFAMsg && <p className="text-[11px] font-semibold text-red">{twoFAMsg}</p>}
@@ -647,7 +647,7 @@ export default function AccountPage() {
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setDeleteModal(false); setDeleteMsg(''); }}>
           <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[400px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5 border-b border-border">
-              <h3 className="text-base font-bold text-white">Delete Account</h3>
+              <h3 className="text-base font-bold text-foreground">Delete Account</h3>
               <p className="text-xs text-text-dark mt-1">This action cannot be undone</p>
             </div>
             <form onSubmit={handleDeleteAccount} className="px-6 py-5 space-y-4">
@@ -665,7 +665,7 @@ export default function AccountPage() {
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
                     required
-                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue transition-colors"
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:border-blue transition-colors"
                   />
                 </div>
               ) : (
@@ -679,7 +679,7 @@ export default function AccountPage() {
                     onChange={(e) => setDeleteCode(e.target.value.replace(/\D/g, ''))}
                     placeholder="000000"
                     required
-                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-white text-center tracking-widest font-mono focus:outline-none focus:border-blue transition-colors"
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground text-center tracking-widest font-mono focus:outline-none focus:border-blue transition-colors"
                   />
                 </div>
               )}

@@ -88,7 +88,7 @@ export default function TradesPage() {
       header: 'User',
       render: (t: Trade) => (
         <div>
-          <span className="font-medium text-white">{t.user.name}</span>
+          <span className="font-medium text-foreground">{t.user.name}</span>
           <span className="text-[10px] text-textDark ml-1.5">{t.user.email}</span>
         </div>
       ),
@@ -104,7 +104,7 @@ export default function TradesPage() {
     {
       key: 'amount',
       header: 'Amount',
-      render: (t: Trade) => <span className="font-medium text-white">${(t.amount / 100).toFixed(2)}</span>,
+      render: (t: Trade) => <span className="font-medium text-foreground">${(t.amount / 100).toFixed(2)}</span>,
     },
     {
       key: 'openPrice',
@@ -168,7 +168,7 @@ export default function TradesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Trade Monitoring</h1>
+        <h1 className="text-xl font-bold text-foreground">Trade Monitoring</h1>
         <p className="text-sm text-textDark">Monitor all platform trades in real-time</p>
       </div>
 
@@ -242,7 +242,7 @@ export default function TradesPage() {
 
       <Dialog open={!!selectedTrade} onClose={() => setSelectedTrade(null)}>
         <DialogHeader onClose={() => setSelectedTrade(null)}>
-          <h2 className="text-lg font-bold text-white">Trade Details</h2>
+          <h2 className="text-lg font-bold text-foreground">Trade Details</h2>
         </DialogHeader>
         <DialogContent>
           {selectedTrade && (
@@ -258,19 +258,19 @@ export default function TradesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-[11px] text-textDark uppercase">Trade ID</p>
-                  <p className="text-sm text-white font-mono">{selectedTrade.id}</p>
+                  <p className="text-sm text-foreground font-mono">{selectedTrade.id}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">Asset</p>
-                  <p className="text-sm text-white font-medium">{selectedTrade.pair.name}</p>
+                  <p className="text-sm text-foreground font-medium">{selectedTrade.pair.name}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">User</p>
-                  <p className="text-sm text-white">{selectedTrade.user.name}</p>
+                  <p className="text-sm text-foreground">{selectedTrade.user.name}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">Amount</p>
-                  <p className="text-sm text-white font-medium">${(selectedTrade.amount / 100).toFixed(2)}</p>
+                  <p className="text-sm text-foreground font-medium">${(selectedTrade.amount / 100).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-textDark uppercase">Open Price</p>

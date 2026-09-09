@@ -67,7 +67,7 @@ export default function NotificationsPage() {
         <Link href="/trade/demo" className="text-xs text-blue font-semibold">← Back</Link>
         <div className="flex items-center justify-between mt-2 mb-4">
           <div>
-            <h1 className="text-xl font-bold text-white">Notifications</h1>
+            <h1 className="text-xl font-bold text-foreground">Notifications</h1>
             <p className="text-sm text-text-dark mt-1">Deposits, withdrawals, security.</p>
           </div>
           <button onClick={markAllRead} className="text-[11px] text-blue hover:text-blue-hover font-bold">
@@ -86,7 +86,7 @@ export default function NotificationsPage() {
                 className={`w-full text-left p-4 bg-surface border rounded-xl transition-colors ${n.readAt ? 'border-border opacity-60' : 'border-blue/30 bg-blue/5'}`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-white">{n.title}</span>
+                  <span className="text-xs font-bold text-foreground">{n.title}</span>
                   <span className="text-[10px] text-text-dark">{new Date(n.createdAt).toLocaleString()}</span>
                 </div>
                 <p className="text-xs text-text leading-relaxed">{n.body}</p>

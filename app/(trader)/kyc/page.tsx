@@ -78,12 +78,12 @@ export default function KycPage() {
     <div className="bg-background text-text h-full overflow-y-auto">
       <div className="px-6 py-6 max-w-xl mx-auto">
         <Link href="/trade/demo" className="text-xs text-blue font-semibold">← Back</Link>
-        <h1 className="text-xl font-bold text-white mt-2">Identity Verification</h1>
+        <h1 className="text-xl font-bold text-foreground mt-2">Identity Verification</h1>
         <p className="text-sm text-text-dark mt-1">Tier 1: government ID + selfie. Documents are encrypted at rest.</p>
 
         <div className="mt-4 p-4 bg-surface border border-border rounded-xl">
           <p className="text-xs text-text-dark uppercase tracking-wider">Status</p>
-          <p className="text-lg font-bold text-white">{status.replace('_', ' ')}</p>
+          <p className="text-lg font-bold text-foreground">{status.replace('_', ' ')}</p>
           {submission?.note && <p className="text-xs text-text-dark mt-1">Reviewer note: {submission.note}</p>}
         </div>
 
@@ -92,7 +92,7 @@ export default function KycPage() {
             {message && <p className="text-xs text-orange">{message}</p>}
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">ID Type</label>
-              <select value={idType} onChange={(e) => setIdType(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue">
+              <select value={idType} onChange={(e) => setIdType(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-blue">
                 <option value="national_id">National ID</option>
                 <option value="passport">Passport</option>
                 <option value="driving_licence">Driving licence</option>
@@ -100,7 +100,7 @@ export default function KycPage() {
             </div>
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">ID Number</label>
-              <input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="As shown on document" required className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-white placeholder:text-text-dark/50 focus:outline-none focus:border-blue" />
+              <input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="As shown on document" required className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-text-dark/50 focus:outline-none focus:border-blue" />
             </div>
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">ID Front (JPEG/PNG/WebP, max 4MB)</label>
