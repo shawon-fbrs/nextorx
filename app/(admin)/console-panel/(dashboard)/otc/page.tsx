@@ -37,11 +37,11 @@ type Pair = {
 };
 
 const CATEGORY_DEFAULTS: Record<string, { volatility: number; spread: number; payoutPercent: number; minTrade: number; maxTrade: number }> = {
-  forex:       { volatility: 0.5,  spread: 0.0001, payoutPercent: 80, minTrade: 1,   maxTrade: 5000 },
-  crypto:      { volatility: 2.0,  spread: 0.0005, payoutPercent: 85, minTrade: 1,   maxTrade: 5000 },
-  commodities: { volatility: 1.0,  spread: 0.00025, payoutPercent: 78, minTrade: 1,   maxTrade: 5000 },
-  indices:     { volatility: 0.8,  spread: 0.00015, payoutPercent: 82, minTrade: 1,   maxTrade: 5000 },
-  stocks:      { volatility: 1.2,  spread: 0.0004, payoutPercent: 82, minTrade: 1,   maxTrade: 5000 },
+  forex:       { volatility: 0.5,  spread: 0.00002, payoutPercent: 80, minTrade: 1,   maxTrade: 5000 },
+  crypto:      { volatility: 2.0,  spread: 0.0001, payoutPercent: 85, minTrade: 1,   maxTrade: 5000 },
+  commodities: { volatility: 1.0,  spread: 0.00005, payoutPercent: 78, minTrade: 1,   maxTrade: 5000 },
+  indices:     { volatility: 0.8,  spread: 0.00003, payoutPercent: 82, minTrade: 1,   maxTrade: 5000 },
+  stocks:      { volatility: 1.2,  spread: 0.00008, payoutPercent: 82, minTrade: 1,   maxTrade: 5000 },
 };
 
 const CATEGORY_OPTIONS = [
