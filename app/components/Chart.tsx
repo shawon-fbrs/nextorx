@@ -265,7 +265,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       try {
         const res = await fetch(`/api/market/pairs/${pid}/candles?limit=200&before=${timestamp}&interval=${encodeURIComponent(tf)}`);
         const data = await res.json();
-        const bars = toBars(data.candles);
+        const bars = toBars(data.candles).filter((b) => b.timestamp < timestamp);
         callback(bars, { backward: false, forward: bars.length >= 200 });
       } catch {
         callback([], { backward: false, forward: true });
