@@ -833,7 +833,8 @@ export default function TradingPage() {
       }
       const liveTrades = trades.filter((t) => t.status === 'active' && t.openPrice != null && t.expiresAt != null && (!activePair || !t.pairId || t.pairId === activePair.id));
       liveTrades.forEach((t, i) => {
-        const pt = chartRef.current?.chartPixel(t.timestamp, t.openPrice as number) ?? null;
+        const backTs = t.timestamp - 2 * intervalMs;
+        const pt = chartRef.current?.chartPixel(backTs, t.openPrice as number) ?? null;
         if (!pt) return;
         const remainSec = Math.max(0, Math.ceil(((t.expiresAt as number) - now) / 1000));
         const mm = String(Math.floor(remainSec / 60)).padStart(2, '0');
