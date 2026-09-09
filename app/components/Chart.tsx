@@ -95,6 +95,45 @@ const CUSTOM_OVERLAYS: Array<{
       ];
     },
   },
+  {
+    name: 'fibBox',
+    totalStep: 3,
+    needDefaultPointFigure: true,
+    needDefaultXAxisFigure: true,
+    needDefaultYAxisFigure: true,
+    createPointFigures: ({ coordinates, overlay, chart }: {
+      coordinates: Array<{ x: number; y: number }>;
+      overlay: { points?: Array<{ value?: number; timestamp?: number; dataIndex?: number }> };
+      chart?: { getSymbol?: () => { pricePrecision?: number } | null };
+    }) => {
+      if (coordinates.length < 2) return [];
+      const v0 = overlay.points?.[0]?.value;
+      const v1 = overlay.points?.[1]?.value;
+      if (typeof v0 !== 'number' || typeof v1 !== 'number' || !Number.isFinite(v0) || !Number.isFinite(v1)) return [];
+      const c0 = coordinates[0];
+      const c1 = coordinates[1];
+      const x0 = Math.min(c0.x, c1.x);
+      const x1 = Math.max(c0.x, c1.x);
+      if (x1 - x0 < 2) return [];
+      const precision = chart?.getSymbol?.()?.pricePrecision ?? 5;
+      const percents = [1, 0.786, 0.618, 0.5, 0.382, 0.236, 0];
+      const yDif = c0.y - c1.y;
+      const valueDif = v0 - v1;
+      const figs: Array<{ key: string; type: string; attrs: Record<string, unknown>; styles?: Record<string, unknown> }> = [];
+      const yTop = Math.min(c0.y, c1.y);
+      const yBottom = Math.max(c0.y, c1.y);
+      if (yBottom - yTop > 0) {
+        figs.push({ type: 'rect', key: 'fib-bg', attrs: { x: x0, y: yTop, width: x1 - x0, height: yBottom - yTop }, styles: { style: 'stroke_fill', color: 'rgba(0,122,255,0.07)', borderColor: '#007aff', borderSize: 1, borderRadius: 0 } });
+      }
+      percents.forEach((percent, i) => {
+        const y = c1.y + yDif * percent;
+        const value = (v1 + valueDif * percent).toFixed(precision);
+        figs.push({ type: 'line', key: `fib-line-${i}`, attrs: { coordinates: [{ x: x0, y }, { x: x1, y }] }, styles: { style: 'solid', size: 1, color: 'rgba(0,122,255,0.9)' } });
+        figs.push({ type: 'text', key: `fib-text-${i}`, attrs: { x: x1 - 4, y, text: `${value} (${(percent * 100).toFixed(1)}%)`, align: 'right', baseline: 'bottom' }, styles: { color: '#e4e8f0', size: 10 } });
+      });
+      return figs;
+    },
+  },
 ];
 
 CUSTOM_OVERLAYS.forEach(o => registerOverlay(o));
@@ -449,6 +488,29 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       chart.resetData();
       chart.setBarSpace(6);
       chart.scrollToRealTime(0);
+      try {
+        chart.setStyles({
+          candle: {
+            tooltip: {
+              legend: {
+                template: [
+                  { title: 'time', value: '{time}' },
+                  { title: 'open', value: '{open}' },
+                  { title: 'high', value: '{high}' },
+                  { title: 'low', value: '{low}' },
+                  { title: 'close', value: '{close}' },
+                ],
+              },
+            },
+          },
+        } as never);
+      } catch {}
+      try {
+        const inds = chart.getIndicators({}) as unknown as Array<{ id?: string; name?: string }>;
+        for (const ind of inds) {
+          if (ind.name === 'VOL' && ind.id) chart.removeIndicator({ id: ind.id });
+        }
+      } catch {}
       try {
         chart.subscribeAction('onZoom', notifyViewChange);
         chart.subscribeAction('onScroll', notifyViewChange);

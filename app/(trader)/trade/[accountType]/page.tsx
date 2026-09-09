@@ -64,7 +64,7 @@ const toolOverlayMap: Record<string, string> = {
   'Horizontal Segment': 'horizontalSegment',
   'Ray Line': 'rayLine',
   'Extended Line': 'straightLine',
-  'Fibonacci Retracement': 'fibonacciLine',
+  'Fibonacci Retracement': 'fibBox',
   'Rectangle': 'rect',
   'Brush': 'brush',
   'Arrow Marker': 'arrowMarker',
