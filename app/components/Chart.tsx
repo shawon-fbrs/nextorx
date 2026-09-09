@@ -384,7 +384,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
             { timestamp: endMs, value: opts.entryPrice },
           ],
           styles: {
-            line: { color, size: 2 },
+            line: { color, size: 3 },
             yAxis: { color, backgroundColor: color, size: 12 },
           },
           needDefaultPointFigure: false,

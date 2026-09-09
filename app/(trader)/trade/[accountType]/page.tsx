@@ -52,6 +52,11 @@ const drawingGroups = [
   { name: 'Signals', icon: 'signals', items: ['Arrow Marker'] },
 ];
 
+const TF_MS: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
+
+const markerEndMs = (entryMs: number, expiresAt: number, tf: string) =>
+  Math.max(expiresAt, entryMs + Math.min(5 * (TF_MS[tf] ?? 60000), 3600000));
+
 const toolOverlayMap: Record<string, string> = {
   'Trend Line': 'segment',
   'Horizontal Line': 'horizontalStraightLine',
@@ -513,7 +518,8 @@ export default function TradingPage() {
   const [viewSeq, setViewSeq] = useState(0);
   const handleViewChange = useCallback(() => setViewSeq((s) => (s + 1) % 1000000), []);
   const [expiryMarks, setExpiryMarks] = useState<Array<{ id: string; x: number; y: number; left: string; amount?: string; dir?: 'up' | 'down'; stack?: number; kind?: 'pill' | 'dot' }>>([]);
-  const [results, setResults] = useState<Array<{ id: string; x: number; y: number; text: string; won: boolean }>>([]);
+  const [results, setResults] = useState<Array<{ id: string; x: number; y: number; text: string; atPrice: string; won: boolean }>>([]);
+  const priceRef = useRef(0);
   const markerRef = useRef<Map<string, string[]>>(new Map());
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -675,6 +681,7 @@ export default function TradingPage() {
   };
 
   const price = currentPrice ?? activePair?.basePrice ?? 1.0;
+  priceRef.current = price;
   const payout = activePair ? (payoutMap[activePair.id] ?? effectivePayout ?? activePair.payoutPercent) : 80;
   const payoutAmount = (investment * (1 + payout / 100)).toFixed(2);
   const timeStr = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}:00`;
@@ -718,10 +725,12 @@ export default function TradingPage() {
           }
           window.dispatchEvent(new Event('balance-refresh'));
           try {
-            const pt = chartRef.current?.chartPixel(Date.now(), t.closePrice ?? t.openPrice ?? price) ?? null;
+            const live = priceRef.current || price;
+            const pt = chartRef.current?.chartPixel(Date.now(), live) ?? null;
             if (pt) {
               const rid = `res:${t.id}`;
-              setResults((prev) => [...prev.slice(-2), { id: rid, x: pt.x, y: pt.y, text: profitText, won: t.status === 'won' }]);
+              const px = activePair && activePair.id.includes('JPY') ? 3 : 5;
+              setResults((prev) => [...prev.slice(-2), { id: rid, x: pt.x, y: pt.y, text: profitText, atPrice: live.toFixed(px), won: t.status === 'won' }]);
               setTimeout(() => setResults((prev) => prev.filter((r) => r.id !== rid)), 4000);
             }
           } catch {}
@@ -735,7 +744,7 @@ export default function TradingPage() {
             const ids = chartRef.current?.drawTradeMarkers({
               entryPrice: t.openPrice,
               entryMs: t.timestamp,
-              endMs: t.expiresAt,
+              endMs: markerEndMs(t.timestamp, t.expiresAt, timeframe),
               direction: t.type,
             }) ?? [];
             if (ids.length > 0) markerRef.current.set(t.id, ids);
@@ -753,7 +762,7 @@ export default function TradingPage() {
         }
       }
     } catch {}
-  }, [accountType, activePair]);
+  }, [accountType, activePair, timeframe]);
 
   useEffect(() => {
     refreshTrades();
@@ -889,7 +898,8 @@ export default function TradingPage() {
         const amt = Number.isInteger(t.amount) ? `$${t.amount}` : `$${t.amount.toFixed(2)}`;
         marks.push({ id: `trade:${t.id}`, x, y: entryPt.y, left: `${mm}:${ss}`, amount: amt, dir: t.type, stack: i, kind: 'pill' });
         marks.push({ id: `dot-start:${t.id}`, x: entryPt.x, y: entryPt.y, left: '', dir: t.type, stack: i, kind: 'dot' });
-        const endPt = chartRef.current?.chartPixel(t.expiresAt as number, openPrice) ?? null;
+        const lineEnd = markerEndMs(t.timestamp, t.expiresAt as number, timeframe);
+        const endPt = chartRef.current?.chartPixel(lineEnd, openPrice) ?? null;
         if (endPt) marks.push({ id: `dot-end:${t.id}`, x: endPt.x, y: endPt.y, left: '', dir: t.type, stack: i, kind: 'dot' });
       });
       setExpiryMarks(marks);
@@ -935,7 +945,7 @@ export default function TradingPage() {
           const ids = chartRef.current?.drawTradeMarkers({
             entryPrice: Number(t.openPrice),
             entryMs: createdAt,
-            endMs: createdAt + Number(t.durationSeconds || 0) * 1000,
+            endMs: markerEndMs(createdAt, createdAt + Number(t.durationSeconds || 0) * 1000, timeframe),
             direction: type,
           }) ?? [];
           if (ids.length > 0) markerRef.current.set(String(t.id), ids);
@@ -946,7 +956,7 @@ export default function TradingPage() {
     } catch {
       setTradeError('Trade failed. Please try again.');
     }
-  }, [activePair, investment, timeMinutes, timeSeconds, accountType, refreshTrades]);
+  }, [activePair, investment, timeMinutes, timeSeconds, accountType, refreshTrades, timeframe]);
 
   const handleTimeChange = (delta: number) => {
     setTimeSeconds(prev => {
@@ -1075,12 +1085,39 @@ export default function TradingPage() {
                   )
                 ))}
                 {results.map((r) => (
-                  <div
-                    key={r.id}
-                    className={`absolute z-40 pointer-events-none px-2.5 py-1 rounded-xl text-white text-xs font-black tabular-nums whitespace-nowrap shadow-lg ${r.won ? 'bg-green' : 'bg-red'}`}
-                    style={{ left: r.x, top: r.y - 36, transform: 'translateX(-50%)' }}
-                  >
-                    {r.text}
+                  <div key={r.id} className="absolute z-40 pointer-events-none" style={{ left: r.x, top: r.y }}>
+                    <div
+                      className={`px-2.5 py-1 rounded-xl text-white text-center shadow-lg ${r.won ? 'bg-green' : 'bg-red'}`}
+                      style={{
+                        transform: 'translate(-50%, -100%) translateY(-12px)',
+                        boxShadow: r.won ? '0 4px 16px rgba(0,195,101,0.45)' : '0 4px 16px rgba(255,73,84,0.45)',
+                      }}
+                    >
+                      <div className="text-xs font-black tabular-nums whitespace-nowrap leading-tight">{r.text}</div>
+                      <div className="text-[9px] font-mono font-semibold tabular-nums whitespace-nowrap opacity-80 leading-tight">{r.atPrice}</div>
+                    </div>
+                    <div
+                      className="mx-auto"
+                      style={{
+                        width: 0,
+                        height: 0,
+                        transform: 'translateY(-12px)',
+                        borderLeft: '6px solid transparent',
+                        borderRight: '6px solid transparent',
+                        borderTop: `8px solid ${r.won ? '#00c365' : '#ff4954'}`,
+                      }}
+                    />
+                    <div
+                      className="absolute rounded-full"
+                      style={{
+                        left: -3,
+                        top: -3,
+                        width: 6,
+                        height: 6,
+                        backgroundColor: r.won ? '#00c365' : '#ff4954',
+                        boxShadow: '0 0 0 2px rgba(255,255,255,0.9)',
+                      }}
+                    />
                   </div>
                 ))}
 
