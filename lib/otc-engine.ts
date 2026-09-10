@@ -94,6 +94,7 @@ export class OTCEngine {
   }
 
   async measureRegimes(now = new Date()) {
+    if (!this.hasMirrorPairs()) return;
     const { measureRealizedSigma } = await import("./mirror-feed");
     const day = dayStringUTC(now);
     const hour = now.getUTCHours();
@@ -136,7 +137,15 @@ export class OTCEngine {
     }
   }
 
+  private hasMirrorPairs(): boolean {
+    for (const state of this.pairs.values()) {
+      if (state.feed === "mirror") return true;
+    }
+    return false;
+  }
+
   async refreshAnchors() {
+    if (!this.hasMirrorPairs()) return;
     try {
       const quotes = await fetchMirrorQuotes();
       for (const q of quotes) {
@@ -383,8 +392,12 @@ export class OTCEngine {
     if (!this.currentSeed) {
       throw new Error("OTC engine has no seed — refusing to start rather than generating uncommitted prices");
     }
-    void this.refreshAnchors();
-    this.mirrorTimer = setInterval(() => void this.refreshAnchors(), 60_000);
+    if (this.hasMirrorPairs()) {
+      void this.refreshAnchors();
+      this.mirrorTimer = setInterval(() => void this.refreshAnchors(), 60_000);
+    } else {
+      console.log("[OTC] No mirror pairs — external market feed disabled, engine fully offline");
+    }
     this.tickTimer = setInterval(() => void this.generateTicks(), TICK_INTERVAL_MS);
     this.scheduleNextCandleClose();
     this.seedTimer = setInterval(() => void this.checkSeeds(), 30_000);

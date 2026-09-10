@@ -5,11 +5,11 @@ import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/services/audit";
 
 const CATEGORY_DEFAULTS: Record<string, { volatility: number; spread: number; payoutPercent: number }> = {
-  forex:       { volatility: 0.5,  spread: 0.0001, payoutPercent: 80 },
-  crypto:      { volatility: 2.0,  spread: 0.0005, payoutPercent: 85 },
-  commodities: { volatility: 1.0,  spread: 0.00025, payoutPercent: 78 },
-  indices:     { volatility: 0.8,  spread: 0.00015, payoutPercent: 82 },
-  stocks:      { volatility: 1.2,  spread: 0.0004, payoutPercent: 82 },
+  forex:       { volatility: 0.5,  spread: 0.00002, payoutPercent: 80 },
+  crypto:      { volatility: 2.0,  spread: 0.0001, payoutPercent: 85 },
+  commodities: { volatility: 1.0,  spread: 0.00005, payoutPercent: 78 },
+  indices:     { volatility: 0.8,  spread: 0.00003, payoutPercent: 82 },
+  stocks:      { volatility: 1.2,  spread: 0.00008, payoutPercent: 82 },
 };
 
 const createPairSchema = z.object({
@@ -91,6 +91,11 @@ export async function POST(request: NextRequest) {
     });
 
     await logAudit(admin.id, "pair.create", "Pair", pair.id, { name: pair.name, category: pair.category });
+
+    try {
+      const { getOTCEngine } = await import("@/lib/otc-engine");
+      await (await getOTCEngine()).addPair(pair.id);
+    } catch {}
 
     return Response.json({ pair }, { status: 201 });
   } catch (e) {
