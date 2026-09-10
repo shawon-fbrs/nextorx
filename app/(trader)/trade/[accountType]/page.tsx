@@ -204,7 +204,7 @@ function TopBar({
   );
 }
 
-function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChange, sentiment, onIndToggle, onDrawTool, onRemoveDrawings }: { timeframe: string; onTimeframeChange: (tf: string) => void; chartType: 'candle' | 'line' | 'area'; onChartTypeChange: (t: 'candle' | 'line' | 'area') => void; sentiment: { upPct: number; total: number } | null; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void }) {
+function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChange, onIndToggle, onDrawTool, onRemoveDrawings }: { timeframe: string; onTimeframeChange: (tf: string) => void; chartType: 'candle' | 'line' | 'area'; onChartTypeChange: (t: 'candle' | 'line' | 'area') => void; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void }) {
   const [drawOpen, setDrawOpen] = useState(false);
   const [ctOpen, setCtOpen] = useState(false);
   const [tfOpen, setTfOpen] = useState(false);
@@ -228,21 +228,8 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
     { name: 'Shapes', items: ['Rectangle', 'Brush', 'Arrow Marker'] },
   ];
 
-  const upPct = sentiment?.upPct ?? 50;
-  const hasSentiment = (sentiment?.total ?? 0) > 0;
-
   return (
-    <div className="absolute left-3 bottom-3 z-40 flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl">
-      <div className="flex flex-col items-center gap-1 px-1" title={hasSentiment ? `${upPct}% buyers · ${100 - upPct}% sellers` : 'No open trades yet'}>
-        <span className={`text-[9px] font-bold font-mono tabular-nums ${hasSentiment ? 'text-green' : 'text-text-dark'}`}>{upPct}%</span>
-        <div className="w-1.5 h-20 rounded-full overflow-hidden flex flex-col" style={{ backgroundColor: 'rgba(255,73,84,0.35)' }}>
-          <div className="w-full rounded-full" style={{ height: `${upPct}%`, backgroundColor: hasSentiment ? '#00c365' : '#5c677f' }} />
-        </div>
-        <span className={`text-[9px] font-bold font-mono tabular-nums ${hasSentiment ? 'text-red' : 'text-text-dark'}`}>{100 - upPct}%</span>
-      </div>
-
-      <div className="w-6 h-px bg-border my-1" />
-
+    <div className="absolute left-8 bottom-3 z-40 flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl">
       <div className="relative">
         <button title="Drawing Tools" onClick={() => setDrawOpen(!drawOpen)}
           className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${drawOpen ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
@@ -679,7 +666,7 @@ export default function TradingPage() {
     };
   }, [activePair, timeframe]);
 
-  const [sentiment, setSentiment] = useState<{ upPct: number; total: number } | null>(null);
+  const [sentiment, setSentiment] = useState<{ upPct: number } | null>(null);
 
   useEffect(() => {
     if (!activePair) {
@@ -692,11 +679,11 @@ export default function TradingPage() {
         const res = await fetch(`/api/market/sentiment?pairId=${activePair.id}`);
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled) setSentiment({ upPct: data.upPct ?? 50, total: data.total ?? 0 });
+        if (!cancelled && Number.isFinite(data.upPct)) setSentiment({ upPct: data.upPct });
       } catch {}
     };
     load();
-    const timer = setInterval(load, 15000);
+    const timer = setInterval(load, 10000);
     return () => {
       cancelled = true;
       clearInterval(timer);
@@ -1351,7 +1338,16 @@ export default function TradingPage() {
             <div className="flex-1 flex min-w-0 overflow-hidden">
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} onViewChange={handleViewChange} watermark={accountType === 'demo' ? 'DEMO' : null} />
-                <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} chartType={chartType} onChartTypeChange={setChartType} sentiment={sentiment} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
+                {sentiment && (
+                  <div className="absolute left-1.5 top-2 bottom-2 z-30 w-5 flex flex-col items-center gap-1 pointer-events-none" title={`Sentiment ${sentiment.upPct}% up · ${100 - sentiment.upPct}% down`}>
+                    <span className="text-[9px] font-bold font-mono tabular-nums text-green">{sentiment.upPct}%</span>
+                    <div className="flex-1 w-1.5 rounded-full overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'rgba(255,73,84,0.35)' }}>
+                      <div className="w-full rounded-full transition-all duration-1000" style={{ height: `${sentiment.upPct}%`, backgroundColor: '#00c365' }} />
+                    </div>
+                    <span className="text-[9px] font-bold font-mono tabular-nums text-red">{100 - sentiment.upPct}%</span>
+                  </div>
+                )}
+                <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} chartType={chartType} onChartTypeChange={setChartType} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
                 {offLive && (
                   <button
                     onClick={() => {

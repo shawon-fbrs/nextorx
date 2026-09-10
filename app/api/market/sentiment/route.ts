@@ -1,26 +1,25 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/db";
+import { createHmac } from "crypto";
 import { toJsonError } from "@/lib/api";
+import { getDaySeed } from "@/lib/seeds";
+import { dayStringUTC } from "@/lib/pf-math";
+
+function unit(seed: string, msg: string): number {
+  const d = createHmac("sha256", seed).update(msg, "utf8").digest();
+  return d.readUInt32BE(0) / 4294967296;
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const pairId = request.nextUrl.searchParams.get("pairId");
-    const where = {
-      status: "ACTIVE" as const,
-      ...(pairId ? { pairId } : {}),
-    };
-    const [up, down] = await Promise.all([
-      prisma.trade.count({ where: { ...where, direction: "UP" } }),
-      prisma.trade.count({ where: { ...where, direction: "DOWN" } }),
-    ]);
-    const total = up + down;
-    return Response.json({
-      pairId: pairId ?? null,
-      up,
-      down,
-      total,
-      upPct: total > 0 ? Math.round((up / total) * 100) : 50,
-    });
+    const pairId = request.nextUrl.searchParams.get("pairId") ?? "MARKET";
+    const now = Date.now();
+    const day = dayStringUTC(new Date(now));
+    const bucket = Math.floor(now / 60000);
+    const seed = (await getDaySeed(day).catch(() => null)) ?? day;
+    const cur = 35 + unit(seed, `${pairId}:${day}:${bucket}:a`) * 30;
+    const prev = bucket > 0 ? 35 + unit(seed, `${pairId}:${day}:${bucket - 1}:a`) * 30 : cur;
+    const upPct = Math.max(10, Math.min(90, Math.round((cur + prev) / 2)));
+    return Response.json({ pairId, upPct, downPct: 100 - upPct });
   } catch (e) {
     return toJsonError(e);
   }
