@@ -229,7 +229,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
   ];
 
   return (
-    <div className="absolute left-8 bottom-3 z-40 flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl">
+    <div className="absolute left-3 bottom-8 z-40 flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl">
       <div className="relative">
         <button title="Drawing Tools" onClick={() => setDrawOpen(!drawOpen)}
           className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${drawOpen ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
@@ -1336,17 +1336,22 @@ export default function TradingPage() {
               </div>
             ) : (
             <div className="flex-1 flex min-w-0 overflow-hidden">
-              <div className="flex-1 relative overflow-hidden">
-                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} onViewChange={handleViewChange} watermark={accountType === 'demo' ? 'DEMO' : null} />
-                {sentiment && (
-                  <div className="absolute left-1.5 top-2 bottom-2 z-30 w-6 flex flex-col items-center gap-1 px-1 py-2 rounded-full bg-background/70 backdrop-blur-md border border-border/60 shadow-lg" title={`Sentiment ${sentiment.upPct}% up · ${100 - sentiment.upPct}% down`}>
+              <div className="w-9 bg-background border-r border-border flex-shrink-0 flex flex-col items-center py-3 gap-1.5"
+                title={sentiment ? `Sentiment ${sentiment.upPct}% up · ${100 - sentiment.upPct}% down` : 'Sentiment'}>
+                {sentiment ? (
+                  <>
                     <span className="text-[9px] font-bold font-mono tabular-nums text-green">{sentiment.upPct}%</span>
-                    <div className="flex-1 w-1.5 rounded-full overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'rgba(255,73,84,0.35)' }}>
-                      <div className="w-full rounded-full transition-[height] duration-[2000ms] ease-linear" style={{ height: `${sentiment.upPct}%`, backgroundColor: '#00c365' }} />
+                    <div className="flex-1 w-1.5 rounded-full overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: '#ff4954' }}>
+                      <div className="w-full transition-[height] duration-[2000ms] ease-linear" style={{ height: `${sentiment.upPct}%`, backgroundColor: '#00c365' }} />
                     </div>
                     <span className="text-[9px] font-bold font-mono tabular-nums text-red">{100 - sentiment.upPct}%</span>
-                  </div>
+                  </>
+                ) : (
+                  <div className="flex-1 w-1.5 rounded-full min-h-0" style={{ backgroundColor: '#31394c' }} />
                 )}
+              </div>
+              <div className="flex-1 relative overflow-hidden">
+                <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} onViewChange={handleViewChange} watermark={accountType === 'demo' ? 'DEMO' : null} />
                 <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} chartType={chartType} onChartTypeChange={setChartType} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
                 {offLive && (
                   <button
