@@ -120,8 +120,20 @@ export async function DELETE(
         { status: 409 }
       );
     }
+    const settledCount = await prisma.trade.count({
+      where: { pairId: id, status: { in: ["WON", "LOST", "CANCELLED"] } },
+    });
+    if (settledCount > 0) {
+      return Response.json(
+        { error: "Cannot delete pair with settled trade history. Disable it instead to preserve the audit trail." },
+        { status: 409 }
+      );
+    }
 
     await prisma.candle.deleteMany({ where: { pairId: id } });
+    await prisma.secondCandle.deleteMany({ where: { pairId: id } });
+    await prisma.pairVolRegime.deleteMany({ where: { pairId: id } });
+    await prisma.candleDayArchive.deleteMany({ where: { pairId: id } });
     await prisma.pair.delete({ where: { id } });
 
     try {
