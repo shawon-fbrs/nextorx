@@ -14,10 +14,10 @@ export async function GET(request: NextRequest) {
     const pairId = request.nextUrl.searchParams.get("pairId") ?? "MARKET";
     const now = Date.now();
     const day = dayStringUTC(new Date(now));
-    const bucket = Math.floor(now / 60000);
+    const bucket = Math.floor(now / 20000);
     const seed = (await getDaySeed(day).catch(() => null)) ?? day;
-    const cur = 35 + unit(seed, `${pairId}:${day}:${bucket}:a`) * 30;
-    const prev = bucket > 0 ? 35 + unit(seed, `${pairId}:${day}:${bucket - 1}:a`) * 30 : cur;
+    const cur = 30 + unit(seed, `${pairId}:${day}:${bucket}:a`) * 40;
+    const prev = 30 + unit(seed, `${pairId}:${day}:${bucket - 1}:a`) * 40;
     const upPct = Math.max(10, Math.min(90, Math.round((cur + prev) / 2)));
     return Response.json({ pairId, upPct, downPct: 100 - upPct });
   } catch (e) {
