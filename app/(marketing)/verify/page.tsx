@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MIRRORED_PAIR_IDS } from '@/lib/mirror-feed';
 
@@ -56,12 +56,25 @@ function gauss(u1: number, u2: number): number {
 
 type Candle = { timestamp: number; open: number; high: number; low: number; close: number; ticks: number };
 
+interface PairInfo {
+  id: string;
+  name: string;
+  basePrice: number | string;
+  volatility: number | string;
+  category: string;
+  feed: string;
+}
+
 export default function VerifyPage() {
   const [seed, setSeed] = useState('');
-  const [pairId, setPairId] = useState('EURUSD');
-  const [day, setDay] = useState('');
-  const [basePrice, setBasePrice] = useState('1.085');
-  const [volatility, setVolatility] = useState('0.5');
+  const [pairId, setPairId] = useState('');
+  const [pairs, setPairs] = useState<PairInfo[]>([]);
+  const [day, setDay] = useState(() => {
+    const d = new Date(Date.now() - 86400000);
+    return d.toISOString().slice(0, 10);
+  });
+  const [basePrice, setBasePrice] = useState('');
+  const [volatility, setVolatility] = useState('');
   const [category, setCategory] = useState('forex');
   const [file, setFile] = useState<File | null>(null);
   const [regimeJson, setRegimeJson] = useState('');
@@ -71,6 +84,28 @@ export default function VerifyPage() {
   const [loadingDay, setLoadingDay] = useState(false);
   const [csvText, setCsvText] = useState('');
   const [csvMeta, setCsvMeta] = useState<{ day: string; asset: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/market/pairs')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { pairs?: PairInfo[] } | null) => {
+        if (cancelled || !data?.pairs) return;
+        setPairs(data.pairs);
+        setPairId((cur) => {
+          if (cur && data.pairs!.some((p) => p.id === cur)) return cur;
+          const synth = data.pairs!.find((p) => p.feed !== 'mirror');
+          return (synth ?? data.pairs![0])?.id ?? '';
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedPair = pairs.find((p) => p.id === pairId) ?? null;
+  const isMirror = selectedPair ? selectedPair.feed === 'mirror' : MIRRORED_PAIR_IDS.includes(pairId);
 
   const loadDayData = async () => {
     setResult('');
@@ -136,7 +171,7 @@ export default function VerifyPage() {
   const runVerify = async () => {
     setResult('');
     setOk(null);
-    if (MIRRORED_PAIR_IDS.includes(pairId)) {
+    if (isMirror) {
       setResult('This asset mirrors the live public market — compare it against public quotes, not the seed. Seed verification applies to synthetic assets.');
       setOk(false);
       return;
@@ -242,8 +277,8 @@ export default function VerifyPage() {
         <div>
           <h1 className="text-2xl font-black text-foreground">Verify Fairness</h1>
           <p className="text-sm text-text-dark mt-1">
-            Re-run the market math in your own browser. Paste the revealed seed, upload the candle CSV, and check every candle.
-            The page first compares your seed against the published commitment hash — mismatches abort.
+            Pick an asset and a day, load everything with one click, and re-run the market math in your own browser.
+            The page first compares the seed against the published commitment hash — mismatches abort.
             Trade entries include a half-spread (shown on each pair); exits are the committed candle closes verified here.
           </p>
         </div>
@@ -268,31 +303,30 @@ export default function VerifyPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Asset</label>
-              <input value={pairId} onChange={(e) => setPairId(e.target.value.trim().toUpperCase())} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono focus:outline-none focus:border-blue" />
+              <select value={pairId} onChange={(e) => setPairId(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-blue">
+                {pairs.length === 0 && <option value="">Loading…</option>}
+                {pairs.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {(p as { name?: string }).name ?? p.id}{p.feed === 'mirror' ? ' · live' : ''}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Day (UTC)</label>
-              <input value={day} onChange={(e) => setDay(e.target.value.trim())} placeholder="2026-09-04" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono focus:outline-none focus:border-blue" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Base Price</label>
-              <input value={basePrice} onChange={(e) => setBasePrice(e.target.value.trim())} inputMode="decimal" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono focus:outline-none focus:border-blue" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Volatility</label>
-              <input value={volatility} onChange={(e) => setVolatility(e.target.value.trim())} inputMode="decimal" className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono focus:outline-none focus:border-blue" />
+              <input type="date" value={day} max={new Date(Date.now() - 86400000).toISOString().slice(0, 10)} onChange={(e) => setDay(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-blue [color-scheme:dark]" />
             </div>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-blue">
-              <option value="forex">Forex</option>
-              <option value="crypto">Crypto</option>
-              <option value="commodities">Commodities</option>
-              <option value="indices">Indices</option>
-              <option value="stocks">Stocks</option>
-            </select>
-          </div>
+          {isMirror && pairId !== '' && (
+            <p className="text-xs text-orange font-semibold bg-orange/10 border border-orange/30 rounded-xl px-4 py-3">
+              Live-mirror asset — seeded check does not apply. Compare it against public market quotes instead.
+            </p>
+          )}
+          {(basePrice !== '' || volatility !== '') && (
+            <p className="text-[11px] text-text-dark font-mono">
+              auto-detected · base {basePrice || '—'} · vol {volatility || '—'} · {category}{regimeJson !== '' ? ' · schedule on' : ''}
+            </p>
+          )}
           <div>
             <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Candle CSV</label>
             {csvText && csvMeta && csvMeta.day === day && csvMeta.asset === pairId ? (
@@ -303,18 +337,7 @@ export default function VerifyPage() {
               <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-sm text-text-dark" />
             )}
           </div>
-          <div>
-            <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Volatility schedule (optional JSON)</label>
-            <textarea
-              value={regimeJson}
-              onChange={(e) => setRegimeJson(e.target.value)}
-              placeholder='{"regimes": [{"hour": 10, "sigmaMult": 1.25}]}'
-              rows={3}
-              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-xs text-foreground font-mono placeholder:text-text-dark/50 focus:outline-none focus:border-blue"
-            />
-            <p className="text-[11px] text-textDark mt-1">Paste the output of /api/market/verify/regime for mirrored assets. Empty means ×1.0 for every hour.</p>
-          </div>
-          <button onClick={runVerify} disabled={working} className="w-full bg-green hover:bg-green-hover text-white font-bold text-sm py-3 rounded-xl transition-colors disabled:opacity-50">
+          <button onClick={runVerify} disabled={working || isMirror} className="w-full bg-green hover:bg-green-hover text-white font-bold text-sm py-3 rounded-xl transition-colors disabled:opacity-50">
             {working ? 'Verifying...' : 'Verify History'}
           </button>
         </div>
