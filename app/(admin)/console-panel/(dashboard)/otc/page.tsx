@@ -12,6 +12,7 @@ import { Select } from '@/components/admin/ui/select';
 import { Toggle } from '@/components/admin/ui/toggle';
 import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/admin/ui/dialog';
 import { Alert } from '@/components/admin/ui/alert';
+import { FileUploader } from '@/app/components/FileUploader';
 
 type Pair = {
   id: string;
@@ -33,6 +34,7 @@ type Pair = {
   tags: string[];
   maxDailyVolume: number | null;
   sortOrder: number;
+  iconUrl: string | null;
   _count: { trades: number };
 };
 
@@ -68,6 +70,7 @@ type PairForm = {
   description: string;
   tradingHours: string;
   isFeatured: boolean;
+  iconUrl: string;
 };
 
 const EMPTY_FORM: PairForm = {
@@ -86,6 +89,7 @@ const EMPTY_FORM: PairForm = {
   description: '',
   tradingHours: '24/7',
   isFeatured: false,
+  iconUrl: '',
 };
 
 export default function OtcPage() {
@@ -180,6 +184,7 @@ export default function OtcPage() {
       description: pair.description || '',
       tradingHours: pair.tradingHours || '24/7',
       isFeatured: pair.isFeatured,
+      iconUrl: pair.iconUrl || '',
     });
     setError('');
     setEditingPair(pair);
@@ -222,6 +227,7 @@ export default function OtcPage() {
         description: form.description || undefined,
         tradingHours: form.tradingHours || undefined,
         isFeatured: form.isFeatured,
+        iconUrl: form.iconUrl || undefined,
       };
       const res = await fetch('/api/admin/pairs', {
         method: 'POST',
@@ -262,6 +268,7 @@ export default function OtcPage() {
         description: form.description || null,
         tradingHours: form.tradingHours || null,
         isFeatured: form.isFeatured,
+        iconUrl: form.iconUrl || null,
       };
       const res = await fetch(`/api/admin/pairs/${editingPair.id}`, {
         method: 'PUT',
@@ -408,6 +415,10 @@ export default function OtcPage() {
             <Input label="Pair ID" placeholder="EURUSD" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value.toUpperCase() })} />
             <Input label="Display Name" placeholder="EUR/USD" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Input label="Symbol (optional)" placeholder="EUR/USD" value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} />
+            <div className="col-span-2">
+              <span className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Icon / Flag (optional)</span>
+              <FileUploader value={form.iconUrl} onChange={(url) => setForm({ ...form, iconUrl: url })} />
+            </div>
             <Select label="Category" options={CATEGORY_OPTIONS} value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} />
             <Input label="Base Price" type="number" step="any" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
             <Input label="Volatility" type="number" step="any" value={form.volatility} onChange={(e) => setForm({ ...form, volatility: e.target.value })} helperText="Uncalibrated (Track B). Higher = more price movement" />
@@ -444,6 +455,10 @@ export default function OtcPage() {
             <Input label="Pair ID" value={form.id} disabled className="opacity-50" />
             <Input label="Display Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Input label="Symbol" value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} />
+            <div className="col-span-2">
+              <span className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Icon / Flag (optional)</span>
+              <FileUploader value={form.iconUrl} onChange={(url) => setForm({ ...form, iconUrl: url })} />
+            </div>
             <Select label="Category" options={CATEGORY_OPTIONS} value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} />
             <Input label="Base Price" type="number" step="any" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
             <Input label="Volatility" type="number" step="any" value={form.volatility} onChange={(e) => setForm({ ...form, volatility: e.target.value })} />

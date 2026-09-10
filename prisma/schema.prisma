@@ -327,6 +327,7 @@ model Pair {
   maxTrade       Decimal  @default(5000) @db.Decimal(10, 2)
   maxPayout      Decimal? @default(95) @db.Decimal(5, 2)
   sortOrder      Int      @default(0)
+  iconUrl        String?
   description    String?
   tradingHours   String?  @default("24/7")
   tags           String[] @default([])
@@ -500,7 +501,8 @@ model ResourceAsset {
   filename   String
   mime       String
   size       Int
-  data       Bytes
+  data       Bytes?
+  key        String?          @unique
   createdAt  DateTime         @default(now())
 
   @@index([categoryId, createdAt(sort: Desc)])

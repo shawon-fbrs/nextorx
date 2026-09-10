@@ -189,6 +189,9 @@ export default function ResourcesPage() {
                     </button>
                     <div className="p-2 flex items-center gap-2">
                       <p className="flex-1 text-[10px] text-textDark truncate" title={a.filename}>{a.filename}</p>
+                      {(a as { storage?: string }).storage === 'minio' && (
+                        <span className="text-[9px] font-bold text-blue bg-blue/10 px-1.5 py-0.5 rounded">S3</span>
+                      )}
                       <button onClick={() => deleteAsset(a)} className="text-[11px] text-red hover:text-red-hover font-bold">✕</button>
                     </div>
                   </div>

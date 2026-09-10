@@ -28,6 +28,8 @@ interface PairDef {
   spread: number;
   minTrade: number;
   maxTrade: number;
+  iconUrl?: string | null;
+  changePct24h?: number | null;
 }
 
 interface Trade {
@@ -65,6 +67,19 @@ const toolOverlayMap: Record<string, string> = {
   'Arrow Marker': 'arrowMarker',
 };
 
+const CATEGORY_ORDER = ['forex', 'crypto', 'commodities', 'indices', 'stocks'];
+
+function PairAvatar({ pair, size = 40 }: { pair: PairDef; size?: number }) {
+  if (pair.iconUrl) {
+    return <img src={pair.iconUrl} alt="" className="rounded-full object-cover flex-shrink-0 bg-background" style={{ width: size, height: size }} />;
+  }
+  return (
+    <div className="rounded-full bg-background flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
+      <span className="text-xs font-bold text-foreground">{pair.name.replace('/', '').slice(0, 3)}</span>
+    </div>
+  );
+}
+
 function TopBar({
   pairs,
   visibleIds,
@@ -90,6 +105,7 @@ function TopBar({
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [catTab, setCatTab] = useState('all');
   const [lastPnL, setLastPnL] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -133,24 +149,43 @@ function TopBar({
                 className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-sm text-foreground placeholder-text-dark focus:outline-none focus:border-blue/50 transition-colors" />
             </div>
           </div>
-          <div className="max-h-[420px] overflow-y-auto px-2 pb-2">
-            {pairs.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(pair => {
+          <div className="px-4 pb-2 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {['all', ...CATEGORY_ORDER.filter(c => pairs.some(p => p.category === c))].map(c => {
+              const n = c === 'all' ? pairs.length : pairs.filter(p => p.category === c).length;
+              return (
+                <button key={c} onClick={() => setCatTab(c)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold capitalize transition-colors ${catTab === c ? 'bg-blue/15 text-blue' : 'text-text-dark hover:text-foreground hover:bg-surface-hover'}`}>
+                  {c === 'all' ? 'All' : c}
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${catTab === c ? 'bg-blue/20' : 'bg-background'}`}>{n}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="max-h-[420px] overflow-y-auto px-2 pb-2 divide-y divide-border/50">
+            {pairs.filter(p => (catTab === 'all' || p.category === catTab) && p.name.toLowerCase().includes(search.toLowerCase())).map(pair => {
               const isActive = pair.id === activePair?.id;
               const isOpen = visibleIds.includes(pair.id);
               const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
               const detail = payoutDetails[pair.id];
               const title = detail ? `Base ${detail.base}%${detail.adjustments.length ? ' ' + detail.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${detail.payout}%` : `${shownPayout}%`;
+              const chg = pair.changePct24h;
               return (
                 <button key={pair.id} onClick={() => { onSelect(pair); setAddOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all mb-0.5 ${isActive ? 'bg-blue/10 border border-blue/30' : 'hover:bg-surface-hover border border-transparent'}`}>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-blue/20' : 'bg-background'}`}>
-                    <span className="text-xs font-bold text-foreground">{pair.name.replace('/', '').slice(0, 3)}</span>
+                  className={`w-full flex items-center gap-3 px-3 py-3 transition-all ${isActive ? 'bg-blue/10' : 'hover:bg-surface-hover'}`}>
+                  <PairAvatar pair={pair} size={36} />
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-foreground truncate">{pair.name}</span>
+                      {isOpen && <span className="text-[10px] text-blue flex-shrink-0">open</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[11px] font-bold font-mono ${chg == null ? 'text-text-dark' : chg >= 0 ? 'text-green' : 'text-red'}`}>
+                        {chg == null ? '—' : `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`}
+                      </span>
+                      <span className="text-[10px] text-text-dark font-mono" title="Spread">SP {String(pair.spread)}</span>
+                    </div>
                   </div>
-                  <div className="flex-1 text-left">
-                    <span className="text-sm font-bold text-foreground">{pair.name}</span>
-                    {isOpen && <span className="text-[10px] text-blue ml-2">open</span>}
-                  </div>
-                  <span className="text-sm font-bold text-green" title={title}>{shownPayout}%</span>
+                  <span className="text-sm font-bold text-green flex-shrink-0" title={title}>{shownPayout}%</span>
                 </button>
               );
             })}
@@ -158,9 +193,11 @@ function TopBar({
         </div>
       </div>
 
-      {pairs.filter((pair) => visibleIds.includes(pair.id)).slice(0, 7).map((pair) => {
+      <div className="flex-1 flex items-center gap-2 overflow-x-auto min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {pairs.filter((pair) => visibleIds.includes(pair.id)).map((pair) => {
         const isActive = pair.id === activePair?.id;
         const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
+        const chg = pair.changePct24h;
         const pairActiveTrades = trades.filter((t) => t.status === 'active' && t.pairId === pair.id);
         const liveUnrealized = (() => {
           if (pairActiveTrades.length === 0 || currentPrice == null || pair.id !== activePair?.id) return null;
@@ -177,17 +214,21 @@ function TopBar({
         const showLive = liveUnrealized !== null;
         return (
           <button key={pair.id} onClick={() => onSelect(pair)}
-            className={`h-11 w-40 min-w-0 flex-shrink rounded-xl flex items-center pl-4 pr-7 gap-2.5 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
+            className={`h-11 w-44 min-w-0 flex-shrink-0 rounded-xl flex items-center pl-3 pr-7 gap-2 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
             <span onClick={(e) => { e.stopPropagation(); onClose(pair.id); }}
               className="absolute top-0 right-0 w-5 h-5 bg-red rounded-bl-xl flex items-center justify-center hover:bg-red-hover transition-colors">
               <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} />
               </svg>
             </span>
-            {isActive && <div className="w-0.5 h-6 bg-blue rounded-full" />}
+            {isActive && <div className="w-0.5 h-6 bg-blue rounded-full flex-shrink-0" />}
+            <PairAvatar pair={pair} size={30} />
             <div className="flex flex-col flex-1 min-w-0">
               <span className="text-xs font-bold text-foreground leading-tight truncate">{pair.name}</span>
               <div className="flex items-center gap-1 leading-tight">
+                <span className={`text-[10px] font-bold font-mono ${chg == null ? 'text-text-dark' : chg >= 0 ? 'text-green' : 'text-red'}`}>
+                  {chg == null ? '' : `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}% • `}
+                </span>
                 <span className="text-[10px] font-bold text-orange" title={(() => { const d = payoutDetails[pair.id]; return d ? `Base ${d.base}%${d.adjustments.length ? ' ' + d.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${d.payout}%` : `${shownPayout}%`; })()}>{shownPayout}%</span>
                 {unrealized !== null ? (
                   <span className={`text-[10px] font-bold ${!showLive ? 'opacity-60' : ''} ${unrealized >= 0 ? 'text-green' : 'text-red'}`}>• {unrealized >= 0 ? '+' : ''}{unrealized.toFixed(2)}$</span>
@@ -199,7 +240,7 @@ function TopBar({
           </button>
         );
       })}
-      <div className="flex-1" />
+      </div>
     </div>
   );
 }

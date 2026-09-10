@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 function getEnv(name: string): string | undefined {
   return process.env[name] ?? process.env[`NEXT_PUBLIC_${name}`];
@@ -79,6 +80,24 @@ export async function s3Exists(key: string): Promise<boolean> {
 
 export function isS3Configured(): boolean {
   return getS3Config() !== null;
+}
+
+export async function s3Delete(key: string): Promise<void> {
+  const c = getClient();
+  if (!c) return;
+  try {
+    await c.client.send(new DeleteObjectCommand({ Bucket: c.bucket, Key: key }));
+  } catch {}
+}
+
+export async function s3PresignGet(key: string, expiresInSec = 3600): Promise<string | null> {
+  const c = getClient();
+  if (!c) return null;
+  try {
+    return await getSignedUrl(c.client, new GetObjectCommand({ Bucket: c.bucket, Key: key }), { expiresIn: expiresInSec });
+  } catch {
+    return null;
+  }
 }
 
 export function s3KeyForDay(day: string, pairId: string, intervalMs: number): string {
