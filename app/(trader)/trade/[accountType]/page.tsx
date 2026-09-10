@@ -683,7 +683,7 @@ export default function TradingPage() {
       } catch {}
     };
     load();
-    const timer = setInterval(load, 10000);
+    const timer = setInterval(load, 2000);
     return () => {
       cancelled = true;
       clearInterval(timer);
@@ -1342,7 +1342,7 @@ export default function TradingPage() {
                   <div className="absolute left-1.5 top-2 bottom-2 z-30 w-6 flex flex-col items-center gap-1 px-1 py-2 rounded-full bg-background/70 backdrop-blur-md border border-border/60 shadow-lg" title={`Sentiment ${sentiment.upPct}% up · ${100 - sentiment.upPct}% down`}>
                     <span className="text-[9px] font-bold font-mono tabular-nums text-green">{sentiment.upPct}%</span>
                     <div className="flex-1 w-1.5 rounded-full overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'rgba(255,73,84,0.35)' }}>
-                      <div className="w-full rounded-full transition-all duration-1000" style={{ height: `${sentiment.upPct}%`, backgroundColor: '#00c365' }} />
+                      <div className="w-full rounded-full transition-[height] duration-[2000ms] ease-linear" style={{ height: `${sentiment.upPct}%`, backgroundColor: '#00c365' }} />
                     </div>
                     <span className="text-[9px] font-bold font-mono tabular-nums text-red">{100 - sentiment.upPct}%</span>
                   </div>
