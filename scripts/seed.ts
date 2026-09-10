@@ -8,11 +8,11 @@ const prisma = new PrismaClient();
 // All other pairs stay admin-managed (synthetic PF engine).
 // Volatility here only shapes the micro-wiggle around the anchor.
 const OTC_PAIRS = [
-  { id: "EURUSD", name: "EUR/USD", symbol: "EUR/USD", category: "forex", feed: "mirror", basePrice: 1.1627, volatility: 0.50, payoutPercent: 82, weekendPayout: 79, spread: 0.00002, tags: ["major", "popular"], sortOrder: 1 },
-  { id: "GBPUSD", name: "GBP/USD", symbol: "GBP/USD", category: "forex", feed: "mirror", basePrice: 1.3500, volatility: 0.55, payoutPercent: 80, weekendPayout: 77, spread: 0.00002, tags: ["major", "popular"], sortOrder: 2 },
-  { id: "USDJPY", name: "USD/JPY", symbol: "USD/JPY", category: "forex", feed: "mirror", basePrice: 155.00, volatility: 0.50, payoutPercent: 84, weekendPayout: 81, spread: 0.002, tags: ["major", "popular"], sortOrder: 3 },
-  { id: "XAUUSD", name: "Gold", symbol: "XAU/USD", category: "commodities", feed: "mirror", basePrice: 4476.60, volatility: 0.90, payoutPercent: 85, weekendPayout: 82, spread: 0.04, tags: ["major", "popular", "volatile"], sortOrder: 4 },
-  { id: "BTCUSD", name: "BTC/USD", symbol: "BTC/USD", category: "crypto", feed: "mirror", basePrice: 92000.00, volatility: 2.20, payoutPercent: 90, weekendPayout: 90, spread: 3.00, tags: ["major", "popular", "volatile"], sortOrder: 5 },
+  { id: "EURUSD", name: "EUR/USD OTC", symbol: "EUR/USD OTC", category: "forex", feed: "synthetic", basePrice: 1.1627, volatility: 0.50, payoutPercent: 82, weekendPayout: 79, spread: 0.00002, tags: ["major", "popular"], sortOrder: 1 },
+  { id: "GBPUSD", name: "GBP/USD OTC", symbol: "GBP/USD OTC", category: "forex", feed: "synthetic", basePrice: 1.3500, volatility: 0.55, payoutPercent: 80, weekendPayout: 77, spread: 0.00002, tags: ["major", "popular"], sortOrder: 2 },
+  { id: "USDJPY", name: "USD/JPY OTC", symbol: "USD/JPY OTC", category: "forex", feed: "synthetic", basePrice: 155.00, volatility: 0.50, payoutPercent: 84, weekendPayout: 81, spread: 0.002, tags: ["major", "popular"], sortOrder: 3 },
+  { id: "XAUUSD", name: "Gold OTC", symbol: "XAU/USD OTC", category: "commodities", feed: "synthetic", basePrice: 4476.60, volatility: 0.90, payoutPercent: 85, weekendPayout: 82, spread: 0.04, tags: ["major", "popular", "volatile"], sortOrder: 4 },
+  { id: "BTCUSD", name: "BTC/USD OTC", symbol: "BTC/USD OTC", category: "crypto", feed: "synthetic", basePrice: 92000.00, volatility: 2.20, payoutPercent: 90, weekendPayout: 90, spread: 3.00, tags: ["major", "popular", "volatile"], sortOrder: 5 },
 ];
 
 async function main() {
