@@ -78,6 +78,7 @@ export default function LandingPage() {
               <a href="#features" className="text-sm text-text hover:text-white transition-colors">Features</a>
               <a href="#assets" className="text-sm text-text hover:text-white transition-colors">Assets</a>
               <a href="#how-it-works" className="text-sm text-text hover:text-white transition-colors">How It Works</a>
+              <Link href="/verify" className="text-sm text-text hover:text-white transition-colors">Fairness</Link>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -315,6 +316,7 @@ export default function LandingPage() {
               <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Support</h4>
               <div className="space-y-2">
                 <a href="/support" className="block text-xs text-text-dark hover:text-white transition-colors">Help Center</a>
+                <a href="/verify" className="block text-xs text-text-dark hover:text-white transition-colors">Verify Fairness</a>
                 <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Contact Us</a>
                 <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">FAQ</a>
                 <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Community</a>

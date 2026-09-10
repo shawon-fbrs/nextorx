@@ -68,6 +68,70 @@ export default function VerifyPage() {
   const [result, setResult] = useState<string>('');
   const [ok, setOk] = useState<boolean | null>(null);
   const [working, setWorking] = useState(false);
+  const [loadingDay, setLoadingDay] = useState(false);
+  const [csvText, setCsvText] = useState('');
+  const [csvMeta, setCsvMeta] = useState<{ day: string; asset: string } | null>(null);
+
+  const loadDayData = async () => {
+    setResult('');
+    setOk(null);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !pairId) {
+      setResult('Enter the asset and the day first (YYYY-MM-DD).');
+      setOk(false);
+      return;
+    }
+    setLoadingDay(true);
+    try {
+      const asset = pairId.toUpperCase();
+      const [seedRes, pairsRes, regimeRes, csvRes] = await Promise.all([
+        fetch(`/api/market/seed/reveal?day=${encodeURIComponent(day)}`),
+        fetch('/api/market/pairs'),
+        fetch(`/api/market/verify/regime?asset=${encodeURIComponent(asset)}&date=${encodeURIComponent(day)}`),
+        fetch(`/api/market/verify/download?asset=${encodeURIComponent(asset)}&date=${encodeURIComponent(day)}`),
+      ]);
+      if (seedRes.ok) {
+        const data = await seedRes.json() as { seed?: string };
+        if (data.seed) setSeed(data.seed);
+      }
+      if (pairsRes.ok) {
+        const data = await pairsRes.json() as { pairs?: Array<{ id: string; basePrice: number | string; volatility: number | string; category: string }> };
+        const found = (data.pairs ?? []).find(p => String(p.id).toUpperCase() === asset);
+        if (found) {
+          setBasePrice(String(found.basePrice));
+          setVolatility(String(found.volatility));
+          setCategory(found.category);
+        }
+      }
+      if (regimeRes.ok) {
+        const data = await regimeRes.json() as { regimes?: Array<{ hour: number; sigmaMult: number }> };
+        if (data.regimes && data.regimes.length > 0) setRegimeJson(JSON.stringify({ regimes: data.regimes }));
+      }
+      let loaded = 0;
+      if (csvRes.ok) {
+        const text = await csvRes.text();
+        if (text.trim().split('\n').length > 1) {
+          setCsvText(text);
+          setCsvMeta({ day, asset });
+          loaded = text.trim().split('\n').length - 1;
+        }
+      }
+      const missing: string[] = [];
+      if (!seed) missing.push('seed (not revealed yet?)');
+      if (loaded === 0) missing.push('candles');
+      if (missing.length > 0) {
+        setResult(`Loaded what is available. Still missing: ${missing.join(', ')}.`);
+        setOk(false);
+      } else {
+        setResult(`Loaded seed, pair info and ${loaded} candles for ${asset} on ${day}. Hit Verify.`);
+        setOk(true);
+      }
+    } catch {
+      setResult('Could not load day data. Please try again.');
+      setOk(false);
+    } finally {
+      setLoadingDay(false);
+    }
+  };
 
   const runVerify = async () => {
     setResult('');
@@ -77,14 +141,15 @@ export default function VerifyPage() {
       setOk(false);
       return;
     }
-    if (!seed || !file || !day || !basePrice || !volatility) {
-      setResult('Fill in every field and attach the CSV.');
+    const useLoaded = csvText && csvMeta && csvMeta.day === day && csvMeta.asset === pairId;
+    if (!seed || (!file && !useLoaded) || !day || !basePrice || !volatility) {
+      setResult('Load the day data above or fill in every field and attach the CSV.');
       setOk(false);
       return;
     }
     setWorking(true);
     try {
-      const text = await file.text();
+      const text = useLoaded ? csvText : await file!.text();
       const lines = text.trim().split('\n');
       if (lines.length < 2) throw new Error('CSV is empty');
       const rows: Candle[] = lines.slice(1).map((l) => {
@@ -188,39 +253,17 @@ export default function VerifyPage() {
           </div>
         )}
         <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
+          <button
+            type="button"
+            onClick={loadDayData}
+            disabled={loadingDay}
+            className="w-full bg-blue hover:bg-blue/80 disabled:opacity-50 text-white text-sm font-bold py-3 rounded-xl transition-colors"
+          >
+            {loadingDay ? 'Loading day data…' : 'Load day data (seed + candles + pair info)'}
+          </button>
           <div>
             <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Revealed Server Seed (hex)</label>
             <input value={seed} onChange={(e) => setSeed(e.target.value.trim())} placeholder="a1b2c3..." className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground font-mono focus:outline-none focus:border-blue" />
-            <button
-              type="button"
-              onClick={async () => {
-                setResult('');
-                setOk(null);
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
-                  setResult('Enter the day first (YYYY-MM-DD).');
-                  setOk(false);
-                  return;
-                }
-                try {
-                  const res = await fetch(`/api/market/seed/reveal?day=${encodeURIComponent(day)}`);
-                  const data = await res.json() as { seed?: string; error?: string };
-                  if (!res.ok || !data.seed) {
-                    setResult(data.error || 'Seed for this day is not revealed yet — reveals shortly after the day ends (UTC).');
-                    setOk(false);
-                    return;
-                  }
-                  setSeed(data.seed);
-                  setResult('Revealed seed loaded. Attach the CSV and run verification.');
-                  setOk(true);
-                } catch {
-                  setResult('Could not load the seed. Please try again.');
-                  setOk(false);
-                }
-              }}
-              className="mt-2 text-xs font-semibold text-blue hover:text-white transition-colors"
-            >
-              Load revealed seed for this day →
-            </button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -252,7 +295,13 @@ export default function VerifyPage() {
           </div>
           <div>
             <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Candle CSV</label>
-            <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-sm text-text-dark" />
+            {csvText && csvMeta && csvMeta.day === day && csvMeta.asset === pairId ? (
+              <p className="text-xs text-green font-semibold bg-green/10 border border-green/30 rounded-xl px-4 py-3">
+                {csvText.trim().split('\n').length - 1} candles loaded for {csvMeta.asset} on {csvMeta.day} — no file needed.
+              </p>
+            ) : (
+              <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-sm text-text-dark" />
+            )}
           </div>
           <div>
             <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Volatility schedule (optional JSON)</label>
