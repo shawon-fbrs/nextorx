@@ -73,6 +73,30 @@ function PairAvatar({ pair, size = 40 }: { pair: PairDef; size?: number }) {
   if (pair.iconUrl) {
     return <img src={pair.iconUrl} alt="" className="rounded-full object-cover flex-shrink-0 bg-background" style={{ width: size, height: size }} />;
   }
+  if (pair.category === 'forex' && /^[A-Z]{6}$/.test(pair.id)) {
+    const base = pair.id.slice(0, 3);
+    const quote = pair.id.slice(3);
+    const half = size / 2;
+    const flag = (cc: string, left: number) => (
+      <div className="absolute top-0 rounded-full bg-background border border-border overflow-hidden flex items-center justify-center" style={{ width: size, height: size, left }}>
+        <span className="font-bold text-foreground" style={{ fontSize: size * 0.28 }}>{cc.slice(0, 2)}</span>
+        <img
+          src={`/api/resources/by-filename/${cc.toLowerCase()}.svg`}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      </div>
+    );
+    return (
+      <div className="relative flex-shrink-0" style={{ width: size + half, height: size }}>
+        {flag(base, 0)}
+        {flag(quote, half)}
+      </div>
+    );
+  }
   return (
     <div className="rounded-full bg-background flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
       <span className="text-xs font-bold text-foreground">{pair.name.replace('/', '').slice(0, 3)}</span>
