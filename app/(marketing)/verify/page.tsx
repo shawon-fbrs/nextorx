@@ -124,9 +124,13 @@ export default function VerifyPage() {
         fetch(`/api/market/verify/regime?asset=${encodeURIComponent(asset)}&date=${encodeURIComponent(day)}`),
         fetch(`/api/market/verify/download?asset=${encodeURIComponent(asset)}&date=${encodeURIComponent(day)}`),
       ]);
+      let haveSeed = seed.trim().length > 0;
       if (seedRes.ok) {
         const data = await seedRes.json() as { seed?: string };
-        if (data.seed) setSeed(data.seed);
+        if (data.seed) {
+          setSeed(data.seed);
+          haveSeed = true;
+        }
       }
       if (pairsRes.ok) {
         const data = await pairsRes.json() as { pairs?: Array<{ id: string; basePrice: number | string; volatility: number | string; category: string }> };
@@ -151,7 +155,10 @@ export default function VerifyPage() {
         }
       }
       const missing: string[] = [];
-      if (!seed) missing.push('seed (not revealed yet?)');
+      if (!haveSeed) {
+        const errData = !seedRes.ok ? await seedRes.json().catch(() => ({})) as { error?: string } : {};
+        missing.push(errData.error ?? 'seed (not revealed yet?)');
+      }
       if (loaded === 0) missing.push('candles');
       if (missing.length > 0) {
         setResult(`Loaded what is available. Still missing: ${missing.join(', ')}.`);
