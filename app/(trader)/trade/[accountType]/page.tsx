@@ -16,7 +16,7 @@ import {
   TrendingUp, Square, ArrowUpRight,
   Minus, MoveHorizontal, ChevronRight,
   GitBranch, Pencil, Activity, Trash2, Maximize2, CandlestickChart,
-  PenLine, ArrowRight, Eye, EyeOff, Settings, X,
+  PenLine, ArrowRight, ChevronsRight, Eye, EyeOff, Settings, X,
 } from 'lucide-react';
 
 interface PairDef {
@@ -1339,7 +1339,7 @@ export default function TradingPage() {
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} onViewChange={handleViewChange} watermark={accountType === 'demo' ? 'DEMO' : null} />
                 {sentiment && (
-                  <div className="absolute left-1.5 top-2 bottom-2 z-30 w-5 flex flex-col items-center gap-1 pointer-events-none" title={`Sentiment ${sentiment.upPct}% up · ${100 - sentiment.upPct}% down`}>
+                  <div className="absolute left-1.5 top-2 bottom-2 z-30 w-6 flex flex-col items-center gap-1 px-1 py-2 rounded-full bg-background/70 backdrop-blur-md border border-border/60 shadow-lg" title={`Sentiment ${sentiment.upPct}% up · ${100 - sentiment.upPct}% down`}>
                     <span className="text-[9px] font-bold font-mono tabular-nums text-green">{sentiment.upPct}%</span>
                     <div className="flex-1 w-1.5 rounded-full overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'rgba(255,73,84,0.35)' }}>
                       <div className="w-full rounded-full transition-all duration-1000" style={{ height: `${sentiment.upPct}%`, backgroundColor: '#00c365' }} />
@@ -1356,14 +1356,10 @@ export default function TradingPage() {
                       } catch {}
                       setOffLive(false);
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-surface/90 backdrop-blur border border-border flex items-center justify-center text-text hover:text-white hover:bg-surface shadow-lg transition-colors"
+                    className="absolute right-20 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-surface/90 backdrop-blur border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface shadow-lg transition-colors"
                     title="Go to live price"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <circle cx="12" cy="12" r="7" />
-                      <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
-                      <path d="M12 2v3m0 14v3M2 12h3m14 0h3" strokeLinecap="round" />
-                    </svg>
+                    <ChevronsRight size={18} />
                   </button>
                 )}
                 <button
