@@ -57,6 +57,15 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
     };
   }, [accountType]);
 
+  const redirecting = !loading && !!user?.role && ADMIN_ROLES.has(user.role);
+  if (loading || redirecting) {
+    return (
+      <div className="h-screen w-screen overflow-hidden flex items-center justify-center bg-background">
+        <div className="w-8 h-8 rounded-full border-2 border-border border-t-blue animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen w-screen overflow-hidden flex bg-background text-text text-sm">
       <Sidebar

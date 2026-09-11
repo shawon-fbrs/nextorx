@@ -328,6 +328,7 @@ model Pair {
   maxPayout      Decimal? @default(95) @db.Decimal(5, 2)
   sortOrder      Int      @default(0)
   iconUrl        String?
+  iconUrl2       String?
   description    String?
   tradingHours   String?  @default("24/7")
   tags           String[] @default([])

@@ -12,7 +12,7 @@ import { Select } from '@/components/admin/ui/select';
 import { Toggle } from '@/components/admin/ui/toggle';
 import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/admin/ui/dialog';
 import { Alert } from '@/components/admin/ui/alert';
-import { FileUploader } from '@/app/components/FileUploader';
+import { ResourcePicker } from '@/app/components/ResourcePicker';
 
 type Pair = {
   id: string;
@@ -35,6 +35,7 @@ type Pair = {
   maxDailyVolume: number | null;
   sortOrder: number;
   iconUrl: string | null;
+  iconUrl2: string | null;
   _count: { trades: number };
 };
 
@@ -71,6 +72,7 @@ type PairForm = {
   tradingHours: string;
   isFeatured: boolean;
   iconUrl: string;
+  iconUrl2: string;
 };
 
 const EMPTY_FORM: PairForm = {
@@ -90,6 +92,7 @@ const EMPTY_FORM: PairForm = {
   tradingHours: '24/7',
   isFeatured: false,
   iconUrl: '',
+  iconUrl2: '',
 };
 
 export default function OtcPage() {
@@ -102,6 +105,7 @@ export default function OtcPage() {
   const [form, setForm] = useState<PairForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [iconPicker, setIconPicker] = useState<null | { field: 'iconUrl' | 'iconUrl2'; label: string }>(null);
 
   const fetchPairs = useCallback(async () => {
     try {
@@ -185,6 +189,7 @@ export default function OtcPage() {
       tradingHours: pair.tradingHours || '24/7',
       isFeatured: pair.isFeatured,
       iconUrl: pair.iconUrl || '',
+      iconUrl2: pair.iconUrl2 || '',
     });
     setError('');
     setEditingPair(pair);
@@ -228,6 +233,7 @@ export default function OtcPage() {
         tradingHours: form.tradingHours || undefined,
         isFeatured: form.isFeatured,
         iconUrl: form.iconUrl || undefined,
+        iconUrl2: form.iconUrl2 || undefined,
       };
       const res = await fetch('/api/admin/pairs', {
         method: 'POST',
@@ -269,6 +275,7 @@ export default function OtcPage() {
         tradingHours: form.tradingHours || null,
         isFeatured: form.isFeatured,
         iconUrl: form.iconUrl || null,
+        iconUrl2: form.iconUrl2 || null,
       };
       const res = await fetch(`/api/admin/pairs/${editingPair.id}`, {
         method: 'PUT',
@@ -415,10 +422,16 @@ export default function OtcPage() {
             <Input label="Pair ID" placeholder="EURUSD" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value.toUpperCase() })} />
             <Input label="Display Name" placeholder="EUR/USD" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Input label="Symbol (optional)" placeholder="EUR/USD" value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} />
-            <div className="col-span-2">
-              <span className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Icon / Flag (optional)</span>
-              <FileUploader value={form.iconUrl} onChange={(url) => setForm({ ...form, iconUrl: url })} />
-            </div>
+            {form.category === 'forex' ? (
+              <>
+                <PairIconField label="Base Flag (optional)" value={form.iconUrl} onPick={() => setIconPicker({ field: 'iconUrl', label: 'Base Flag' })} onClear={() => setForm({ ...form, iconUrl: '' })} />
+                <PairIconField label="Quote Flag (optional)" value={form.iconUrl2} onPick={() => setIconPicker({ field: 'iconUrl2', label: 'Quote Flag' })} onClear={() => setForm({ ...form, iconUrl2: '' })} />
+              </>
+            ) : (
+              <div className="col-span-2">
+                <PairIconField label="Logo (optional)" value={form.iconUrl} onPick={() => setIconPicker({ field: 'iconUrl', label: 'Logo' })} onClear={() => setForm({ ...form, iconUrl: '' })} />
+              </div>
+            )}
             <Select label="Category" options={CATEGORY_OPTIONS} value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} />
             <Input label="Base Price" type="number" step="any" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
             <Input label="Volatility" type="number" step="any" value={form.volatility} onChange={(e) => setForm({ ...form, volatility: e.target.value })} helperText="Uncalibrated (Track B). Higher = more price movement" />
@@ -455,10 +468,16 @@ export default function OtcPage() {
             <Input label="Pair ID" value={form.id} disabled className="opacity-50" />
             <Input label="Display Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Input label="Symbol" value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} />
-            <div className="col-span-2">
-              <span className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Icon / Flag (optional)</span>
-              <FileUploader value={form.iconUrl} onChange={(url) => setForm({ ...form, iconUrl: url })} />
-            </div>
+            {form.category === 'forex' ? (
+              <>
+                <PairIconField label="Base Flag (optional)" value={form.iconUrl} onPick={() => setIconPicker({ field: 'iconUrl', label: 'Base Flag' })} onClear={() => setForm({ ...form, iconUrl: '' })} />
+                <PairIconField label="Quote Flag (optional)" value={form.iconUrl2} onPick={() => setIconPicker({ field: 'iconUrl2', label: 'Quote Flag' })} onClear={() => setForm({ ...form, iconUrl2: '' })} />
+              </>
+            ) : (
+              <div className="col-span-2">
+                <PairIconField label="Logo (optional)" value={form.iconUrl} onPick={() => setIconPicker({ field: 'iconUrl', label: 'Logo' })} onClear={() => setForm({ ...form, iconUrl: '' })} />
+              </div>
+            )}
             <Select label="Category" options={CATEGORY_OPTIONS} value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} />
             <Input label="Base Price" type="number" step="any" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
             <Input label="Volatility" type="number" step="any" value={form.volatility} onChange={(e) => setForm({ ...form, volatility: e.target.value })} />
@@ -485,6 +504,53 @@ export default function OtcPage() {
           </Button>
         </DialogFooter>
       </Dialog>
+      {iconPicker && (
+        <ResourcePicker
+          title={iconPicker.label}
+          onClose={() => setIconPicker(null)}
+          onPick={(url) => {
+            setForm((f) => ({ ...f, [iconPicker.field]: url ?? '' }));
+            setIconPicker(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PairIconField({ label, value, onPick, onClear }: {
+  label: string;
+  value: string;
+  onPick: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <div>
+      <span className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">{label}</span>
+      <div className="flex items-center gap-2">
+        {value ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={value} alt={label} className="w-10 h-10 rounded-full object-cover bg-white flex-shrink-0" />
+        ) : (
+          <span className="w-10 h-10 rounded-full bg-surface border border-dashed border-border flex items-center justify-center text-textDark flex-shrink-0">+</span>
+        )}
+        <button
+          type="button"
+          onClick={onPick}
+          className="px-3 py-2 rounded-lg bg-surface border border-border text-xs font-bold text-text hover:text-foreground transition-colors"
+        >
+          {value ? 'Change' : 'Pick'}
+        </button>
+        {value && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="px-3 py-2 text-xs font-bold text-text-dark hover:text-red transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
     </div>
   );
 }

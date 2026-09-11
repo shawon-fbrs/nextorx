@@ -32,6 +32,7 @@ const createPairSchema = z.object({
   isFeatured: z.boolean().optional(),
   maxDailyVolume: z.number().int().positive().optional(),
   iconUrl: z.string().max(500).optional(),
+  iconUrl2: z.string().max(500).optional(),
 });
 
 export async function GET() {
@@ -88,6 +89,7 @@ export async function POST(request: NextRequest) {
         isFeatured: parsed.data.isFeatured ?? false,
         maxDailyVolume: parsed.data.maxDailyVolume,
         iconUrl: parsed.data.iconUrl,
+        iconUrl2: parsed.data.iconUrl2,
         sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
       },
     });

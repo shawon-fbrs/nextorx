@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         maxTrade: Number(p.maxTrade),
         maxPayout: p.maxPayout != null ? Number(p.maxPayout) : null,
         iconUrl: (p as { iconUrl?: string | null }).iconUrl ?? null,
+        iconUrl2: (p as { iconUrl2?: string | null }).iconUrl2 ?? null,
         feed: (p as { feed?: string }).feed ?? "synthetic",
         isActive: p.isActive,
         isFeatured: p.isFeatured,

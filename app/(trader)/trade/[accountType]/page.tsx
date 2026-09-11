@@ -29,6 +29,7 @@ interface PairDef {
   minTrade: number;
   maxTrade: number;
   iconUrl?: string | null;
+  iconUrl2?: string | null;
   changePct24h?: number | null;
 }
 
@@ -69,7 +70,32 @@ const toolOverlayMap: Record<string, string> = {
 
 const CATEGORY_ORDER = ['forex', 'crypto', 'commodities', 'indices', 'stocks'];
 
+function DualAvatar({ left, right, size = 40 }: { left: string; right: string; size?: number }) {
+  const half = size / 2;
+  const one = (src: string, x: number) => (
+    <div className="absolute top-0 rounded-full bg-background border border-border overflow-hidden" style={{ width: size, height: size, left: x }}>
+      <img
+        src={src}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+    </div>
+  );
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size + half, height: size }}>
+      {one(left, 0)}
+      {one(right, half)}
+    </div>
+  );
+}
+
 function PairAvatar({ pair, size = 40 }: { pair: PairDef; size?: number }) {
+  if (pair.iconUrl && pair.iconUrl2) {
+    return <DualAvatar left={pair.iconUrl} right={pair.iconUrl2} size={size} />;
+  }
   if (pair.iconUrl) {
     return <img src={pair.iconUrl} alt="" className="rounded-full object-cover flex-shrink-0 bg-background" style={{ width: size, height: size }} />;
   }

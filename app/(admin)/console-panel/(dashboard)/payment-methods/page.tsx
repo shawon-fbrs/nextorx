@@ -9,6 +9,7 @@ import { Select } from '@/components/admin/ui/select';
 import { Toggle } from '@/components/admin/ui/toggle';
 import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/admin/ui/dialog';
 import { Skeleton } from '@/components/admin/ui/skeleton';
+import { ResourcePicker } from '@/app/components/ResourcePicker';
 
 type Method = {
   id: string;
@@ -360,67 +361,4 @@ export default function PaymentMethodsPage() {
       address: m.accountAddress ?? '',
     });
   }
-}
-
-function ResourcePicker({
-  title,
-  onClose,
-  onPick,
-}: {
-  title: string;
-  onClose: () => void;
-  onPick: (url: string | null) => void;
-}) {
-  const [cats, setCats] = useState<Array<{ id: string; name: string; assets: Array<{ id: string; url: string; filename: string }> }>>([]);
-  const [catId, setCatId] = useState<string>('');
-
-  useEffect(() => {
-    fetch('/api/admin/resources')
-      .then((r) => r.json())
-      .then((d) => {
-        const list = d.categories ?? [];
-        setCats(list);
-        if (list.length > 0) setCatId(list[0].id);
-      })
-      .catch(() => {});
-  }, []);
-
-  const assets = cats.find((c) => c.id === catId)?.assets ?? [];
-
-  return (
-    <Dialog open onClose={onClose}>
-      <DialogHeader onClose={onClose}>
-        <h2 className="text-lg font-bold text-foreground">{title}</h2>
-      </DialogHeader>
-      <DialogContent className="space-y-3">
-        <div className="flex gap-2 flex-wrap">
-          {cats.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setCatId(c.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${catId === c.id ? 'border-blue/50 bg-blue/10 text-foreground' : 'border-border text-textDark'}`}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-        {assets.length === 0 ? (
-          <p className="text-xs text-textDark text-center py-6">No images. Upload some under Resources first.</p>
-        ) : (
-          <div className="grid grid-cols-4 gap-2 max-h-72 overflow-y-auto">
-            {assets.map((a) => (
-              <button key={a.id} onClick={() => onPick(a.url)} className="border border-border rounded-lg overflow-hidden hover:border-blue/50 bg-black/40" title={a.filename}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.url} alt={a.filename} className="w-full h-16 object-contain" />
-              </button>
-            ))}
-          </div>
-        )}
-      </DialogContent>
-      <DialogFooter>
-        <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button variant="ghost" onClick={() => onPick(null)}>Clear</Button>
-      </DialogFooter>
-    </Dialog>
-  );
 }
