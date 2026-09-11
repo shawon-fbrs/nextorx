@@ -1,10 +1,20 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { readFile } from "fs/promises";
+import { join } from "path";
 import { requirePermission, toJsonError } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/services/audit";
 import { isS3Configured, s3Put } from "@/lib/s3";
 import { FLAG_CURRENCIES, fetchFlagSvg, flagFileName } from "@/lib/flags";
+
+async function loadFlagSvg(code: string): Promise<Buffer | null> {
+  try {
+    const buf = await readFile(join(process.cwd(), "public", "flags", `${code.toLowerCase()}.svg`));
+    if (buf.length > 0 && buf.toString("utf8", 0, 200).includes("<svg")) return buf;
+  } catch {}
+  return fetchFlagSvg(code);
+}
 
 export async function POST() {
   try {
@@ -30,7 +40,7 @@ export async function POST() {
         skipped++;
         continue;
       }
-      const buf = await fetchFlagSvg(code);
+      const buf = await loadFlagSvg(code);
       if (!buf) {
         failed.push(code);
         continue;
