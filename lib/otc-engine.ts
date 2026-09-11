@@ -281,9 +281,17 @@ export class OTCEngine {
       const existingCount = await prisma.secondCandle.count({
         where: { pairId: state.pairId, timestamp: { gte: BigInt(startOfDay * 1000) } },
       }).catch(() => 0);
+      const latest = existingCount > 0
+        ? await prisma.secondCandle.findFirst({
+            where: { pairId: state.pairId },
+            orderBy: { timestamp: "desc" },
+            select: { timestamp: true },
+          }).catch(() => null)
+        : null;
+      const latestAgeSec = latest ? Math.max(0, currentSecond - Math.floor(Number(latest.timestamp) / 1000)) : Infinity;
       const expected = Math.max(0, currentSecond - startOfDay);
-      if (existingCount >= expected * 0.9 && expected > 60) {
-        console.log(`[OTC] Backfill skip ${state.pairId}: ${existingCount}/${expected} present`);
+      if (existingCount >= expected * 0.9 && expected > 60 && latestAgeSec < 300) {
+        console.log(`[OTC] Backfill skip ${state.pairId}: ${existingCount}/${expected} present, latest ${latestAgeSec}s ago`);
         continue;
       }
       let prevClose = state.basePrice;
