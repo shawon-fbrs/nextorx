@@ -502,10 +502,11 @@ model ResourceAsset {
   mime       String
   size       Int
   data       Bytes?
-  key        String?          @unique
+  key        String?
   createdAt  DateTime         @default(now())
 
   @@index([categoryId, createdAt(sort: Desc)])
+  @@index([key])
 }
 
 // ─────────────────────────── compliance ───────────────────────────
