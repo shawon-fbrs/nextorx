@@ -50,6 +50,7 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
   const [candle, setCandle] = useState<CandleData | null>(null);
   const [serverTime, setServerTime] = useState<number | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastMsgRef = useRef<number>(Date.now());
   const subscribedPairRef = useRef<string | null>(null);
   const pairIdRef = useRef(pairId);
   pairIdRef.current = pairId;
@@ -75,6 +76,7 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
 
     ws.onopen = () => {
       setIsConnected(true);
+      lastMsgRef.current = Date.now();
       const cur = pairIdRef.current;
       if (cur) {
         ws.send(JSON.stringify({ type: 'subscribe', pairId: cur }));
@@ -85,6 +87,7 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
     const lastTickRef = { current: 0 } as { current: number };
     ws.onmessage = (event) => {
       try {
+        lastMsgRef.current = Date.now();
         const msg: WSMessage = JSON.parse(event.data);
 
         if (msg.type === 'tick') {
@@ -131,7 +134,17 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
   useEffect(() => {
     connect();
 
+    const heartbeat = setInterval(() => {
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN && Date.now() - lastMsgRef.current > 10_000) {
+        try {
+          ws.close();
+        } catch {}
+      }
+    }, 5000);
+
     return () => {
+      clearInterval(heartbeat);
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       if (wsRef.current) {
         wsRef.current.close();

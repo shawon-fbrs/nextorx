@@ -825,6 +825,7 @@ export class OTCEngine {
       const currentSecond = Math.floor(now / 1000);
       const day = dayStringUTC(new Date(now));
       const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
+      const census: string[] = [];
       for (const state of Array.from(this.pairs.values())) {
         try {
           const latest = await prisma.secondCandle.findFirst({
@@ -833,6 +834,7 @@ export class OTCEngine {
             select: { timestamp: true },
           });
           const ageSec = latest ? Math.max(0, currentSecond - Math.floor(Number(latest.timestamp) / 1000)) : -1;
+          census.push(`${state.pairId}:${ageSec}s`);
           if (ageSec !== -1 && ageSec <= 90) continue;
           console.error(`[OTC] SELF-HEAL ${state.pairId}: latest second ${ageSec}s old, rebuilding missing history`);
           const filled = await this.backfillPairDay(state, day, startOfDay, currentSecond);
@@ -842,6 +844,7 @@ export class OTCEngine {
           console.error(`[OTC] SELF-HEAL check failed for ${state.pairId}:`, e instanceof Error ? e.message : e);
         }
       }
+      console.log(`[OTC] tick-census ${census.join(" ")}`);
     } catch (e) {
       console.error("[OTC] SELF-HEAL pass failed:", e instanceof Error ? e.message : e);
     }
