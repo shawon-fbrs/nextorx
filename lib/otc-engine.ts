@@ -855,9 +855,43 @@ export class OTCEngine {
     return info;
   }
 
+  hasPair(pairId: string): boolean {
+    return this.pairs.has(pairId);
+  }
+
   async addPair(pairId: string): Promise<void> {
     if (this.pairs.has(pairId)) return;
     await this.loadPairState(pairId);
+    const state = this.pairs.get(pairId);
+    if (!state) return;
+    console.log(`[OTC] Added pair: ${pairId} (live ticking, history building in background)`);
+    setTimeout(() => {
+      void (async () => {
+        try {
+          const inMap = this.pairs.has(pairId);
+          const livePrice = this.pairs.get(pairId)?.currentPrice ?? null;
+          const latest = await prisma.secondCandle.findFirst({
+            where: { pairId },
+            orderBy: { timestamp: "desc" },
+            select: { timestamp: true },
+          });
+          const ageSec = latest ? Math.round((Date.now() - Number(latest.timestamp)) / 1000) : -1;
+          if (!inMap || ageSec < 0 || ageSec > 120) {
+            console.error(`[OTC] Pair health check FAILED for ${pairId}: inMap=${inMap} livePrice=${livePrice} latestSecondAgeSec=${ageSec}`);
+          } else {
+            console.log(`[OTC] Pair health check OK for ${pairId}: livePrice=${livePrice} latestSecondAgeSec=${ageSec}`);
+          }
+        } catch (e) {
+          console.error(`[OTC] Pair health check error for ${pairId}:`, e instanceof Error ? e.message : e);
+        }
+      })();
+    }, 45000);
+    void this.buildPairHistory(pairId).catch((e) => {
+      console.error(`[OTC] Pair history build failed for ${pairId}:`, e instanceof Error ? e.message : e);
+    });
+  }
+
+  private async buildPairHistory(pairId: string): Promise<void> {
     const state = this.pairs.get(pairId);
     if (!state) return;
 
@@ -903,28 +937,7 @@ export class OTCEngine {
       };
       this.secondCloses.set(pairId, closePrice);
     }
-    console.log(`[OTC] Added pair: ${pairId}`);
-    setTimeout(() => {
-      void (async () => {
-        try {
-          const inMap = this.pairs.has(pairId);
-          const livePrice = this.pairs.get(pairId)?.currentPrice ?? null;
-          const latest = await prisma.secondCandle.findFirst({
-            where: { pairId },
-            orderBy: { timestamp: "desc" },
-            select: { timestamp: true },
-          });
-          const ageSec = latest ? Math.round((Date.now() - Number(latest.timestamp)) / 1000) : -1;
-          if (!inMap || ageSec < 0 || ageSec > 120) {
-            console.error(`[OTC] Pair health check FAILED for ${pairId}: inMap=${inMap} livePrice=${livePrice} latestSecondAgeSec=${ageSec}`);
-          } else {
-            console.log(`[OTC] Pair health check OK for ${pairId}: livePrice=${livePrice} latestSecondAgeSec=${ageSec}`);
-          }
-        } catch (e) {
-          console.error(`[OTC] Pair health check error for ${pairId}:`, e instanceof Error ? e.message : e);
-        }
-      })();
-    }, 45000);
+    console.log(`[OTC] Pair history ready for ${pairId}`);
   }
 
   async removePair(pairId: string): Promise<void> {

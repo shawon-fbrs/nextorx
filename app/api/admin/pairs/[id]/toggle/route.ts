@@ -31,7 +31,9 @@ export async function PUT(
       } else {
         await engine.removePair(id);
       }
-    } catch {}
+    } catch (e) {
+      console.error(`[Admin] engine sync failed for ${id}:`, e instanceof Error ? e.message : e);
+    }
 
     await logAudit(admin.id, "pair.toggle", "Pair", pair.id, { isActive: newisActive });
 

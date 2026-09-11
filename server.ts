@@ -82,6 +82,7 @@ async function authorizeWs(req: IncomingMessage): Promise<{ userId: string; role
   const wss = new WebSocketServer({ server, path: '/ws' });
 
   const engine = await getOTCEngine();
+  const loadingPairs = new Set<string>();
 
   // Reconcile any expired trades from previous session
   await reconcileExpiredTrades();
@@ -158,16 +159,33 @@ async function authorizeWs(req: IncomingMessage): Promise<{ userId: string; role
           engine.subscribe(msg.pairId, ws);
           subscribedPairs.add(msg.pairId);
 
-          const candle = engine.getCandle(msg.pairId);
-          const price = engine.getCurrentPrice(msg.pairId);
-          if (candle && price !== null) {
-            ws.send(JSON.stringify({
-              type: 'snapshot',
-              pairId: msg.pairId,
-              price,
-              candle,
-              timestamp: Date.now(),
-            }));
+          const sendSnapshot = () => {
+            try {
+              const candle = engine.getCandle(msg.pairId);
+              const price = engine.getCurrentPrice(msg.pairId);
+              if (candle && price !== null) {
+                ws.send(JSON.stringify({
+                  type: 'snapshot',
+                  pairId: msg.pairId,
+                  price,
+                  candle,
+                  timestamp: Date.now(),
+                }));
+                return true;
+              }
+            } catch {}
+            return false;
+          };
+
+          if (!sendSnapshot() && !engine.hasPair(msg.pairId) && !loadingPairs.has(msg.pairId)) {
+            loadingPairs.add(msg.pairId);
+            console.log(`[WS] on-demand load for unknown pair ${msg.pairId}`);
+            void engine.addPair(msg.pairId)
+              .catch((e) => console.error(`[WS] on-demand load failed for ${msg.pairId}:`, e instanceof Error ? e.message : e))
+              .finally(() => {
+                loadingPairs.delete(msg.pairId);
+                sendSnapshot();
+              });
           }
         }
 

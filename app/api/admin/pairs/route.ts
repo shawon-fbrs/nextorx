@@ -99,7 +99,9 @@ export async function POST(request: NextRequest) {
     try {
       const { getOTCEngine } = await import("@/lib/otc-engine");
       await (await getOTCEngine()).addPair(pair.id);
-    } catch {}
+    } catch (e) {
+      console.error(`[Admin] engine.addPair failed for ${pair.id}:`, e instanceof Error ? e.message : e);
+    }
 
     return Response.json({ pair }, { status: 201 });
   } catch (e) {
