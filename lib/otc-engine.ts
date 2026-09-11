@@ -64,6 +64,8 @@ export class OTCEngine {
   private pendingSeconds = new Map<string, { timestamp: bigint; open: number; high: number; low: number; close: number }>();
   private lastPersistedSecond = 0;
   private ticking = false;
+  private lastTickAt = 0;
+  private bootedAt = 0;
   private anchors = new Map<string, { price: number; fetchedAt: number }>();
   private mirrorTimer: ReturnType<typeof setInterval> | null = null;
   private regimes = new Map<string, number>();
@@ -392,6 +394,7 @@ export class OTCEngine {
     if (!this.currentSeed) {
       throw new Error("OTC engine has no seed — refusing to start rather than generating uncommitted prices");
     }
+    if (!this.bootedAt) this.bootedAt = Date.now();
     if (this.hasMirrorPairs()) {
       void this.refreshAnchors();
       this.mirrorTimer = setInterval(() => void this.refreshAnchors(), 60_000);
@@ -430,6 +433,7 @@ export class OTCEngine {
   private async generateTicks() {
     if (this.ticking) return;
     this.ticking = true;
+    this.lastTickAt = Date.now();
     try {
       await this.generateTicksInner();
     } finally {
@@ -751,6 +755,20 @@ export class OTCEngine {
     return { day: this.currentDay, seedHash: "", revealed: false };
   }
 
+  getStatus() {
+    return {
+      day: this.currentDay,
+      uptimeSec: this.bootedAt ? Math.floor((Date.now() - this.bootedAt) / 1000) : 0,
+      lastTickAgeMs: this.lastTickAt ? Date.now() - this.lastTickAt : -1,
+      pairs: Array.from(this.pairs.values()).map((s) => ({
+        pairId: s.pairId,
+        currentPrice: s.currentPrice,
+        subscribers: s.subscribers.size,
+        lastClose: this.secondCloses.get(s.pairId) ?? null,
+      })),
+    };
+  }
+
   async getSeedHash(): Promise<SeedInfo> {
     const info = await getSeedHash(this.currentDay || dayStringUTC(new Date()));
     return info;
@@ -792,6 +810,27 @@ export class OTCEngine {
       this.secondCloses.set(pairId, closePrice);
     }
     console.log(`[OTC] Added pair: ${pairId}`);
+    setTimeout(() => {
+      void (async () => {
+        try {
+          const inMap = this.pairs.has(pairId);
+          const livePrice = this.pairs.get(pairId)?.currentPrice ?? null;
+          const latest = await prisma.secondCandle.findFirst({
+            where: { pairId },
+            orderBy: { timestamp: "desc" },
+            select: { timestamp: true },
+          });
+          const ageSec = latest ? Math.round((Date.now() - Number(latest.timestamp)) / 1000) : -1;
+          if (!inMap || ageSec < 0 || ageSec > 120) {
+            console.error(`[OTC] Pair health check FAILED for ${pairId}: inMap=${inMap} livePrice=${livePrice} latestSecondAgeSec=${ageSec}`);
+          } else {
+            console.log(`[OTC] Pair health check OK for ${pairId}: livePrice=${livePrice} latestSecondAgeSec=${ageSec}`);
+          }
+        } catch (e) {
+          console.error(`[OTC] Pair health check error for ${pairId}:`, e instanceof Error ? e.message : e);
+        }
+      })();
+    }, 45000);
   }
 
   async removePair(pairId: string): Promise<void> {
