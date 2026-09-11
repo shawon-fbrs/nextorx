@@ -28,6 +28,31 @@ export default function ResourcesPage() {
   const [newName, setNewName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [pulling, setPulling] = useState(false);
+
+  const pullFlags = async () => {
+    setPulling(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/resources/pull-flags', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Flag pull failed');
+        return;
+      }
+      const parts: string[] = [];
+      if (data.added > 0) parts.push(`added ${data.added}`);
+      if (data.skipped > 0) parts.push(`skipped ${data.skipped} existing`);
+      if ((data.failed ?? []).length > 0) parts.push(`failed: ${(data.failed as string[]).join(', ')}`);
+      setError('');
+      alert(`Flags: ${parts.join(' · ') || 'nothing to do'} (of ${data.total})`);
+      fetchAll();
+    } catch {
+      setError('Flag pull failed');
+    } finally {
+      setPulling(false);
+    }
+  };
   const [error, setError] = useState('');
 
   const fetchAll = useCallback(async () => {
@@ -124,9 +149,18 @@ export default function ResourcesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">Resources</h1>
-        <p className="text-sm text-textDark">Media library for payment logos and QR codes. Click a file to copy its URL.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Resources</h1>
+          <p className="text-sm text-textDark">Media library for payment logos and QR codes. Click a file to copy its URL.</p>
+        </div>
+        <button
+          onClick={pullFlags}
+          disabled={pulling}
+          className="px-4 py-2.5 rounded-xl bg-blue/15 border border-blue/40 text-blue text-xs font-bold hover:bg-blue/25 disabled:opacity-40 transition-colors flex-shrink-0"
+        >
+          {pulling ? 'Pulling flags…' : 'Pull all currency flags'}
+        </button>
       </div>
 
       {error && <p className="text-xs text-red font-semibold">{error}</p>}

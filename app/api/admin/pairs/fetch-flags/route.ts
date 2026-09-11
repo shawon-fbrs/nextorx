@@ -12,29 +12,10 @@ const schema = z.object({
   pairId: z.string().max(20).optional(),
 });
 
+import { fetchFlagSvg } from "@/lib/flags";
+
 async function fetchFlag(code: string): Promise<Buffer | null> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 10000);
-  try {
-    const res = await fetch(`https://flagcdn.com/${code.toLowerCase()}.svg`, {
-      signal: ctrl.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-        Accept: 'image/svg+xml,image/*,*/*',
-      },
-    });
-    if (!res.ok) return null;
-    const type = res.headers.get("content-type") ?? "";
-    if (!type.includes("svg")) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length === 0 || buf.length > 500 * 1024) return null;
-    if (!buf.toString("utf8", 0, 200).includes("<svg")) return null;
-    return buf;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  return fetchFlagSvg(code);
 }
 
 export async function POST(request: NextRequest) {
