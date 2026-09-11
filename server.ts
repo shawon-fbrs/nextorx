@@ -92,8 +92,22 @@ async function authorizeWs(req: IncomingMessage): Promise<{ userId: string; role
 
     const data = JSON.stringify(msg);
     for (const ws of Array.from(pairSubs)) {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        } else {
+          engine.unsubscribeAll(ws);
+          try {
+            ws.terminate();
+          } catch {}
+        }
+      } catch {
+        try {
+          engine.unsubscribeAll(ws);
+        } catch {}
+        try {
+          ws.terminate();
+        } catch {}
       }
     }
   });

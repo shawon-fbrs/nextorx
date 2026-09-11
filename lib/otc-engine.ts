@@ -452,47 +452,51 @@ export class OTCEngine {
     const utcHour = new Date(now).getUTCHours();
 
     for (const state of Array.from(this.pairs.values())) {
-      const prevClose = this.secondCloses.get(state.pairId) ?? state.currentPrice;
-      const r = computeSecond(
-        this.currentSeed, state.pairId, day, secondOfDay, prevClose,
-        state.basePrice, this.effVol(state, day, utcHour), state.category, utcHour,
-      );
-      const price = r.ticks[Math.min(idx, r.ticks.length - 1)];
-      state.currentPrice = Number(price.toFixed(8));
+      try {
+        const prevClose = this.secondCloses.get(state.pairId) ?? state.currentPrice;
+        const r = computeSecond(
+          this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+          state.basePrice, this.effVol(state, day, utcHour), state.category, utcHour,
+        );
+        const price = r.ticks[Math.min(idx, r.ticks.length - 1)];
+        state.currentPrice = Number(price.toFixed(8));
 
-      const candle = state.candle;
-      candle.close = state.currentPrice;
-      if (state.currentPrice > candle.high) candle.high = state.currentPrice;
-      if (state.currentPrice < candle.low) candle.low = state.currentPrice;
-      if (idx === 0) candle.volume += 2 + (r.volume % 6);
+        const candle = state.candle;
+        candle.close = state.currentPrice;
+        if (state.currentPrice > candle.high) candle.high = state.currentPrice;
+        if (state.currentPrice < candle.low) candle.low = state.currentPrice;
+        if (idx === 0) candle.volume += 2 + (r.volume % 6);
 
-      const secStart = Math.floor(now / 1000) * 1000;
-      if (secStart !== this.lastPersistedSecond && this.lastPersistedSecond !== 0) {
-        await this.persistSecond(this.lastPersistedSecond);
-      }
-      if (secStart !== this.lastPersistedSecond) {
-        this.lastPersistedSecond = secStart;
-      }
-      if (idx === TICKS_PER_SECOND - 1) {
-        const secStartMs = Math.floor(now / 1000) * 1000;
-        this.pendingSeconds.set(state.pairId, {
-          timestamp: BigInt(secStartMs),
-          open: prevClose,
-          high: r.high,
-          low: r.low,
-          close: r.close,
-        });
-        this.secondCloses.set(state.pairId, r.close);
-      }
+        const secStart = Math.floor(now / 1000) * 1000;
+        if (secStart !== this.lastPersistedSecond && this.lastPersistedSecond !== 0) {
+          await this.persistSecond(this.lastPersistedSecond);
+        }
+        if (secStart !== this.lastPersistedSecond) {
+          this.lastPersistedSecond = secStart;
+        }
+        if (idx === TICKS_PER_SECOND - 1) {
+          const secStartMs = Math.floor(now / 1000) * 1000;
+          this.pendingSeconds.set(state.pairId, {
+            timestamp: BigInt(secStartMs),
+            open: prevClose,
+            high: r.high,
+            low: r.low,
+            close: r.close,
+          });
+          this.secondCloses.set(state.pairId, r.close);
+        }
 
-      const msg: TickMessage = {
-        type: "tick",
-        pairId: state.pairId,
-        price: state.currentPrice,
-        timestamp: now,
-        candle: { ...candle },
-      };
-      if (this.broadcast) this.broadcast(msg);
+        const msg: TickMessage = {
+          type: "tick",
+          pairId: state.pairId,
+          price: state.currentPrice,
+          timestamp: now,
+          candle: { ...candle },
+        };
+        if (this.broadcast) this.broadcast(msg);
+      } catch (e) {
+        console.error(`[OTC] Tick failed for ${state.pairId}:`, e instanceof Error ? e.message : e);
+      }
     }
   }
 
