@@ -106,6 +106,38 @@ export default function OtcPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [iconPicker, setIconPicker] = useState<null | { field: 'iconUrl' | 'iconUrl2'; label: string }>(null);
+  const [fetchingFlags, setFetchingFlags] = useState(false);
+
+  const fetchFlags = async () => {
+    if (!/^[A-Z]{6}$/.test(form.id)) return;
+    setFetchingFlags(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/pairs/fetch-flags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base: form.id.slice(0, 3),
+          quote: form.id.slice(3),
+          ...(editingPair ? { pairId: editingPair.id } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Flag fetch failed');
+        return;
+      }
+      setForm((f) => ({
+        ...f,
+        iconUrl: data.base ?? f.iconUrl,
+        iconUrl2: data.quote ?? f.iconUrl2,
+      }));
+    } catch {
+      setError('Flag fetch failed');
+    } finally {
+      setFetchingFlags(false);
+    }
+  };
 
   const fetchPairs = useCallback(async () => {
     try {
@@ -422,6 +454,23 @@ export default function OtcPage() {
             <Input label="Pair ID" placeholder="EURUSD" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value.toUpperCase() })} />
             <Input label="Display Name" placeholder="EUR/USD" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Input label="Symbol (optional)" placeholder="EUR/USD" value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} />
+            {form.category === 'forex' && (
+              <div className="col-span-2 flex items-center gap-3 rounded-xl bg-background border border-border px-3 py-2.5">
+                <span className="text-[11px] text-text-dark flex-1">
+                  {/^[A-Z]{6}$/.test(form.id)
+                    ? <>Base <b className="text-foreground">{form.id.slice(0, 3)}</b> (left, front) · Quote <b className="text-foreground">{form.id.slice(3)}</b> (right, back)</>
+                    : 'Base = first 3 letters (front-left) · Quote = last 3 (back-right)'}
+                </span>
+                <button
+                  type="button"
+                  disabled={!/^[A-Z]{6}$/.test(form.id) || fetchingFlags}
+                  onClick={fetchFlags}
+                  className="px-3 py-2 rounded-lg bg-blue/15 border border-blue/40 text-blue text-xs font-bold hover:bg-blue/25 disabled:opacity-40 transition-colors flex-shrink-0"
+                >
+                  {fetchingFlags ? 'Fetching…' : 'Auto-fetch flags'}
+                </button>
+              </div>
+            )}
             {form.category === 'forex' ? (
               <>
                 <PairIconField label="Base Flag (optional)" value={form.iconUrl} onPick={() => setIconPicker({ field: 'iconUrl', label: 'Base Flag' })} onClear={() => setForm({ ...form, iconUrl: '' })} />
@@ -468,6 +517,23 @@ export default function OtcPage() {
             <Input label="Pair ID" value={form.id} disabled className="opacity-50" />
             <Input label="Display Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Input label="Symbol" value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} />
+            {form.category === 'forex' && (
+              <div className="col-span-2 flex items-center gap-3 rounded-xl bg-background border border-border px-3 py-2.5">
+                <span className="text-[11px] text-text-dark flex-1">
+                  {/^[A-Z]{6}$/.test(form.id)
+                    ? <>Base <b className="text-foreground">{form.id.slice(0, 3)}</b> (left, front) · Quote <b className="text-foreground">{form.id.slice(3)}</b> (right, back)</>
+                    : 'Base = first 3 letters (front-left) · Quote = last 3 (back-right)'}
+                </span>
+                <button
+                  type="button"
+                  disabled={!/^[A-Z]{6}$/.test(form.id) || fetchingFlags}
+                  onClick={fetchFlags}
+                  className="px-3 py-2 rounded-lg bg-blue/15 border border-blue/40 text-blue text-xs font-bold hover:bg-blue/25 disabled:opacity-40 transition-colors flex-shrink-0"
+                >
+                  {fetchingFlags ? 'Fetching…' : 'Auto-fetch flags'}
+                </button>
+              </div>
+            )}
             {form.category === 'forex' ? (
               <>
                 <PairIconField label="Base Flag (optional)" value={form.iconUrl} onPick={() => setIconPicker({ field: 'iconUrl', label: 'Base Flag' })} onClear={() => setForm({ ...form, iconUrl: '' })} />

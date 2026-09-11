@@ -70,10 +70,11 @@ const toolOverlayMap: Record<string, string> = {
 
 const CATEGORY_ORDER = ['forex', 'crypto', 'commodities', 'indices', 'stocks'];
 
-function DualAvatar({ left, right, size = 40 }: { left: string; right: string; size?: number }) {
+function DualAvatar({ left, right, leftLabel, rightLabel, size = 40 }: { left: string; right: string; leftLabel: string; rightLabel: string; size?: number }) {
   const half = size / 2;
-  const one = (src: string, x: number) => (
-    <div className="absolute top-0 rounded-full bg-background border border-border overflow-hidden" style={{ width: size, height: size, left: x }}>
+  const one = (src: string, x: number, z: number, label: string) => (
+    <div className="absolute top-0 rounded-full bg-background border border-border overflow-hidden flex items-center justify-center" style={{ width: size, height: size, left: x, zIndex: z }}>
+      <span className="font-bold text-foreground" style={{ fontSize: size * 0.28 }}>{label}</span>
       <img
         src={src}
         alt=""
@@ -86,15 +87,17 @@ function DualAvatar({ left, right, size = 40 }: { left: string; right: string; s
   );
   return (
     <div className="relative flex-shrink-0" style={{ width: size + half, height: size }}>
-      {one(left, 0)}
-      {one(right, half)}
+      {one(left, 0, 2, leftLabel)}
+      {one(right, half, 1, rightLabel)}
     </div>
   );
 }
 
 function PairAvatar({ pair, size = 40 }: { pair: PairDef; size?: number }) {
   if (pair.iconUrl && pair.iconUrl2) {
-    return <DualAvatar left={pair.iconUrl} right={pair.iconUrl2} size={size} />;
+    const base = /^[A-Z]{6}$/.test(pair.id) ? pair.id.slice(0, 2) : pair.name.slice(0, 2);
+    const quote = /^[A-Z]{6}$/.test(pair.id) ? pair.id.slice(3, 5) : pair.name.slice(0, 2);
+    return <DualAvatar left={pair.iconUrl} right={pair.iconUrl2} leftLabel={base} rightLabel={quote} size={size} />;
   }
   if (pair.iconUrl) {
     return <img src={pair.iconUrl} alt="" className="rounded-full object-cover flex-shrink-0 bg-background" style={{ width: size, height: size }} />;
@@ -102,25 +105,14 @@ function PairAvatar({ pair, size = 40 }: { pair: PairDef; size?: number }) {
   if (pair.category === 'forex' && /^[A-Z]{6}$/.test(pair.id)) {
     const base = pair.id.slice(0, 3);
     const quote = pair.id.slice(3);
-    const half = size / 2;
-    const flag = (cc: string, left: number) => (
-      <div className="absolute top-0 rounded-full bg-background border border-border overflow-hidden flex items-center justify-center" style={{ width: size, height: size, left }}>
-        <span className="font-bold text-foreground" style={{ fontSize: size * 0.28 }}>{cc.slice(0, 2)}</span>
-        <img
-          src={`/api/resources/by-filename/${cc.toLowerCase()}.svg`}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
-        />
-      </div>
-    );
     return (
-      <div className="relative flex-shrink-0" style={{ width: size + half, height: size }}>
-        {flag(base, 0)}
-        {flag(quote, half)}
-      </div>
+      <DualAvatar
+        left={`/api/resources/by-filename/${base.toLowerCase()}.svg`}
+        right={`/api/resources/by-filename/${quote.toLowerCase()}.svg`}
+        leftLabel={base.slice(0, 2)}
+        rightLabel={quote.slice(0, 2)}
+        size={size}
+      />
     );
   }
   return (
@@ -222,7 +214,7 @@ function TopBar({
               return (
                 <button key={pair.id} onClick={() => { onSelect(pair); setAddOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-3 transition-all ${isActive ? 'bg-blue/10' : 'hover:bg-surface-hover'}`}>
-                  <PairAvatar pair={pair} size={36} />
+                  <PairAvatar pair={pair} size={32} />
                   <div className="flex-1 text-left min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold text-foreground truncate">{pair.name}</span>
@@ -272,7 +264,7 @@ function TopBar({
               </svg>
             </span>
             {isActive && <div className="w-0.5 h-6 bg-blue rounded-full flex-shrink-0" />}
-            <PairAvatar pair={pair} size={30} />
+            <PairAvatar pair={pair} size={26} />
             <div className="flex flex-col flex-1 min-w-0">
               <span className="text-xs font-bold text-foreground leading-tight truncate">{pair.name}</span>
               <div className="flex items-center gap-1 leading-tight">
