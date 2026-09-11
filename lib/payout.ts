@@ -9,6 +9,8 @@ const VAULT_WARNING_ADJUSTMENT = -2;
 const MAX_COMBINED_REDUCTION = 10;
 const MIN_PAYOUT = 50;
 
+const lastPayoutSig = new Map<string, string>();
+
 export interface PayoutAdjustment {
   reason: string;
   delta: number;
@@ -81,16 +83,20 @@ export async function getPayoutBreakdown(pairId: string, now = new Date()): Prom
   const payout = Math.max(MIN_PAYOUT, Math.min(max, base + reduction));
 
   if (adjustments.length > 0) {
-    console.log(
-      JSON.stringify({
-        event: "payout.adjusted",
-        pairId,
-        base,
-        payout,
-        adjustments,
-        reservePercent: Math.round(reservePercent * 100) / 100,
-      }),
-    );
+    const sig = `${pairId}:${base}:${payout}:${JSON.stringify(adjustments)}`;
+    if (lastPayoutSig.get(pairId) !== sig) {
+      lastPayoutSig.set(pairId, sig);
+      console.log(
+        JSON.stringify({
+          event: "payout.adjusted",
+          pairId,
+          base,
+          payout,
+          adjustments,
+          reservePercent: Math.round(reservePercent * 100) / 100,
+        }),
+      );
+    }
   }
 
   return { payout, base, adjustments };

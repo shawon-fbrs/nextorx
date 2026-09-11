@@ -5,7 +5,7 @@ export async function GET() {
   try {
     await requirePermission("pair", "list");
     const engine = await getOTCEngine();
-    return Response.json(engine.getStatus());
+    return Response.json(await engine.getHealth());
   } catch (e) {
     return toJsonError(e);
   }

@@ -66,6 +66,8 @@ export class OTCEngine {
   private ticking = false;
   private lastTickAt = 0;
   private bootedAt = 0;
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
+  private lastPersistErrorAt = 0;
   private anchors = new Map<string, { price: number; fetchedAt: number }>();
   private mirrorTimer: ReturnType<typeof setInterval> | null = null;
   private regimes = new Map<string, number>();
@@ -276,7 +278,6 @@ export class OTCEngine {
     const currentSecond = Math.floor(now / 1000);
     const day = dayStringUTC(new Date(now));
     const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
-    const fromSecond = startOfDay;
     for (const state of Array.from(this.pairs.values())) {
       const existingCount = await prisma.secondCandle.count({
         where: { pairId: state.pairId, timestamp: { gte: BigInt(startOfDay * 1000) } },
@@ -294,6 +295,13 @@ export class OTCEngine {
         console.log(`[OTC] Backfill skip ${state.pairId}: ${existingCount}/${expected} present, latest ${latestAgeSec}s ago`);
         continue;
       }
+      const filled = await this.backfillPairDay(state, day, startOfDay, currentSecond);
+      console.log(`[OTC] Backfilled ${filled} 1s candles for ${state.pairId}`);
+      await this.backfillMinutes(state.pairId, day, startOfDay, currentSecond);
+    }
+  }
+
+  private async backfillPairDay(state: PairState, day: string, startOfDay: number, currentSecond: number): Promise<number> {
       let prevClose = state.basePrice;
       const rows: Array<{
         pairId: string;
@@ -304,7 +312,7 @@ export class OTCEngine {
         close: number;
         ticks: number;
       }> = [];
-      for (let s = Math.max(fromSecond, startOfDay); s < currentSecond; s++) {
+      for (let s = startOfDay; s < currentSecond; s++) {
         const secondOfDay = s % SECONDS_PER_DAY;
         const utcHour = new Date(s * 1000).getUTCHours();
         const r = computeSecond(
@@ -327,9 +335,7 @@ export class OTCEngine {
         await prisma.secondCandle.createMany({ data: batch, skipDuplicates: true });
         await new Promise((r2) => setImmediate(r2));
       }
-      console.log(`[OTC] Backfilled ${rows.length} 1s candles for ${state.pairId}`);
-      await this.backfillMinutes(state.pairId, day, startOfDay, currentSecond);
-    }
+      return rows.length;
   }
 
   private async backfillMinutes(pairId: string, day: string, startOfDaySec: number, currentSecond: number) {
@@ -412,6 +418,7 @@ export class OTCEngine {
     this.tickTimer = setInterval(() => void this.generateTicks(), TICK_INTERVAL_MS);
     this.scheduleNextCandleClose();
     this.seedTimer = setInterval(() => void this.checkSeeds(), 30_000);
+    this.watchdogTimer = setInterval(() => void this.healStalePairs(), 60_000);
     console.log("[OTC] PF engine started (100ms deterministic ticks)");
   }
 
@@ -424,14 +431,14 @@ export class OTCEngine {
   }
 
   stop() {
-    for (const timer of [this.tickTimer, this.persistTimer, this.seedTimer, this.mirrorTimer]) {
+    for (const timer of [this.tickTimer, this.persistTimer, this.seedTimer, this.mirrorTimer, this.watchdogTimer]) {
       if (timer) clearInterval(timer);
     }
     if (this.candleTimer) {
       clearTimeout(this.candleTimer as unknown as NodeJS.Timeout);
       clearInterval(this.candleTimer);
     }
-    this.tickTimer = this.candleTimer = this.persistTimer = this.seedTimer = this.mirrorTimer = null;
+    this.tickTimer = this.candleTimer = this.persistTimer = this.seedTimer = this.mirrorTimer = this.watchdogTimer = null;
   }
 
   private tickIndexInSecond(now: number): number {
@@ -533,7 +540,13 @@ export class OTCEngine {
       this.pendingSeconds.delete(pairId);
     }
     if (rows.length > 0) {
-      await prisma.secondCandle.createMany({ data: rows, skipDuplicates: true }).catch(() => {});
+      await prisma.secondCandle.createMany({ data: rows, skipDuplicates: true }).catch((e) => {
+        const nowMs = Date.now();
+        if (nowMs - this.lastPersistErrorAt > 30_000) {
+          this.lastPersistErrorAt = nowMs;
+          console.error(`[OTC] persistSecond failed for ${rows.map((r) => r.pairId).join(",")}:`, e instanceof Error ? e.message : e);
+        }
+      });
     }
   }
 
@@ -781,6 +794,59 @@ export class OTCEngine {
     };
   }
 
+  async getHealth() {
+    const status = this.getStatus();
+    const pairs: Array<{
+      pairId: string;
+      currentPrice: number;
+      subscribers: number;
+      lastClose: number | null;
+      pendingSecond: boolean;
+      latestSecondAgeSec: number;
+    }> = [];
+    for (const p of status.pairs) {
+      let ageSec = -1;
+      try {
+        const latest = await prisma.secondCandle.findFirst({
+          where: { pairId: p.pairId },
+          orderBy: { timestamp: "desc" },
+          select: { timestamp: true },
+        });
+        ageSec = latest ? Math.max(0, Math.floor(Date.now() / 1000) - Math.floor(Number(latest.timestamp) / 1000)) : -1;
+      } catch {}
+      pairs.push({ ...p, pendingSecond: this.pendingSeconds.has(p.pairId), latestSecondAgeSec: ageSec });
+    }
+    return { ...status, pairs };
+  }
+
+  private async healStalePairs() {
+    try {
+      const now = Date.now();
+      const currentSecond = Math.floor(now / 1000);
+      const day = dayStringUTC(new Date(now));
+      const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
+      for (const state of Array.from(this.pairs.values())) {
+        try {
+          const latest = await prisma.secondCandle.findFirst({
+            where: { pairId: state.pairId },
+            orderBy: { timestamp: "desc" },
+            select: { timestamp: true },
+          });
+          const ageSec = latest ? Math.max(0, currentSecond - Math.floor(Number(latest.timestamp) / 1000)) : -1;
+          if (ageSec !== -1 && ageSec <= 90) continue;
+          console.error(`[OTC] SELF-HEAL ${state.pairId}: latest second ${ageSec}s old, rebuilding missing history`);
+          const filled = await this.backfillPairDay(state, day, startOfDay, currentSecond);
+          await this.backfillMinutes(state.pairId, day, startOfDay, currentSecond);
+          console.error(`[OTC] SELF-HEAL ${state.pairId}: done, ${filled} 1s rows recomputed (idempotent)`);
+        } catch (e) {
+          console.error(`[OTC] SELF-HEAL check failed for ${state.pairId}:`, e instanceof Error ? e.message : e);
+        }
+      }
+    } catch (e) {
+      console.error("[OTC] SELF-HEAL pass failed:", e instanceof Error ? e.message : e);
+    }
+  }
+
   async getSeedHash(): Promise<SeedInfo> {
     const info = await getSeedHash(this.currentDay || dayStringUTC(new Date()));
     return info;
@@ -795,6 +861,19 @@ export class OTCEngine {
     const existingCount = await prisma.candle.count({ where: { pairId } });
     if (existingCount < 200) {
       await this.seedHistoricalCandlesForPair(state);
+    }
+
+    try {
+      const nowMs = Date.now();
+      const dayNow = dayStringUTC(new Date(nowMs));
+      const startOfDayNow = Math.floor(Date.parse(`${dayNow}T00:00:00.000Z`) / 1000);
+      const filled = await this.backfillPairDay(state, dayNow, startOfDayNow, Math.floor(nowMs / 1000));
+      if (filled > 0) {
+        console.log(`[OTC] New-pair day backfill for ${pairId}: ${filled} 1s candles`);
+        await this.backfillMinutes(pairId, dayNow, startOfDayNow, Math.floor(nowMs / 1000));
+      }
+    } catch (e) {
+      console.error(`[OTC] New-pair day backfill failed for ${pairId}:`, e instanceof Error ? e.message : e);
     }
 
     const lastSecond = await prisma.secondCandle.findFirst({
@@ -962,11 +1041,20 @@ export class OTCEngine {
 }
 
 let engine: OTCEngine | null = null;
+let enginePromise: Promise<OTCEngine> | null = null;
 
 export async function getOTCEngine(): Promise<OTCEngine> {
-  if (!engine) {
-    engine = new OTCEngine();
-    await engine.init();
+  if (!enginePromise) {
+    enginePromise = (async () => {
+      const inst = new OTCEngine();
+      await inst.init();
+      engine = inst;
+      return inst;
+    })().catch((e) => {
+      enginePromise = null;
+      engine = null;
+      throw e;
+    });
   }
-  return engine;
+  return enginePromise;
 }
