@@ -52,7 +52,7 @@ interface Trade {
   expiresAt?: number;
 }
 
-const TF_MS: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
+const TF_MS: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '10m': 600000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
 
 const markerEndMs = (entryMs: number, expiresAt: number, tf: string) =>
   Math.max(expiresAt, entryMs + Math.min(5 * (TF_MS[tf] ?? 60000), 3600000));
@@ -394,7 +394,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
           <div className="absolute left-full top-0 ml-1 w-40 bg-surface border border-border rounded-lg shadow-2xl p-1.5 z-50">
             <div className="text-[9px] font-bold text-text-dark uppercase tracking-wider mb-1.5 px-1">Timeframe</div>
             <div className="grid grid-cols-3 gap-1">
-              {['5s', '30s', '1m', '5m', '15m', '30m', '1h', '4h'].map(tf => (
+              {['5s', '30s', '1m', '5m', '10m', '15m', '30m', '1h', '4h'].map(tf => (
                 <button key={tf} onClick={() => { onTimeframeChange(tf); setOpenMenu(null); }}
                   className={`py-1.5 text-[11px] font-semibold rounded-md transition-all ${timeframe === tf ? 'bg-blue-500 text-white' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
                   {tf}
@@ -1150,6 +1150,10 @@ export default function TradingPage() {
   const price = currentPrice ?? activePair?.basePrice ?? 1.0;
   priceRef.current = price;
   const payout = activePair ? (payoutMap[activePair.id] ?? effectivePayout ?? activePair.payoutPercent) : 80;
+  const minTrade = activePair?.minTrade ?? 1;
+  const maxTrade = activePair?.maxTrade ?? 5000;
+  const miniAmts = [1, 5, 10, 25, 100].filter((a) => a >= minTrade && a <= maxTrade);
+  const miniAmtList = miniAmts.length > 0 ? miniAmts : [minTrade];
   const payoutAmount = (investment * (1 + payout / 100)).toFixed(2);
 
   const refreshTrades = useCallback(async () => {
@@ -1311,7 +1315,7 @@ export default function TradingPage() {
   }, []);
 
   useEffect(() => {
-    const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
+    const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '10m': 600000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const update = () => {
       const now = getServerNow();
@@ -1327,7 +1331,7 @@ export default function TradingPage() {
   }, [timeframe]);
 
   useEffect(() => {
-    const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
+    const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '10m': 600000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const updateMarks = () => {
       const now = getServerNow();
@@ -1437,7 +1441,7 @@ export default function TradingPage() {
   };
 
   const handleTimeSet = (m: number, s: number) => {
-    const total = Math.max(30, Math.min(3600, m * 60 + s));
+    const total = Math.max(5, Math.min(3600, m * 60 + s));
     setTimeMinutes(Math.floor(total / 60));
     setTimeSeconds(total % 60);
   };
@@ -1770,7 +1774,7 @@ export default function TradingPage() {
                           </button>
                         </div>
                         <div className="flex gap-1 mt-1.5 w-full">
-                          {['00:30', '01:00', '03:00', '05:00'].map((t) => {
+                          {['00:05', '00:30', '01:00', '05:00'].map((t) => {
                             const [m, s] = t.split(':').map(Number);
                             return (
                               <button key={t} onClick={() => handleTimeSet(m, s)} className={`flex-1 py-0.5 text-[8px] font-semibold rounded transition-all border ${timeMinutes === m && timeSeconds === s ? 'text-white bg-blue/15 border-blue/40' : 'text-text-dark bg-background border-transparent hover:text-foreground'}`}>{t}</button>
@@ -1781,7 +1785,7 @@ export default function TradingPage() {
                       <div>
                         <span className="text-[9px] text-text-dark font-semibold uppercase tracking-wider block mb-1">Investment</span>
                         <div className="flex items-center gap-1.5">
-                          <button onClick={() => setInvestment(Math.max(1, investment - 1))} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-foreground transition-all">
+                          <button onClick={() => setInvestment(Math.max(minTrade, investment - 1))} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-foreground transition-all">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
                           <div className="flex-1 flex items-center gap-1">
@@ -1791,20 +1795,20 @@ export default function TradingPage() {
                               value={investment}
                               onChange={(e) => {
                                 const v = parseInt(e.target.value, 10);
-                                if (!isNaN(v)) setInvestment(Math.max(1, Math.min(1000, v)));
-                                else if (e.target.value === '') setInvestment(1);
+                                if (!isNaN(v)) setInvestment(Math.max(minTrade, Math.min(maxTrade, v)));
+                                else if (e.target.value === '') setInvestment(minTrade);
                               }}
-                              min={1}
-                              max={1000}
+                              min={minTrade}
+                              max={maxTrade}
                               className="flex-1 bg-background border border-border rounded-lg px-2 py-1 text-foreground font-bold text-sm text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </div>
-                          <button onClick={() => setInvestment(Math.min(1000, investment + 1))} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-foreground transition-all">
+                          <button onClick={() => setInvestment(Math.min(maxTrade, investment + 1))} className="w-7 h-7 rounded-lg bg-background border border-border flex items-center justify-center text-text hover:text-foreground transition-all">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </button>
                         </div>
                         <div className="flex gap-1 mt-1.5">
-                          {[1, 5, 10, 25].map((amt) => (
+                          {miniAmtList.map((amt) => (
                             <button key={amt} onClick={() => setInvestment(amt)} className={`flex-1 py-0.5 text-[8px] font-semibold rounded transition-all border ${investment === amt ? 'text-white bg-blue/15 border-blue/40' : 'text-text-dark bg-background border-transparent hover:text-foreground'}`}>${amt}</button>
                           ))}
                         </div>
@@ -1844,6 +1848,8 @@ export default function TradingPage() {
             onDirectionHover={setHoverDir}
             payoutAmount={payoutAmount}
             trades={trades}
+            minTrade={minTrade}
+            maxTrade={maxTrade}
           />
         )}
       </div>

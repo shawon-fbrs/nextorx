@@ -21,6 +21,8 @@ interface TradingPanelProps {
   onDirectionHover?: (dir: 'up' | 'down' | null) => void;
   payoutAmount: string;
   trades: TradeLike[];
+  minTrade?: number;
+  maxTrade?: number;
 }
 
 interface TradeLike {
@@ -78,6 +80,8 @@ export function TradingPanel({
   onDirectionHover,
   payoutAmount,
   trades,
+  minTrade = 1,
+  maxTrade = 1000,
 }: TradingPanelProps) {
   const [expandedTrade, setExpandedTrade] = useState<string | number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -89,8 +93,10 @@ export function TradingPanel({
     return () => clearInterval(timer);
   }, []);
 
-  const quickTimes = ['00:30', '01:00', '03:00', '05:00'];
+  const quickTimes = ['00:05', '00:30', '01:00', '05:00', '15:00', '30:00'];
   const currentQuick = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}`;
+  const amtChips = [1, 5, 10, 25, 50, 100, 200, 500, 1000].filter((a) => a >= minTrade && a <= maxTrade);
+  const amtList = amtChips.length > 0 ? amtChips : [minTrade];
 
   return (
     <aside className="w-[260px] 2xl:w-[300px] bg-surface border-border flex flex-col z-30 flex-shrink-0 border-l
@@ -168,10 +174,10 @@ export function TradingPanel({
         <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2.5 max-lg:py-1.5">
           <div className="flex items-center justify-between mb-2 max-lg:mb-1">
             <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Investment</span>
-            <span className="text-[9px] text-textDark">Min $1</span>
+            <span className="text-[9px] text-textDark whitespace-nowrap">Min ${minTrade} – Max ${maxTrade}</span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setInvestment(Math.max(1, investment - 1))}
+            <button onClick={() => setInvestment(Math.max(minTrade, investment - 1))}
               className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
@@ -185,11 +191,11 @@ export function TradingPanel({
                   value={investment}
                   onChange={(e) => {
                     const v = parseInt(e.target.value, 10);
-                    if (!isNaN(v)) setInvestment(Math.max(1, Math.min(1000, v)));
-                    else if (e.target.value === '') setInvestment(1);
+                    if (!isNaN(v)) setInvestment(Math.max(minTrade, Math.min(maxTrade, v)));
+                    else if (e.target.value === '') setInvestment(minTrade);
                   }}
-                  min={1}
-                  max={1000}
+                  min={minTrade}
+                  max={maxTrade}
                   className="w-16 max-lg:w-14 bg-surface border border-border rounded-lg px-2 py-1 max-lg:py-0.5 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
@@ -199,7 +205,7 @@ export function TradingPanel({
               className="lg:hidden w-9 h-9 rounded-lg bg-blue/15 border border-blue/40 text-blue text-sm font-bold flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform">
               $
             </button>
-            <button onClick={() => setInvestment(Math.min(1000, investment + 1))}
+            <button onClick={() => setInvestment(Math.min(maxTrade, investment + 1))}
               className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" />
@@ -207,7 +213,7 @@ export function TradingPanel({
             </button>
           </div>
           <div className="flex gap-1.5 mt-2 max-lg:hidden">
-            {[1, 5, 10, 25, 50].map((amt) => (
+            {amtList.map((amt) => (
               <button key={amt} onClick={() => setInvestment(amt)}
                 className={`flex-1 py-1 text-[9px] font-semibold rounded-md transition-all border ${
                   investment === amt
@@ -388,7 +394,7 @@ export function TradingPanel({
       {amountSheet && (
         <QuickSheet title="Investment amount" onClose={() => setAmountSheet(false)}>
           <div className="grid grid-cols-4 gap-2">
-            {[1, 5, 10, 25, 50, 100, 200, 500].map((amt) => (
+            {amtList.map((amt) => (
               <button key={amt} onClick={() => { setInvestment(amt); setAmountSheet(false); }}
                 className={`py-3 text-sm font-bold rounded-xl border transition-all active:scale-95 ${
                   investment === amt
@@ -404,7 +410,7 @@ export function TradingPanel({
       {timeSheet && (
         <QuickSheet title="Expiry time" onClose={() => setTimeSheet(false)}>
           <div className="grid grid-cols-4 gap-2">
-            {[['00:15', 0, 15], ['00:30', 0, 30], ['01:00', 1, 0], ['02:00', 2, 0], ['03:00', 3, 0], ['05:00', 5, 0], ['10:00', 10, 0], ['15:00', 15, 0]].map(([label, m, s]) => {
+            {[['00:05', 0, 5], ['00:10', 0, 10], ['00:15', 0, 15], ['00:30', 0, 30], ['01:00', 1, 0], ['02:00', 2, 0], ['03:00', 3, 0], ['05:00', 5, 0], ['10:00', 10, 0], ['15:00', 15, 0], ['30:00', 30, 0]].map(([label, m, s]) => {
               const cur = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}` === label;
               return (
                 <button key={label as string} onClick={() => { onTimeSet(m as number, s as number); setTimeSheet(false); }}

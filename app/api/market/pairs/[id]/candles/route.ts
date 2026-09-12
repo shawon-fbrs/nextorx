@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { toJsonError, ApiError } from "@/lib/api";
 import { dayStringUTC } from "@/lib/pf-math";
 
-const INTERVAL_MS_MAP: Record<string, number> = { "5s": 5_000, "30s": 30_000, "1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000, "4h": 14_400_000 };
+const INTERVAL_MS_MAP: Record<string, number> = { "5s": 5_000, "30s": 30_000, "1m": 60_000, "5m": 300_000, "10m": 600_000, "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000, "4h": 14_400_000 };
 
 interface OutBar { timestamp: number; open: number; high: number; low: number; close: number; volume: number }
 

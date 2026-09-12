@@ -8,7 +8,7 @@ import { getSnapshotPrice } from "@/lib/settle-trade";
 import { getPayoutForPair } from "@/lib/payout";
 import { getSetting } from "@/lib/settings";
 
-const MIN_DURATION_SECONDS = 30;
+const MIN_DURATION_SECONDS = 5;
 const MAX_DURATION_SECONDS = 3600;
 
 const tradeSchema = z.object({
