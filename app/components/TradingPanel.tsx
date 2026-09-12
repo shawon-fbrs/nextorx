@@ -45,6 +45,7 @@ interface TradingPanelProps {
   onDirectionHover?: (dir: 'up' | 'down' | null) => void;
   payoutAmount: string;
   trades: TradeLike[];
+  open?: boolean;
 }
 
 export function TradingPanel({
@@ -60,9 +61,11 @@ export function TradingPanel({
   onDirectionHover,
   payoutAmount,
   trades,
+  open = true,
 }: TradingPanelProps) {
   const [expandedTrade, setExpandedTrade] = useState<string | number | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -73,8 +76,43 @@ export function TradingPanel({
   const currentQuick = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}`;
 
   return (
-    <aside className="w-[260px] bg-surface border-l border-border flex flex-col z-30 flex-shrink-0">
-      <div className="px-3 py-3 flex-1 flex flex-col gap-2.5 overflow-hidden">
+    <aside className={`w-[260px] 2xl:w-[300px] bg-surface border-border flex flex-col z-50 flex-shrink-0 border-l
+      max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:w-full max-md:border-l-0 max-md:border-t max-md:rounded-t-2xl max-md:shadow-2xl max-md:max-h-[80vh]
+      md:max-lg:fixed md:max-lg:right-0 md:max-lg:top-0 md:max-lg:bottom-0 md:max-lg:w-[280px] md:max-lg:border-l md:max-lg:shadow-2xl md:max-lg:transition-transform md:max-lg:duration-300
+      ${open ? 'md:max-lg:translate-x-0' : 'md:max-lg:translate-x-full'}`}>
+      {/* Mobile sheet handle + summary */}
+      <button onClick={() => setSheetOpen((v) => !v)}
+        className="hidden max-md:flex items-center gap-2 px-4 pt-2 pb-1.5 w-full">
+        <span className="absolute top-1 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-text-dark/40" />
+        <span className="text-[11px] font-bold text-foreground tabular-nums">{timeStr}</span>
+        <span className="text-[11px] text-text-dark">·</span>
+        <span className="text-[11px] font-bold text-foreground tabular-nums">${investment}</span>
+        <span className="text-[11px] text-text-dark">·</span>
+        <span className="text-[11px] font-bold text-green tabular-nums">+{payoutAmount}$</span>
+        <svg className={`w-4 h-4 ml-auto text-text-dark transition-transform ${sheetOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {/* Mobile peek trade buttons */}
+      {!sheetOpen && (
+        <div className="hidden max-md:flex items-center gap-2 px-3 pb-3">
+          <button
+            onClick={() => onTrade('up')}
+            className="flex-1 bg-green text-white font-bold text-sm py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98]"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path d="M5 10l7-7m0 0l7 7m-7-7v18" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            Up
+          </button>
+          <button
+            onClick={() => onTrade('down')}
+            className="flex-1 bg-red text-white font-bold text-sm py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98]"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path d="M19 14l-7 7m0 0l-7-7m7 7V3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            Down
+          </button>
+        </div>
+      )}
+      <div className={`px-3 py-3 flex-1 min-h-0 flex-col gap-2.5 overflow-hidden ${sheetOpen ? 'flex max-md:overflow-y-auto' : 'flex max-md:hidden'}`}>
         {/* Time Section */}
         <div className="bg-background rounded-xl border border-border px-3 py-2.5">
           <div className="flex items-center justify-between mb-2">
@@ -82,7 +120,7 @@ export function TradingPanel({
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => onTimeChange(-10)}
-              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -114,7 +152,7 @@ export function TradingPanel({
               />
             </div>
             <button onClick={() => onTimeChange(10)}
-              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -125,7 +163,7 @@ export function TradingPanel({
               const [m, s] = t.split(':').map(Number);
               return (
                 <button key={t} onClick={() => onTimeSet(m, s)}
-                  className={`flex-1 py-1 text-[9px] font-semibold rounded-md transition-all border ${
+                  className={`flex-1 py-1 max-md:py-1.5 text-[9px] max-md:text-[10px] font-semibold rounded-md transition-all border ${
                     currentQuick === t
                       ? 'text-foreground bg-blue/15 border-blue/40'
                       : 'text-textDark bg-surface border-transparent hover:text-foreground hover:bg-surface-hover hover:border-border'
@@ -145,7 +183,7 @@ export function TradingPanel({
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setInvestment(Math.max(1, investment - 1))}
-              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -169,7 +207,7 @@ export function TradingPanel({
               <span className="text-[9px] text-textDark mt-0.5">amount</span>
             </div>
             <button onClick={() => setInvestment(Math.min(1000, investment + 1))}
-              className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>

@@ -173,7 +173,7 @@ function TopBar({
   }, [trades, currentPrice, activePair, payoutMap]);
 
   return (
-    <div className="h-14 flex items-center gap-2 px-3 bg-surface border-b border-border flex-shrink-0 relative z-50">
+    <div className="h-14 max-md:h-auto max-md:min-h-14 max-md:py-2 max-md:flex-wrap max-md:gap-y-2 flex items-center gap-2 px-3 bg-surface border-b border-border flex-shrink-0 relative z-50">
       <div className="relative">
         <button onClick={() => { setAddOpen(!addOpen); setSearch(''); }}
           className={`w-10 h-10 flex-shrink-0 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 ${addOpen ? 'bg-foreground text-background rotate-45' : 'bg-blue text-white hover:bg-blue/80'}`}>
@@ -181,7 +181,7 @@ function TopBar({
             <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
           </svg>
         </button>
-        <div className={`absolute top-full left-0 mt-2 w-[420px] bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-50 ${addOpen ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
+        <div className={`absolute top-full left-0 mt-2 w-[420px] max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-50 ${addOpen ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
           <div className="p-4 pb-3">
             <div className="relative">
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -237,7 +237,7 @@ function TopBar({
         </div>
       </div>
 
-      <div className="flex-1 flex items-center gap-2 min-w-0">
+      <div className="flex-1 flex items-center gap-2 min-w-0 max-md:order-3 max-md:basis-full max-md:flex-wrap">
       {pairs.filter((pair) => visibleIds.includes(pair.id)).map((pair) => {
         const isActive = pair.id === activePair?.id;
         const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
@@ -257,7 +257,7 @@ function TopBar({
         const showLive = liveUnrealized !== null;
         return (
           <button key={pair.id} onClick={() => onSelect(pair)}
-            className={`h-11 flex-1 min-w-0 rounded-xl flex items-center pl-3 pr-7 gap-2 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
+            className={`h-11 flex-1 min-w-0 max-md:flex-[1_1_28%] rounded-xl flex items-center pl-3 pr-7 gap-2 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
             <span onClick={(e) => { e.stopPropagation(); onClose(pair.id); }}
               className="absolute top-0 right-0 w-5 h-5 bg-red rounded-bl-xl flex items-center justify-center hover:bg-red-hover transition-colors">
               <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -310,7 +310,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
   ];
 
   return (
-    <div className="absolute left-3 bottom-8 z-40 flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl">
+    <div className="absolute left-3 max-md:left-2 bottom-8 max-md:bottom-[134px] z-40 flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl">
       <div className="relative">
         <button title="Drawing Tools" onClick={() => setDrawOpen(!drawOpen)}
           className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${drawOpen ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
@@ -556,7 +556,7 @@ function IndDialog({ open, onClose, supported, active, onAdd, onToggle, onSettin
 
   return (
     <div className="absolute inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
-      <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[420px] max-h-[480px] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[420px] max-w-[calc(100vw-2rem)] max-h-[480px] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="px-5 pt-5 pb-3">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-foreground">Indicators</h3>
@@ -706,6 +706,7 @@ export default function TradingPage() {
   const [activePair, setActivePair] = useState<PairDef | null>(null);
   const [effectivePayout, setEffectivePayout] = useState<number | null>(null);
   const [payoutMap, setPayoutMap] = useState<Record<string, number>>({});
+  const [panelOpen, setPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
   const [timeframe, setTimeframe] = useState('1m');
@@ -1381,7 +1382,7 @@ export default function TradingPage() {
   const isComingSoon = accountType === 'funded' || accountType === 'tournament';
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden 2xl:max-w-[1920px] 2xl:mx-auto 2xl:w-full">
       <div className="flex-1 flex min-w-0 overflow-hidden">
         <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
           <IndDialog
@@ -1403,7 +1404,7 @@ export default function TradingPage() {
           )}
           <InsufficientDialog open={insufficientOpen} isDemo={accountType === 'demo'} onClose={() => setInsufficientOpen(false)} />
           <TradeFailDialog open={!!tradeError} message={tradeError} onClose={() => setTradeError('')} />
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden max-md:pb-[122px]">
             <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={handleSelectPair} onClose={handleClosePair} />
             {!activePair ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
@@ -1417,7 +1418,7 @@ export default function TradingPage() {
               </div>
             ) : (
             <div className="flex-1 flex min-w-0 overflow-hidden">
-              <div className="w-9 bg-background border-r border-border flex-shrink-0 flex flex-col items-center py-3 gap-1.5"
+              <div className="w-9 max-sm:hidden bg-background border-r border-border flex-shrink-0 flex flex-col items-center py-3 gap-1.5"
                 title={sentiment ? `Sentiment ${sentiment.upPct}% up · ${100 - sentiment.upPct}% down` : 'Sentiment'}>
                 {sentiment ? (
                   <>
@@ -1433,6 +1434,12 @@ export default function TradingPage() {
               </div>
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} onViewChange={handleViewChange} watermark={accountType === 'demo' ? 'DEMO' : null} />
+                <button onClick={() => setPanelOpen((v) => !v)} title="Trading panel"
+                  className="hidden md:flex lg:hidden absolute right-2 top-1/2 -translate-y-1/2 z-40 w-9 h-9 rounded-full bg-surface/90 backdrop-blur border border-border items-center justify-center text-text hover:text-foreground hover:bg-surface shadow-lg transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path d="M4 6h16M4 12h16M4 18h10" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
                 <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} chartType={chartType} onChartTypeChange={setChartType} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
                 {offLive && (
                   <button
@@ -1766,7 +1773,12 @@ export default function TradingPage() {
           </div>
         </div>
         {!isFullscreen && activePair && (
+          <>
+          {panelOpen && (
+            <div onClick={() => setPanelOpen(false)} className="hidden md:block lg:hidden fixed inset-0 z-40 bg-black/50" />
+          )}
           <TradingPanel
+            open={panelOpen}
             symbol={activePair}
             investment={investment}
             setInvestment={setInvestment}
@@ -1780,6 +1792,7 @@ export default function TradingPage() {
             payoutAmount={payoutAmount}
             trades={trades}
           />
+          </>
         )}
       </div>
     </div>
