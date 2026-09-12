@@ -203,6 +203,12 @@ function TopBar({
               );
             })}
           </div>
+          <div className="flex items-center gap-2 px-5 pb-1 text-[10px] font-bold text-text-dark uppercase tracking-wider">
+            <span className="flex-1 text-left">Asset</span>
+            <span className="w-[64px] text-right">24h</span>
+            <span className="w-[76px] text-right">Spread</span>
+            <span className="w-[48px] text-right">Payout</span>
+          </div>
           <div className="max-h-[420px] overflow-y-auto px-2 pb-2 divide-y divide-border/50">
             {pairs.filter(p => (catTab === 'all' || p.category === catTab) && p.name.toLowerCase().includes(search.toLowerCase())).map(pair => {
               const isActive = pair.id === activePair?.id;
@@ -213,21 +219,17 @@ function TopBar({
               const chg = pair.changePct24h;
               return (
                 <button key={pair.id} onClick={() => { onSelect(pair); setAddOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-3 transition-all ${isActive ? 'bg-blue/10' : 'hover:bg-surface-hover'}`}>
-                  <PairAvatar pair={pair} size={32} />
-                  <div className="flex-1 text-left min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-foreground truncate">{pair.name}</span>
-                      {isOpen && <span className="text-[10px] text-blue flex-shrink-0">open</span>}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[11px] font-bold font-mono ${chg == null ? 'text-text-dark' : chg >= 0 ? 'text-green' : 'text-red'}`}>
-                        {chg == null ? '—' : `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`}
-                      </span>
-                      <span className="text-[10px] text-text-dark font-mono" title="Spread">SP {String(pair.spread)}</span>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-green flex-shrink-0" title={title}>{shownPayout}%</span>
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 transition-all ${isActive ? 'bg-blue/10' : 'hover:bg-surface-hover'}`}>
+                  <PairAvatar pair={pair} size={28} />
+                  <span className="flex-1 text-left min-w-0">
+                    <span className="block text-sm font-bold text-foreground truncate">{pair.name}</span>
+                  </span>
+                  {isOpen && <span className="text-[10px] text-blue flex-shrink-0">open</span>}
+                  <span className={`w-[64px] text-right text-[11px] font-bold font-mono flex-shrink-0 ${chg == null ? 'text-text-dark' : chg >= 0 ? 'text-green' : 'text-red'}`}>
+                    {chg == null ? '—' : `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`}
+                  </span>
+                  <span className="w-[76px] text-right text-[10px] text-text-dark font-mono flex-shrink-0 truncate" title="Spread">{String(pair.spread)}</span>
+                  <span className="w-[48px] text-right text-sm font-bold text-green flex-shrink-0" title={title}>{shownPayout}%</span>
                 </button>
               );
             })}
@@ -235,11 +237,10 @@ function TopBar({
         </div>
       </div>
 
-      <div className="flex-1 flex items-center gap-2 overflow-x-auto min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex-1 flex items-center gap-2 min-w-0">
       {pairs.filter((pair) => visibleIds.includes(pair.id)).map((pair) => {
         const isActive = pair.id === activePair?.id;
         const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
-        const chg = pair.changePct24h;
         const pairActiveTrades = trades.filter((t) => t.status === 'active' && t.pairId === pair.id);
         const liveUnrealized = (() => {
           if (pairActiveTrades.length === 0 || currentPrice == null || pair.id !== activePair?.id) return null;
@@ -256,7 +257,7 @@ function TopBar({
         const showLive = liveUnrealized !== null;
         return (
           <button key={pair.id} onClick={() => onSelect(pair)}
-            className={`h-11 w-44 min-w-0 flex-shrink-0 rounded-xl flex items-center pl-3 pr-7 gap-2 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
+            className={`h-11 flex-1 min-w-0 rounded-xl flex items-center pl-3 pr-7 gap-2 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
             <span onClick={(e) => { e.stopPropagation(); onClose(pair.id); }}
               className="absolute top-0 right-0 w-5 h-5 bg-red rounded-bl-xl flex items-center justify-center hover:bg-red-hover transition-colors">
               <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,9 +269,6 @@ function TopBar({
             <div className="flex flex-col flex-1 min-w-0">
               <span className="text-xs font-bold text-foreground leading-tight truncate">{pair.name}</span>
               <div className="flex items-center gap-1 leading-tight">
-                <span className={`text-[10px] font-bold font-mono ${chg == null ? 'text-text-dark' : chg >= 0 ? 'text-green' : 'text-red'}`}>
-                  {chg == null ? '' : `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}% • `}
-                </span>
                 <span className="text-[10px] font-bold text-orange" title={(() => { const d = payoutDetails[pair.id]; return d ? `Base ${d.base}%${d.adjustments.length ? ' ' + d.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${d.payout}%` : `${shownPayout}%`; })()}>{shownPayout}%</span>
                 {unrealized !== null ? (
                   <span className={`text-[10px] font-bold ${!showLive ? 'opacity-60' : ''} ${unrealized >= 0 ? 'text-green' : 'text-red'}`}>• {unrealized >= 0 ? '+' : ''}{unrealized.toFixed(2)}$</span>
