@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme';
 import { LeaderboardDrawer } from './LeaderboardDrawer';
-import { useFullscreenActive } from '../(trader)/use-fullscreen';
 function getAccountTypeFromPath(pathname: string): string {
   const match = pathname.match(/\/trade\/(\w+)/);
   return match ? match[1] : 'real';
@@ -180,12 +179,9 @@ function MoreSheet({ onClose }: { onClose: () => void }) {
 export function BottomNav() {
   const pathname = usePathname();
   const accountType = getAccountTypeFromPath(pathname);
-  const isFs = useFullscreenActive();
   const [boardOpen, setBoardOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
-
-  if (isFs) return null;
 
   const tradeHref = `/trade/${accountType}`;
   const isTrade = pathname === tradeHref;

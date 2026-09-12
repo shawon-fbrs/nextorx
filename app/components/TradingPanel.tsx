@@ -48,7 +48,7 @@ function formatCountdown(expiresAt: number, now: number): string {
 
 function QuickSheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
-    <div className="fixed inset-0 z-[95]">
+    <div className="fixed inset-0 z-[120]">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="absolute inset-x-0 bottom-0 bg-surface rounded-t-2xl max-h-[70vh] flex flex-col overflow-hidden">
         <div className="relative px-4 pt-2.5 pb-2 flex items-center justify-center border-b border-border flex-shrink-0">
@@ -100,12 +100,6 @@ export function TradingPanel({
         <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2.5 max-lg:py-1.5">
           <div className="flex items-center justify-between mb-2 max-lg:mb-1">
             <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Expiration Time</span>
-            <button onClick={() => setTimeSheet(true)} title="Quick times"
-              className="lg:hidden w-7 h-7 rounded-lg bg-blue/15 border border-blue/40 text-blue flex items-center justify-center active:scale-95 transition-transform">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => onTimeChange(-10)}
@@ -140,6 +134,12 @@ export function TradingPanel({
                 className="w-12 max-lg:w-10 bg-surface border border-border rounded-lg px-1 py-1 max-lg:py-0.5 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
+            <button onClick={() => setTimeSheet(true)} title="Quick times"
+              className="lg:hidden w-9 h-9 rounded-lg bg-blue/15 border border-blue/40 text-blue flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
             <button onClick={() => onTimeChange(10)}
               className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -168,13 +168,7 @@ export function TradingPanel({
         <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2.5 max-lg:py-1.5">
           <div className="flex items-center justify-between mb-2 max-lg:mb-1">
             <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Investment</span>
-            <span className="flex items-center gap-1.5">
-              <span className="text-[9px] text-textDark">Min $1</span>
-              <button onClick={() => setAmountSheet(true)} title="Quick amounts"
-                className="lg:hidden w-7 h-7 rounded-lg bg-blue/15 border border-blue/40 text-blue text-sm font-bold flex items-center justify-center active:scale-95 transition-transform">
-                $
-              </button>
-            </span>
+            <span className="text-[9px] text-textDark">Min $1</span>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setInvestment(Math.max(1, investment - 1))}
@@ -201,6 +195,10 @@ export function TradingPanel({
               </div>
               <span className="text-[9px] text-textDark mt-0.5">amount</span>
             </div>
+            <button onClick={() => setAmountSheet(true)} title="Quick amounts"
+              className="lg:hidden w-9 h-9 rounded-lg bg-blue/15 border border-blue/40 text-blue text-sm font-bold flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform">
+              $
+            </button>
             <button onClick={() => setInvestment(Math.min(1000, investment + 1))}
               className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>

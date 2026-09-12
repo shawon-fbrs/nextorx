@@ -357,7 +357,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
   ];
 
   return (
-    <div className="absolute left-2 bottom-2 z-40 flex flex-col items-center gap-1.5">
+    <div className="absolute left-2 bottom-8 z-40 flex flex-col items-center gap-1.5">
       <div className={`flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all duration-300 ease-in-out ${toolsOpen ? 'max-lg:max-h-[420px] max-lg:opacity-100' : 'max-lg:max-h-0 max-lg:opacity-0 max-lg:py-0 max-lg:border-transparent max-lg:pointer-events-none max-lg:overflow-hidden'}`}>
       <div className="relative">
         <button title="Drawing Tools" onClick={() => toggleMenu('draw')}
@@ -420,8 +420,10 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
       </button>
 
       <button title="Fullscreen" onClick={() => {
+        if (document.fullscreenElement) { document.exitFullscreen(); return; }
+        if (window.innerWidth < 1024) { document.documentElement.requestFullscreen().catch(() => {}); return; }
         const el = document.querySelector('[data-chart-area]') as HTMLElement;
-        if (el) { document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen(); }
+        if (el) el.requestFullscreen();
       }}
         className="w-9 h-9 flex items-center justify-center rounded-lg text-text hover:bg-surface-hover hover:text-foreground transition-all">
         <Maximize2 size={20} />
@@ -1829,7 +1831,7 @@ export default function TradingPage() {
             )}
           </div>
         </div>
-        {!isFullscreen && activePair && (
+        {(!isFullscreen || isCompact) && activePair && (
           <TradingPanel
             symbol={activePair}
             investment={investment}
