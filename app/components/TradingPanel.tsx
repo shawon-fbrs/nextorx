@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 
 interface SymbolLike {
@@ -45,7 +45,24 @@ interface TradingPanelProps {
   onDirectionHover?: (dir: 'up' | 'down' | null) => void;
   payoutAmount: string;
   trades: TradeLike[];
-  open?: boolean;
+}
+
+function QuickSheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-[95]">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 bg-surface rounded-t-2xl px-4 pt-2 pb-8 flex flex-col" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="w-10 h-1 rounded-full bg-text-dark/40 mx-auto my-2 flex-shrink-0" />
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-bold text-foreground">{title}</span>
+          <button onClick={onClose} className="p-1.5 text-text-dark">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export function TradingPanel({
@@ -61,11 +78,12 @@ export function TradingPanel({
   onDirectionHover,
   payoutAmount,
   trades,
-  open = true,
 }: TradingPanelProps) {
   const [expandedTrade, setExpandedTrade] = useState<string | number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [amountSheet, setAmountSheet] = useState(false);
+  const [timeSheet, setTimeSheet] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -76,13 +94,11 @@ export function TradingPanel({
   const currentQuick = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}`;
 
   return (
-    <aside className={`w-[260px] 2xl:w-[300px] bg-surface border-border flex flex-col z-50 flex-shrink-0 border-l
-      max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:w-full max-md:border-l-0 max-md:border-t max-md:rounded-t-2xl max-md:shadow-2xl max-md:max-h-[80vh]
-      md:max-lg:fixed md:max-lg:right-0 md:max-lg:top-0 md:max-lg:bottom-0 md:max-lg:w-[280px] md:max-lg:border-l md:max-lg:shadow-2xl md:max-lg:transition-transform md:max-lg:duration-300
-      ${open ? 'md:max-lg:translate-x-0' : 'md:max-lg:translate-x-full'}`}>
+    <aside className="w-[260px] 2xl:w-[300px] bg-surface border-border flex flex-col z-50 flex-shrink-0 border-l
+      max-lg:fixed max-lg:inset-x-0 max-lg:bottom-[calc(60px+env(safe-area-inset-bottom))] max-lg:top-auto max-lg:w-full max-lg:border-l-0 max-lg:border-t max-lg:rounded-t-2xl max-lg:shadow-2xl max-lg:max-h-[70vh]">
       {/* Mobile sheet handle + summary */}
       <button onClick={() => setSheetOpen((v) => !v)}
-        className="hidden max-md:flex items-center gap-2 px-4 pt-2 pb-1.5 w-full">
+        className="hidden max-lg:flex items-center gap-2 px-4 pt-2 pb-1.5 w-full">
         <span className="absolute top-1 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-text-dark/40" />
         <span className="text-[11px] font-bold text-foreground tabular-nums">{timeStr}</span>
         <span className="text-[11px] text-text-dark">·</span>
@@ -95,7 +111,7 @@ export function TradingPanel({
       </button>
       {/* Mobile peek trade buttons */}
       {!sheetOpen && (
-        <div className="hidden max-md:flex items-center gap-2 px-3 pb-3">
+        <div className="hidden max-lg:flex items-center gap-2 px-3 pb-3">
           <button
             onClick={() => onTrade('up')}
             className="flex-1 bg-green text-white font-bold text-sm py-3 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98]"
@@ -112,15 +128,21 @@ export function TradingPanel({
           </button>
         </div>
       )}
-      <div className={`px-3 py-3 flex-1 min-h-0 flex-col gap-2.5 overflow-hidden ${sheetOpen ? 'flex max-md:overflow-y-auto' : 'flex max-md:hidden'}`}>
+      <div className={`px-3 py-3 flex-1 min-h-0 flex-col gap-2.5 overflow-hidden ${sheetOpen ? 'flex max-lg:grid max-lg:grid-cols-2 max-lg:overflow-y-auto' : 'flex max-lg:hidden'}`}>
         {/* Time Section */}
         <div className="bg-background rounded-xl border border-border px-3 py-2.5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Expiration Time</span>
+            <button onClick={() => setTimeSheet(true)} title="Quick times"
+              className="lg:hidden w-7 h-7 rounded-lg bg-blue/15 border border-blue/40 text-blue flex items-center justify-center active:scale-95 transition-transform">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => onTimeChange(-10)}
-              className="w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -152,18 +174,18 @@ export function TradingPanel({
               />
             </div>
             <button onClick={() => onTimeChange(10)}
-              className="w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>
-          <div className="flex gap-1.5 mt-2">
+          <div className="flex gap-1.5 mt-2 max-lg:hidden">
             {quickTimes.map((t) => {
               const [m, s] = t.split(':').map(Number);
               return (
                 <button key={t} onClick={() => onTimeSet(m, s)}
-                  className={`flex-1 py-1 max-md:py-1.5 text-[9px] max-md:text-[10px] font-semibold rounded-md transition-all border ${
+                  className={`flex-1 py-1 text-[9px] font-semibold rounded-md transition-all border ${
                     currentQuick === t
                       ? 'text-foreground bg-blue/15 border-blue/40'
                       : 'text-textDark bg-surface border-transparent hover:text-foreground hover:bg-surface-hover hover:border-border'
@@ -179,11 +201,17 @@ export function TradingPanel({
         <div className="bg-background rounded-xl border border-border px-3 py-2.5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Investment</span>
-            <span className="text-[9px] text-textDark">Min $1</span>
+            <span className="flex items-center gap-1.5">
+              <span className="text-[9px] text-textDark">Min $1</span>
+              <button onClick={() => setAmountSheet(true)} title="Quick amounts"
+                className="lg:hidden w-7 h-7 rounded-lg bg-blue/15 border border-blue/40 text-blue text-sm font-bold flex items-center justify-center active:scale-95 transition-transform">
+                $
+              </button>
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setInvestment(Math.max(1, investment - 1))}
-              className="w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -207,13 +235,13 @@ export function TradingPanel({
               <span className="text-[9px] text-textDark mt-0.5">amount</span>
             </div>
             <button onClick={() => setInvestment(Math.min(1000, investment + 1))}
-              className="w-9 h-9 max-md:w-11 max-md:h-11 rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>
-          <div className="flex gap-1.5 mt-2">
+          <div className="flex gap-1.5 mt-2 max-lg:hidden">
             {[1, 5, 10, 25, 50].map((amt) => (
               <button key={amt} onClick={() => setInvestment(amt)}
                 className={`flex-1 py-1 text-[9px] font-semibold rounded-md transition-all border ${
@@ -228,13 +256,13 @@ export function TradingPanel({
         </div>
 
         {/* Payout */}
-        <div className="bg-background rounded-xl border border-border px-3 py-2.5">
+        <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider block mb-0.5">Potential Payout</span>
               <span className="text-green font-bold text-lg">+{payoutAmount}$</span>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
+            <div className="w-10 h-10 max-lg:hidden rounded-lg bg-green/10 flex items-center justify-center">
               <svg className="w-5 h-5 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -248,12 +276,12 @@ export function TradingPanel({
         </div>
 
         {/* Up/Down buttons */}
-        <div className="flex flex-col gap-2 mt-auto">
+        <div className="flex flex-col max-lg:flex-row gap-2 mt-auto max-lg:mt-0 max-lg:col-span-2">
           <button
             onClick={() => onTrade('up')}
             onMouseEnter={() => onDirectionHover?.('up')}
             onMouseLeave={() => onDirectionHover?.(null)}
-            className="bg-green hover:bg-green-hover text-white font-bold text-base py-4 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_14px_0_rgba(0,195,101,0.25)] active:scale-[0.98]"
+            className="bg-green hover:bg-green-hover text-white font-bold text-base max-lg:text-sm py-4 max-lg:py-3 max-lg:flex-1 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_14px_0_rgba(0,195,101,0.25)] active:scale-[0.98]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
               <path d="M5 10l7-7m0 0l7 7m-7-7v18" strokeLinecap="round" strokeLinejoin="round" />
@@ -265,7 +293,7 @@ export function TradingPanel({
             onClick={() => onTrade('down')}
             onMouseEnter={() => onDirectionHover?.('down')}
             onMouseLeave={() => onDirectionHover?.(null)}
-            className="bg-red hover:bg-red-hover text-white font-bold text-base py-4 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_14px_0_rgba(255,73,84,0.25)] active:scale-[0.98]"
+            className="bg-red hover:bg-red-hover text-white font-bold text-base max-lg:text-sm py-4 max-lg:py-3 max-lg:flex-1 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_14px_0_rgba(255,73,84,0.25)] active:scale-[0.98]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
               <path d="M19 14l-7 7m0 0l-7-7m7 7V3" strokeLinecap="round" strokeLinejoin="round" />
@@ -276,7 +304,7 @@ export function TradingPanel({
         </div>
 
         {/* All Trades */}
-        <div className="bg-background rounded-xl border border-border overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="bg-background rounded-xl border border-border overflow-hidden flex flex-col flex-1 min-h-0 max-lg:col-span-2">
           <div className="px-4 py-3 flex items-center justify-between border-b border-border flex-shrink-0">
             <span className="text-[11px] text-textDark font-semibold uppercase tracking-wider">All Trades</span>
             <span className="text-[10px] text-textDark">{trades.length} total</span>
@@ -393,6 +421,41 @@ export function TradingPanel({
           </div>
         </div>
       </div>
+      {amountSheet && (
+        <QuickSheet title="Investment amount" onClose={() => setAmountSheet(false)}>
+          <div className="grid grid-cols-4 gap-2">
+            {[1, 5, 10, 25, 50, 100, 200, 500].map((amt) => (
+              <button key={amt} onClick={() => { setInvestment(amt); setAmountSheet(false); }}
+                className={`py-3 text-sm font-bold rounded-xl border transition-all active:scale-95 ${
+                  investment === amt
+                    ? 'text-white bg-blue/20 border-blue/50'
+                    : 'text-foreground bg-background border-border'
+                }`}>
+                ${amt}
+              </button>
+            ))}
+          </div>
+        </QuickSheet>
+      )}
+      {timeSheet && (
+        <QuickSheet title="Expiry time" onClose={() => setTimeSheet(false)}>
+          <div className="grid grid-cols-4 gap-2">
+            {[['00:15', 0, 15], ['00:30', 0, 30], ['01:00', 1, 0], ['02:00', 2, 0], ['03:00', 3, 0], ['05:00', 5, 0], ['10:00', 10, 0], ['15:00', 15, 0]].map(([label, m, s]) => {
+              const cur = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}` === label;
+              return (
+                <button key={label as string} onClick={() => { onTimeSet(m as number, s as number); setTimeSheet(false); }}
+                  className={`py-3 text-sm font-bold rounded-xl border font-mono transition-all active:scale-95 ${
+                    cur
+                      ? 'text-white bg-blue/20 border-blue/50'
+                      : 'text-foreground bg-background border-border'
+                  }`}>
+                  {label as string}
+                </button>
+              );
+            })}
+          </div>
+        </QuickSheet>
+      )}
     </aside>
   );
 }

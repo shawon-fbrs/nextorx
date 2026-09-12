@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
+import { BottomNav } from '../components/BottomNav';
+import { BalanceProvider } from './balance-context';
 import { useAuth } from '@/lib/auth-context';
 import { Toaster } from 'sonner';
 
@@ -12,8 +14,10 @@ const ADMIN_ROLES = new Set(['super_admin', 'finance', 'support', 'risk']);
 export default function TraderLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading } = useAuth();
   const accountType = (params.accountType as string) || 'real';
+  const isTradeRoute = pathname.startsWith('/trade/');
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [balance, setBalance] = useState(0);
   const [demoBalance, setDemoBalance] = useState(0);
@@ -67,18 +71,26 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
   }
 
   return (
+    <BalanceProvider value={{ balance: shownBalance, demoBalance, realBalance: balance, accountType }}>
     <div className="h-screen w-screen overflow-hidden flex bg-background text-text text-sm">
+      <div className="contents max-lg:hidden">
       <Sidebar
         expanded={sidebarExpanded}
         onToggle={() => setSidebarExpanded(!sidebarExpanded)}
       />
+      </div>
       <div className="flex-1 flex flex-col min-w-0">
+        <div className={isTradeRoute ? 'contents max-lg:hidden' : 'contents'}>
         <Header balance={shownBalance} demoBalance={demoBalance} realBalance={balance} />
+        </div>
         <div className="flex-1 min-h-0 overflow-hidden">
           {children}
         </div>
+        <div className="lg:hidden flex-shrink-0" style={{ height: 'calc(60px + env(safe-area-inset-bottom))' }} />
       </div>
+      <BottomNav />
       <Toaster position="bottom-left" theme="dark" richColors closeButton />
     </div>
+    </BalanceProvider>
   );
 }

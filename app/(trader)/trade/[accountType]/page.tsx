@@ -10,6 +10,7 @@ import { readStoredIndicators, writeStoredIndicators, type StoredIndicator } fro
 const Chart = dynamic(() => import('../../../components/Chart').then(m => m.Chart), { ssr: false });
 import { TradingPanel } from '../../../components/TradingPanel';
 import { usePairWS, type CandleData } from '@/lib/use-ws';
+import { useBalance } from '../../balance-context';
 import { getServerNow, syncWithServer } from '@/lib/server-time';
 import { useTheme } from '@/lib/theme';
 import {
@@ -122,6 +123,18 @@ function PairAvatar({ pair, size = 40 }: { pair: PairDef; size?: number }) {
   );
 }
 
+function useCompactLayout() {
+  const [compact, setCompact] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023.5px)');
+    const onChange = () => setCompact(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return compact;
+}
+
 function TopBar({
   pairs,
   visibleIds,
@@ -173,10 +186,27 @@ function TopBar({
   }, [trades, currentPrice, activePair, payoutMap]);
 
   return (
-    <div className="h-14 max-md:h-auto max-md:min-h-14 max-md:py-2 max-md:flex-wrap max-md:gap-y-2 flex items-center gap-2 px-3 bg-surface border-b border-border flex-shrink-0 relative z-50">
+    <div className="h-14 flex items-center gap-2 px-3 bg-surface border-b border-border flex-shrink-0 relative z-50">
       <div className="relative">
         <button onClick={() => { setAddOpen(!addOpen); setSearch(''); }}
-          className={`w-10 h-10 flex-shrink-0 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 ${addOpen ? 'bg-foreground text-background rotate-45' : 'bg-blue text-white hover:bg-blue/80'}`}>
+          className={`lg:hidden h-10 flex items-center gap-2 rounded-xl pl-1.5 pr-2.5 bg-background border border-border transition-all ${addOpen ? 'border-blue/50' : ''}`}>
+          {activePair ? (
+            <>
+              <PairAvatar pair={activePair} size={28} />
+              <span className="text-left min-w-0">
+                <span className="block text-xs font-bold text-foreground leading-tight truncate max-w-[110px]">{activePair.name}</span>
+                <span className="block text-[10px] font-bold text-green leading-tight">{payoutMap[activePair.id] ?? activePair.payoutPercent}%</span>
+              </span>
+            </>
+          ) : (
+            <span className="text-xs font-bold text-text-dark px-2">Select asset</span>
+          )}
+          <svg className={`w-4 h-4 text-text-dark flex-shrink-0 transition-transform ${addOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button onClick={() => { setAddOpen(!addOpen); setSearch(''); }}
+          className={`max-lg:hidden w-10 h-10 flex-shrink-0 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 ${addOpen ? 'bg-foreground text-background rotate-45' : 'bg-blue text-white hover:bg-blue/80'}`}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
           </svg>
@@ -237,7 +267,7 @@ function TopBar({
         </div>
       </div>
 
-      <div className="flex-1 flex items-center gap-2 min-w-0 max-md:order-3 max-md:basis-full max-md:flex-wrap">
+      <div className="flex-1 hidden lg:flex items-center gap-2 min-w-0">
       {pairs.filter((pair) => visibleIds.includes(pair.id)).map((pair) => {
         const isActive = pair.id === activePair?.id;
         const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
@@ -257,7 +287,7 @@ function TopBar({
         const showLive = liveUnrealized !== null;
         return (
           <button key={pair.id} onClick={() => onSelect(pair)}
-            className={`h-11 flex-auto w-44 max-w-44 min-w-0 max-md:flex-[1_1_28%] max-md:w-auto max-md:max-w-none rounded-xl flex items-center pl-3 pr-7 gap-2 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
+            className={`h-11 flex-auto w-44 max-w-44 min-w-0 rounded-xl flex items-center pl-3 pr-7 gap-2 cursor-pointer transition-all shadow-lg relative ${isActive ? 'bg-background/90 border border-blue/50 shadow-blue/10' : 'bg-surface/90 border border-border/50 hover:bg-surface-hover/90 backdrop-blur-sm'}`}>
             <span onClick={(e) => { e.stopPropagation(); onClose(pair.id); }}
               className="absolute top-0 right-0 w-5 h-5 bg-red rounded-bl-xl flex items-center justify-center hover:bg-red-hover transition-colors">
               <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -281,6 +311,26 @@ function TopBar({
         );
       })}
       </div>
+      <MobileTopBarRight />
+    </div>
+  );
+}
+
+function MobileTopBarRight() {
+  const { balance, accountType } = useBalance();
+  const label = accountType.charAt(0).toUpperCase() + accountType.slice(1);
+  return (
+    <div className="lg:hidden flex items-center gap-2 ml-auto flex-shrink-0">
+      <div className="flex flex-col items-end leading-tight">
+        <span className="text-[9px] text-text-dark font-semibold uppercase tracking-wide">{label}</span>
+        <span className="text-sm font-bold text-foreground tabular-nums">${balance.toFixed(2)}</span>
+      </div>
+      <Link href="/deposit" className="bg-green text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1 active:scale-95 transition-transform">
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
+        </svg>
+        Deposit
+      </Link>
     </div>
   );
 }
@@ -289,6 +339,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
   const [drawOpen, setDrawOpen] = useState(false);
   const [ctOpen, setCtOpen] = useState(false);
   const [tfOpen, setTfOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   const toolIcons: Record<string, React.ReactNode> = {
     'Trend Line': <TrendingUp size={14} />,
@@ -310,7 +361,12 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
   ];
 
   return (
-    <div className="absolute left-3 max-md:left-2 bottom-8 max-md:bottom-[134px] z-40 flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl">
+    <div className="absolute left-3 max-lg:left-2 bottom-8 max-lg:bottom-[196px] z-40 flex flex-col items-center gap-1.5">
+      <button title="Chart tools" onClick={() => setToolsOpen((v) => !v)}
+        className={`lg:hidden w-11 h-11 flex items-center justify-center rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all active:scale-95 ${toolsOpen ? 'text-foreground' : 'text-text'}`}>
+        <Settings size={20} />
+      </button>
+      <div className={`flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${toolsOpen ? 'max-lg:max-h-[420px] max-lg:opacity-100' : 'max-lg:max-h-0 max-lg:opacity-0 max-lg:py-0 max-lg:border-transparent max-lg:pointer-events-none'}`}>
       <div className="relative">
         <button title="Drawing Tools" onClick={() => setDrawOpen(!drawOpen)}
           className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${drawOpen ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
@@ -394,6 +450,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
         className="w-9 h-9 flex items-center justify-center rounded-lg text-text hover:bg-surface-hover hover:text-foreground transition-all">
         <Maximize2 size={20} />
       </button>
+      </div>
     </div>
   );
 }
@@ -706,7 +763,7 @@ export default function TradingPage() {
   const [activePair, setActivePair] = useState<PairDef | null>(null);
   const [effectivePayout, setEffectivePayout] = useState<number | null>(null);
   const [payoutMap, setPayoutMap] = useState<Record<string, number>>({});
-  const [panelOpen, setPanelOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+  const isCompact = useCompactLayout();
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
   const [timeframe, setTimeframe] = useState('1m');
@@ -988,6 +1045,16 @@ export default function TradingPage() {
       } catch {}
       return next;
     });
+    setActivePair(p);
+  }, []);
+
+  const handleSelectSingle = useCallback((p: PairDef) => {
+    clearMarkers();
+    try {
+      localStorage.setItem('nextorx-visible-pairs', JSON.stringify([p.id]));
+      localStorage.setItem('nextorx-active-pair', p.id);
+    } catch {}
+    setVisibleIds([p.id]);
     setActivePair(p);
   }, []);
 
@@ -1404,8 +1471,8 @@ export default function TradingPage() {
           )}
           <InsufficientDialog open={insufficientOpen} isDemo={accountType === 'demo'} onClose={() => setInsufficientOpen(false)} />
           <TradeFailDialog open={!!tradeError} message={tradeError} onClose={() => setTradeError('')} />
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden max-md:pb-[122px]">
-            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={handleSelectPair} onClose={handleClosePair} />
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden max-lg:pb-[186px]">
+            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} />
             {!activePair ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
                 <div className="w-14 h-14 rounded-2xl bg-blue/10 border border-blue/20 flex items-center justify-center">
@@ -1418,7 +1485,7 @@ export default function TradingPage() {
               </div>
             ) : (
             <div className="flex-1 flex min-w-0 overflow-hidden">
-              <div className="w-9 max-sm:hidden bg-background border-r border-border flex-shrink-0 flex flex-col items-center py-3 gap-1.5"
+              <div className="w-9 bg-background border-r border-border flex-shrink-0 flex flex-col items-center py-3 gap-1.5"
                 title={sentiment ? `Sentiment ${sentiment.upPct}% up · ${100 - sentiment.upPct}% down` : 'Sentiment'}>
                 {sentiment ? (
                   <>
@@ -1434,12 +1501,6 @@ export default function TradingPage() {
               </div>
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} onViewChange={handleViewChange} watermark={accountType === 'demo' ? 'DEMO' : null} />
-                <button onClick={() => setPanelOpen((v) => !v)} title="Trading panel"
-                  className="hidden md:flex lg:hidden absolute right-2 top-1/2 -translate-y-1/2 z-40 w-9 h-9 rounded-full bg-surface/90 backdrop-blur border border-border items-center justify-center text-text hover:text-foreground hover:bg-surface shadow-lg transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                    <path d="M4 6h16M4 12h16M4 18h10" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
                 <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} chartType={chartType} onChartTypeChange={setChartType} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
                 {offLive && (
                   <button
@@ -1773,12 +1834,7 @@ export default function TradingPage() {
           </div>
         </div>
         {!isFullscreen && activePair && (
-          <>
-          {panelOpen && (
-            <div onClick={() => setPanelOpen(false)} className="hidden md:block lg:hidden fixed inset-0 z-40 bg-black/50" />
-          )}
           <TradingPanel
-            open={panelOpen}
             symbol={activePair}
             investment={investment}
             setInvestment={setInvestment}
@@ -1792,7 +1848,6 @@ export default function TradingPage() {
             payoutAmount={payoutAmount}
             trades={trades}
           />
-          </>
         )}
       </div>
     </div>
