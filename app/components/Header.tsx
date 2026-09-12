@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme';
 import { AccountMenu } from './AccountMenu';
+import { BanknoteArrowDown, BanknoteArrowUp } from 'lucide-react';
 
 export type AccountType = 'demo' | 'real' | 'funded' | 'tournament';
 
@@ -130,18 +131,14 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
           href="/deposit"
           className="bg-green hover:bg-green-hover text-white font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-green/20"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
-          </svg>
+          <BanknoteArrowDown className="w-4 h-4" />
           Deposit
         </Link>
         <Link
           href="/withdraw"
           className="border border-border hover:bg-surface-hover text-text hover:text-foreground font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
-          </svg>
+          <BanknoteArrowUp className="w-4 h-4" />
           Withdraw
         </Link>
       </div>

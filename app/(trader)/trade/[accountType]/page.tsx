@@ -17,8 +17,8 @@ import { useTheme } from '@/lib/theme';
 import {
   TrendingUp, Square, ArrowUpRight,
   Minus, MoveHorizontal, ChevronRight,
-  GitBranch, Pencil, Activity, Trash2, Maximize2, CandlestickChart,
-  PenLine, ArrowRight, ChevronsRight, Eye, EyeOff, Settings, Settings2, X,
+  GitBranch, Pencil, DraftingCompass, Trash2, Maximize, Minimize, AlignHorizontalDistributeCenter,
+  PencilRuler, ArrowRight, ChevronsRight, Eye, EyeOff, Settings, Settings2, SquareFunction, X,
 } from 'lucide-react';
 
 interface PairDef {
@@ -332,7 +332,7 @@ function MobileTopBarRight() {
   );
 }
 
-function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChange, onIndToggle, onDrawTool, onRemoveDrawings }: { timeframe: string; onTimeframeChange: (tf: string) => void; chartType: 'candle' | 'line' | 'area'; onChartTypeChange: (t: 'candle' | 'line' | 'area') => void; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void }) {
+function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChange, onIndToggle, onDrawTool, onRemoveDrawings, fullscreen = false }: { timeframe: string; onTimeframeChange: (tf: string) => void; chartType: 'candle' | 'line' | 'area'; onChartTypeChange: (t: 'candle' | 'line' | 'area') => void; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void; fullscreen?: boolean }) {
   const [openMenu, setOpenMenu] = useState<'draw' | 'chart' | 'tf' | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const toggleMenu = (m: 'draw' | 'chart' | 'tf') => setOpenMenu((cur) => (cur === m ? null : m));
@@ -362,7 +362,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
       <div className="relative">
         <button title="Drawing Tools" onClick={() => toggleMenu('draw')}
           className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${openMenu === 'draw' ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
-          <PenLine size={20} />
+          <PencilRuler size={20} />
         </button>
       </div>
 
@@ -371,7 +371,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
       <div className="relative">
         <button title="Chart Type" onClick={() => toggleMenu('chart')}
           className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${openMenu === 'chart' ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
-          <CandlestickChart size={20} />
+          <AlignHorizontalDistributeCenter size={20} />
         </button>
         {openMenu === 'chart' && (
           <div className="absolute left-full top-0 ml-1 w-32 bg-surface border border-border rounded-lg shadow-2xl p-1.5 z-50">
@@ -409,7 +409,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
 
       <button title="Indicators" onClick={onIndToggle}
         className="w-9 h-9 flex items-center justify-center rounded-lg text-text hover:bg-surface-hover hover:text-foreground transition-all">
-        <Activity size={20} />
+        <DraftingCompass size={20} />
       </button>
 
       <div className="w-6 h-px bg-border my-1" />
@@ -419,14 +419,14 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
         <Trash2 size={20} />
       </button>
 
-      <button title="Fullscreen" onClick={() => {
+      <button title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} onClick={() => {
         if (document.fullscreenElement) { document.exitFullscreen(); return; }
         if (window.innerWidth < 1024) { document.documentElement.requestFullscreen().catch(() => {}); return; }
         const el = document.querySelector('[data-chart-area]') as HTMLElement;
         if (el) el.requestFullscreen();
       }}
         className="w-9 h-9 flex items-center justify-center rounded-lg text-text hover:bg-surface-hover hover:text-foreground transition-all">
-        <Maximize2 size={20} />
+        {fullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
       </button>
       </div>
       <button title="Chart tools" onClick={() => setToolsOpen((v) => !v)}
@@ -669,9 +669,7 @@ function IndDialog({ open, onClose, supported, active, onAdd, onToggle, onSettin
                     <button key={item.name} onClick={() => { if (!added) onAdd(item.name); }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-hover transition-colors group text-left">
                       <div className="w-7 h-7 rounded-lg bg-background flex items-center justify-center flex-shrink-0">
-                        <svg className="w-3.5 h-3.5 text-text-dark group-hover:text-blue transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                          <path d="M7 12l3-3 3 3 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <SquareFunction className="w-3.5 h-3.5 text-text-dark group-hover:text-blue transition-colors" />
                       </div>
                       <span className="flex-1 text-[12px] font-medium text-text group-hover:text-foreground transition-colors">{item.label}</span>
                       {added && <span className="text-[10px] font-bold text-green">ADDED</span>}
@@ -1503,7 +1501,7 @@ export default function TradingPage() {
               </div>
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} onViewChange={handleViewChange} watermark={accountType === 'demo' ? 'DEMO' : null} />
-                <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} chartType={chartType} onChartTypeChange={setChartType} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} />
+                <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} chartType={chartType} onChartTypeChange={setChartType} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} fullscreen={isFullscreen} />
                 {offLive && (
                   <button
                     onClick={() => {
