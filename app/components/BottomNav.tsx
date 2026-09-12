@@ -182,6 +182,88 @@ function MoreSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
+export function LandscapeDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const accountType = getAccountTypeFromPath(pathname);
+  const { theme, toggleTheme } = useTheme();
+  const { signOut } = useAuth();
+  const [boardOpen, setBoardOpen] = useState(false);
+  const [positionsOpen, setPositionsOpen] = useState(false);
+
+  const tradeHref = `/trade/${accountType}`;
+  const row = 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-colors active:scale-[0.99]';
+
+  return (
+    <div className={`fixed inset-0 z-[85] hidden max-lg:landscape:block ${open ? '' : 'pointer-events-none'}`} aria-hidden={!open}>
+      <div className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`} onClick={onClose} />
+      <aside className={`absolute left-0 top-0 bottom-0 w-64 max-w-[80vw] bg-surface border-r border-border flex flex-col transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="relative px-4 pt-3 pb-2.5 flex items-center border-b border-border flex-shrink-0">
+          <span className="text-sm font-bold text-foreground">Menu</span>
+          <button onClick={onClose} className="absolute right-3 top-2.5 p-1.5 text-text-dark">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+          <Link href={tradeHref} onClick={onClose} className={`${row} ${pathname === tradeHref ? 'bg-blue/15 text-blue' : 'text-text hover:bg-surface-hover'}`}>
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Trade
+          </Link>
+          <button onClick={() => setPositionsOpen(true)} className={`${row} text-text hover:bg-surface-hover`}>
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            All Trades
+          </button>
+          <button onClick={() => setBoardOpen(true)} className={`${row} text-text hover:bg-surface-hover`}>
+            <Podium className="w-5 h-5 flex-shrink-0" />
+            Leaderboard
+          </button>
+          <Link href="/trade/tournament" onClick={onClose} className={`${row} ${pathname === '/trade/tournament' ? 'bg-blue/15 text-blue' : 'text-text hover:bg-surface-hover'}`}>
+            <Trophy className="w-5 h-5 flex-shrink-0" />
+            Tournaments
+          </Link>
+          <div className="text-[10px] font-bold text-text-dark uppercase tracking-wider px-3 pt-3 pb-1">More</div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {MORE_LINKS.map((item) => (
+              <Link key={item.label} href={item.href} onClick={onClose}
+                className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-background border border-border text-text active:scale-95 transition-transform">
+                {typeof item.icon === 'string' ? (
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path d={item.icon} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : (
+                  item.icon
+                )}
+                <span className="text-[11px] font-semibold truncate">{item.label}</span>
+              </Link>
+            ))}
+          </div>
+          <button onClick={toggleTheme} className={`${row} text-text hover:bg-surface-hover mt-1`}>
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              {theme === 'dark' ? (
+                <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" strokeLinecap="round" strokeLinejoin="round" />
+              ) : (
+                <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" strokeLinecap="round" strokeLinejoin="round" />
+              )}
+            </svg>
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
+          <button
+            onClick={() => { onClose(); signOut().then(() => router.push('/login')).catch(() => router.push('/login')); }}
+            className={`${row} text-red hover:bg-red/10 justify-center mt-1`}>
+            Log Out
+          </button>
+        </div>
+      </aside>
+      {positionsOpen && <PositionsSheet onClose={() => setPositionsOpen(false)} />}
+      <LeaderboardDrawer open={boardOpen} onClose={() => setBoardOpen(false)} />
+    </div>
+  );
+}
+
 export function BottomNav() {
   const pathname = usePathname();
   const accountType = getAccountTypeFromPath(pathname);
@@ -198,7 +280,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-[80] bg-surface/95 backdrop-blur border-t border-border flex items-stretch px-1"
+      <nav className="lg:hidden landscape:hidden fixed bottom-0 inset-x-0 z-[80] bg-surface/95 backdrop-blur border-t border-border flex items-stretch px-1"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <Link href={tradeHref} className={btn(isTrade)}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>

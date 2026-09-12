@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme';
 import { AccountMenu } from './AccountMenu';
-import { BanknoteArrowDown, BanknoteArrowUp } from 'lucide-react';
+import { BanknoteArrowDown } from 'lucide-react';
 
 export type AccountType = 'demo' | 'real' | 'funded' | 'tournament';
 
@@ -133,13 +133,6 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
         >
           <BanknoteArrowDown className="w-4 h-4" />
           Deposit
-        </Link>
-        <Link
-          href="/withdraw"
-          className="border border-border hover:bg-surface-hover text-text hover:text-foreground font-bold text-sm px-6 py-2.5 rounded-xl flex items-center gap-2 transition-colors"
-        >
-          <BanknoteArrowUp className="w-4 h-4" />
-          Withdraw
         </Link>
       </div>
     </header>

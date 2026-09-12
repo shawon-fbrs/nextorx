@@ -10,6 +10,7 @@ import { readStoredIndicators, writeStoredIndicators, type StoredIndicator } fro
 const Chart = dynamic(() => import('../../../components/Chart').then(m => m.Chart), { ssr: false });
 import { TradingPanel } from '../../../components/TradingPanel';
 import { AccountMenu } from '../../../components/AccountMenu';
+import { LandscapeDrawer } from '../../../components/BottomNav';
 import { usePairWS, type CandleData } from '@/lib/use-ws';
 import { useBalance } from '../../balance-context';
 import { getServerNow, syncWithServer } from '@/lib/server-time';
@@ -18,7 +19,7 @@ import {
   TrendingUp, Square, ArrowUpRight,
   Minus, MoveHorizontal, ChevronRight,
   GitBranch, Pencil, DraftingCompass, Trash2, Maximize, Minimize, AlignHorizontalDistributeCenter,
-  PencilRuler, ArrowRight, ChevronsRight, Eye, EyeOff, Settings, Settings2, SquareFunction, X,
+  PencilRuler, ArrowRight, ChevronsRight,   Eye, EyeOff, Settings, Settings2, SquareFunction, X, Menu,
 } from 'lucide-react';
 
 interface PairDef {
@@ -147,6 +148,7 @@ function TopBar({
   currentPrice,
   onSelect,
   onClose,
+  onMenuClick,
 }: {
   pairs: PairDef[];
   visibleIds: string[];
@@ -158,6 +160,7 @@ function TopBar({
   currentPrice: number | null;
   onSelect: (p: PairDef) => void;
   onClose: (id: string) => void;
+  onMenuClick?: () => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -187,7 +190,13 @@ function TopBar({
   }, [trades, currentPrice, activePair, payoutMap]);
 
   return (
-    <div className="h-14 max-lg:h-12 flex items-center gap-2 px-3 max-lg:px-2.5 bg-surface border-b border-border flex-shrink-0 relative z-50">
+    <div className="h-14 max-lg:h-12 max-lg:landscape:h-11 flex items-center gap-2 px-3 max-lg:px-2.5 bg-surface border-b border-border flex-shrink-0 relative z-50">
+      {onMenuClick && (
+        <button onClick={onMenuClick} title="Menu"
+          className="hidden max-lg:landscape:flex w-9 h-9 flex-shrink-0 rounded-xl items-center justify-center text-text hover:text-foreground hover:bg-surface-hover transition-colors">
+          <Menu size={20} />
+        </button>
+      )}
       <div className="relative">
         <button onClick={() => { setAddOpen(!addOpen); setSearch(''); }}
           className={`lg:hidden h-10 flex items-center gap-2 rounded-xl pl-1.5 pr-2.5 bg-background border border-border transition-all ${addOpen ? 'border-blue/50' : ''}`}>
@@ -761,6 +770,7 @@ export default function TradingPage() {
   const [effectivePayout, setEffectivePayout] = useState<number | null>(null);
   const [payoutMap, setPayoutMap] = useState<Record<string, number>>({});
   const isCompact = useCompactLayout();
+  const [landNavOpen, setLandNavOpen] = useState(false);
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
   const [timeframe, setTimeframe] = useState('1m');
@@ -1450,7 +1460,7 @@ export default function TradingPage() {
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden 2xl:max-w-[1920px] 2xl:mx-auto 2xl:w-full">
-      <div className="flex-1 flex max-lg:flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex max-lg:flex-col max-lg:landscape:flex-row min-w-0 overflow-hidden">
         <div className="flex-1 flex min-w-0 max-lg:min-h-0 overflow-hidden" data-chart-area>
           <IndDialog
             open={indOpen}
@@ -1472,7 +1482,8 @@ export default function TradingPage() {
           <InsufficientDialog open={insufficientOpen} isDemo={accountType === 'demo'} onClose={() => setInsufficientOpen(false)} />
           <TradeFailDialog open={!!tradeError} message={tradeError} onClose={() => setTradeError('')} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} />
+            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} onMenuClick={() => setLandNavOpen(true)} />
+            <LandscapeDrawer open={landNavOpen} onClose={() => setLandNavOpen(false)} />
             {!activePair ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
                 <div className="w-14 h-14 rounded-2xl bg-blue/10 border border-blue/20 flex items-center justify-center">

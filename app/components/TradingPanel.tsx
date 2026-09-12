@@ -100,8 +100,9 @@ export function TradingPanel({
 
   return (
     <aside className="w-[260px] 2xl:w-[300px] bg-surface border-border flex flex-col z-30 flex-shrink-0 border-l
-      max-lg:w-full max-lg:border-l-0 max-lg:border-t max-lg:max-h-[44vh] max-lg:overflow-y-auto">
-      <div className="px-3 py-3 max-lg:px-2.5 max-lg:py-2 flex-1 min-h-0 flex flex-col max-lg:grid max-lg:grid-cols-2 gap-2.5 max-lg:gap-1.5 overflow-hidden max-lg:overflow-visible">
+      max-lg:w-full max-lg:border-l-0 max-lg:border-t max-lg:max-h-[44vh] max-lg:overflow-y-auto
+      max-lg:landscape:w-[240px] max-lg:landscape:border-t-0 max-lg:landscape:border-l max-lg:landscape:max-h-none">
+      <div className="px-3 py-3 max-lg:px-2.5 max-lg:py-2 flex-1 min-h-0 flex flex-col max-lg:grid max-lg:grid-cols-2 max-lg:landscape:flex max-lg:landscape:flex-col gap-2.5 max-lg:gap-1.5 overflow-hidden max-lg:overflow-visible">
         {/* Time Section */}
         <div>
           <div className="flex items-center justify-between mb-1.5 px-1">
@@ -249,12 +250,12 @@ export function TradingPanel({
         </div>
 
         {/* Up/Down buttons */}
-        <div className="flex flex-col max-lg:flex-row gap-2 mt-auto max-lg:mt-0 max-lg:col-span-2">
+        <div className="flex flex-col max-lg:flex-row max-lg:landscape:flex-col gap-2 mt-auto max-lg:mt-0 max-lg:col-span-2">
           <button
             onClick={() => onTrade('up')}
             onMouseEnter={() => onDirectionHover?.('up')}
             onMouseLeave={() => onDirectionHover?.(null)}
-            className="bg-green hover:bg-green-hover text-white font-bold text-base max-lg:text-sm py-4 max-lg:py-3 max-lg:flex-1 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_14px_0_rgba(0,195,101,0.25)] active:scale-[0.98]"
+            className="bg-green hover:bg-green-hover text-white font-bold text-base max-lg:text-sm py-4 max-lg:py-3 max-lg:flex-1 max-lg:landscape:flex-none rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_14px_0_rgba(0,195,101,0.25)] active:scale-[0.98]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
               <path d="M5 10l7-7m0 0l7 7m-7-7v18" strokeLinecap="round" strokeLinejoin="round" />
@@ -266,7 +267,7 @@ export function TradingPanel({
             onClick={() => onTrade('down')}
             onMouseEnter={() => onDirectionHover?.('down')}
             onMouseLeave={() => onDirectionHover?.(null)}
-            className="bg-red hover:bg-red-hover text-white font-bold text-base max-lg:text-sm py-4 max-lg:py-3 max-lg:flex-1 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_14px_0_rgba(255,73,84,0.25)] active:scale-[0.98]"
+            className="bg-red hover:bg-red-hover text-white font-bold text-base max-lg:text-sm py-4 max-lg:py-3 max-lg:flex-1 max-lg:landscape:flex-none rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_14px_0_rgba(255,73,84,0.25)] active:scale-[0.98]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
               <path d="M19 14l-7 7m0 0l-7-7m7 7V3" strokeLinecap="round" strokeLinejoin="round" />
