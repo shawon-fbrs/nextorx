@@ -17,7 +17,7 @@ import {
   TrendingUp, Square, ArrowUpRight,
   Minus, MoveHorizontal, ChevronRight,
   GitBranch, Pencil, Activity, Trash2, Maximize2, CandlestickChart,
-  PenLine, ArrowRight, ChevronsRight, Eye, EyeOff, Settings, X,
+  PenLine, ArrowRight, ChevronsRight, Eye, EyeOff, Settings, Settings2, X,
 } from 'lucide-react';
 
 interface PairDef {
@@ -318,12 +318,38 @@ function TopBar({
 
 function MobileTopBarRight() {
   const { balance, accountType } = useBalance();
+  const [open, setOpen] = useState(false);
   const label = accountType.charAt(0).toUpperCase() + accountType.slice(1);
+  const options = [
+    { id: 'demo', label: 'Demo', color: 'text-blue' },
+    { id: 'real', label: 'Real', color: 'text-green' },
+  ];
   return (
     <div className="lg:hidden flex items-center gap-2 ml-auto flex-shrink-0">
-      <div className="flex flex-col items-end leading-tight">
-        <span className="text-[9px] text-text-dark font-semibold uppercase tracking-wide">{label}</span>
-        <span className="text-sm font-bold text-foreground tabular-nums">${balance.toFixed(2)}</span>
+      <div className="relative">
+        <button onClick={() => setOpen((v) => !v)} className="flex flex-col items-end leading-tight rounded-lg px-1.5 py-0.5 active:bg-surface-hover transition-colors">
+          <span className="text-[9px] text-text-dark font-semibold uppercase tracking-wide flex items-center gap-1">
+            {label}
+            <svg className={`w-2.5 h-2.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+              <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <span className="text-sm font-bold text-foreground tabular-nums">${balance.toFixed(2)}</span>
+        </button>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
+            <div className="absolute right-0 top-full mt-2 w-44 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden z-[61] p-1.5">
+              {options.map((o) => (
+                <Link key={o.id} href={`/trade/${o.id}`} onClick={() => setOpen(false)}
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition-colors ${o.id === accountType ? 'bg-blue/15 text-blue' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
+                  <span className={`w-2 h-2 rounded-full ${o.id === accountType ? 'bg-blue' : 'bg-text-dark/40'}`} />
+                  {o.label}
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
       </div>
       <Link href="/deposit" className="bg-green text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1 active:scale-95 transition-transform">
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -361,11 +387,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
   ];
 
   return (
-    <div className="absolute left-3 max-lg:left-2 bottom-8 max-lg:bottom-[196px] z-40 flex flex-col items-center gap-1.5">
-      <button title="Chart tools" onClick={() => setToolsOpen((v) => !v)}
-        className={`lg:hidden w-11 h-11 flex items-center justify-center rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all active:scale-95 ${toolsOpen ? 'text-foreground' : 'text-text'}`}>
-        <Settings size={20} />
-      </button>
+    <div className="absolute left-2 bottom-2 z-40 flex flex-col items-center gap-1.5">
       <div className={`flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${toolsOpen ? 'max-lg:max-h-[420px] max-lg:opacity-100' : 'max-lg:max-h-0 max-lg:opacity-0 max-lg:py-0 max-lg:border-transparent max-lg:pointer-events-none'}`}>
       <div className="relative">
         <button title="Drawing Tools" onClick={() => setDrawOpen(!drawOpen)}
@@ -451,6 +473,10 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
         <Maximize2 size={20} />
       </button>
       </div>
+      <button title="Chart tools" onClick={() => setToolsOpen((v) => !v)}
+        className={`lg:hidden w-11 h-11 flex items-center justify-center rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all active:scale-95 ${toolsOpen ? 'text-foreground' : 'text-text'}`}>
+        <Settings2 size={20} />
+      </button>
     </div>
   );
 }
@@ -1450,8 +1476,8 @@ export default function TradingPage() {
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden 2xl:max-w-[1920px] 2xl:mx-auto 2xl:w-full">
-      <div className="flex-1 flex min-w-0 overflow-hidden">
-        <div className="flex-1 flex min-w-0 overflow-hidden" data-chart-area>
+      <div className="flex-1 flex max-lg:flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex min-w-0 max-lg:min-h-0 overflow-hidden" data-chart-area>
           <IndDialog
             open={indOpen}
             onClose={() => setIndOpen(false)}
@@ -1471,7 +1497,7 @@ export default function TradingPage() {
           )}
           <InsufficientDialog open={insufficientOpen} isDemo={accountType === 'demo'} onClose={() => setInsufficientOpen(false)} />
           <TradeFailDialog open={!!tradeError} message={tradeError} onClose={() => setTradeError('')} />
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden max-lg:pb-[186px]">
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} />
             {!activePair ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
@@ -1846,7 +1872,6 @@ export default function TradingPage() {
             onTrade={handleTrade}
             onDirectionHover={setHoverDir}
             payoutAmount={payoutAmount}
-            trades={trades}
           />
         )}
       </div>
