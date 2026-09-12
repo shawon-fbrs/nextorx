@@ -973,7 +973,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     <div className="absolute inset-0 bg-background overflow-hidden">
       <div ref={chartContainerRef} id={chartIdRef.current} className="absolute inset-0" />
       {clock && (
-        <div className="absolute top-2 left-2 z-20 px-2 py-1 rounded-md bg-background/70 backdrop-blur border border-border/50 text-[10px] font-mono font-bold text-foreground tabular-nums pointer-events-none">
+        <div className="absolute top-2 right-12 z-20 px-2 py-1 rounded-md bg-background/70 backdrop-blur border border-border/50 text-[10px] font-mono font-bold text-foreground tabular-nums pointer-events-none">
           {clock}
         </div>
       )}
