@@ -103,10 +103,11 @@ export function TradingPanel({
       max-lg:w-full max-lg:border-l-0 max-lg:border-t max-lg:max-h-[44vh] max-lg:overflow-y-auto">
       <div className="px-3 py-3 max-lg:px-2.5 max-lg:py-2 flex-1 min-h-0 flex flex-col max-lg:grid max-lg:grid-cols-2 gap-2.5 max-lg:gap-1.5 overflow-hidden max-lg:overflow-visible">
         {/* Time Section */}
-        <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2.5 max-lg:py-1.5">
-          <div className="flex items-center justify-between mb-2 max-lg:mb-1">
+        <div>
+          <div className="flex items-center justify-between mb-1.5 px-1">
             <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Expiration Time</span>
           </div>
+          <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2 max-lg:py-2">
           <div className="flex items-center gap-2">
             <button onClick={() => onTimeChange(-10)}
               className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
@@ -124,7 +125,7 @@ export function TradingPanel({
                 }}
                 min={0}
                 max={60}
-                className="w-12 max-lg:w-10 bg-surface border border-border rounded-lg px-1 py-1 max-lg:py-0.5 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-12 max-lg:w-10 h-9 bg-surface border border-border rounded-lg px-1 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <span className="text-foreground font-bold">:</span>
               <input
@@ -137,7 +138,7 @@ export function TradingPanel({
                 }}
                 min={0}
                 max={59}
-                className="w-12 max-lg:w-10 bg-surface border border-border rounded-lg px-1 py-1 max-lg:py-0.5 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-12 max-lg:w-10 h-9 bg-surface border border-border rounded-lg px-1 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
             <button onClick={() => setTimeSheet(true)} title="Quick times"
@@ -168,14 +169,16 @@ export function TradingPanel({
               );
             })}
           </div>
+          </div>
         </div>
 
         {/* Investment Section */}
-        <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2.5 max-lg:py-1.5">
-          <div className="flex items-center justify-between mb-2 max-lg:mb-1">
+        <div>
+          <div className="flex items-center justify-between mb-1.5 px-1">
             <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Investment</span>
             <span className="text-[9px] text-textDark whitespace-nowrap">Min ${minTrade} – Max ${maxTrade}</span>
           </div>
+          <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2 max-lg:py-2">
           <div className="flex items-center gap-2">
             <button onClick={() => setInvestment(Math.max(minTrade, investment - 1))}
               className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
@@ -183,24 +186,18 @@ export function TradingPanel({
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-            <div className="flex-1 flex flex-col items-center">
-              <div className="flex items-center gap-1">
-                <span className="text-foreground font-bold text-lg">$</span>
-                <input
-                  type="number"
-                  value={investment}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    if (!isNaN(v)) setInvestment(Math.max(minTrade, Math.min(maxTrade, v)));
-                    else if (e.target.value === '') setInvestment(minTrade);
-                  }}
-                  min={minTrade}
-                  max={maxTrade}
-                  className="w-16 max-lg:w-14 bg-surface border border-border rounded-lg px-2 py-1 max-lg:py-0.5 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              </div>
-              <span className="text-[9px] text-textDark mt-0.5">amount</span>
-            </div>
+            <input
+              type="number"
+              value={investment}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v)) setInvestment(Math.max(minTrade, Math.min(maxTrade, v)));
+                else if (e.target.value === '') setInvestment(minTrade);
+              }}
+              min={minTrade}
+              max={maxTrade}
+              className="flex-1 min-w-0 h-9 bg-surface border border-border rounded-lg px-2 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
             <button onClick={() => setAmountSheet(true)} title="Quick amounts"
               className="lg:hidden w-9 h-9 rounded-lg bg-blue/15 border border-blue/40 text-blue text-sm font-bold flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform">
               $
@@ -224,13 +221,17 @@ export function TradingPanel({
               </button>
             ))}
           </div>
+          </div>
         </div>
 
         {/* Payout */}
-        <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:hidden">
+        <div className="max-lg:hidden">
+          <div className="flex items-center justify-between mb-1.5 px-1">
+            <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Potential Payout</span>
+          </div>
+          <div className="bg-background rounded-xl border border-border px-3 py-2.5">
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider block mb-0.5">Potential Payout</span>
               <span className="text-green font-bold text-lg">+{payoutAmount}$</span>
             </div>
             <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
@@ -244,6 +245,7 @@ export function TradingPanel({
               Entry includes {(Number(symbol.spread) / 2 / Number(symbol.basePrice) * 100).toFixed(3)}% spread
             </p>
           ) : null}
+          </div>
         </div>
 
         {/* Up/Down buttons */}
