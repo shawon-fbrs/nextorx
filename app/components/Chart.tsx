@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useRef, useEffect, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { init, dispose, registerOverlay, getSupportedIndicators as getLibSupportedIndicators, Chart as KLineChart, KLineData } from 'klinecharts';
 import { readStoredIndicators } from '@/lib/indicator-store';
 import { getServerNow, syncWithServer } from '@/lib/server-time';
@@ -229,6 +229,25 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   const bucketStartRef = useRef<number | null>(null);
   const bucketBaseRef = useRef<KLineData | null>(null);
   const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [clock, setClock] = useState('');
+
+  useEffect(() => {
+    const tickClock = () => {
+      try {
+        const now = new Date();
+        const t = now.toLocaleTimeString('en-GB', { hour12: false });
+        let tz = '';
+        try {
+          const parts = new Intl.DateTimeFormat('en', { timeZoneName: 'short' }).formatToParts(now);
+          tz = parts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+        } catch {}
+        setClock(tz ? `${t} ${tz}` : t);
+      } catch {}
+    };
+    tickClock();
+    const id = setInterval(tickClock, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const watermarkIdRef = useRef<string | null>(null);
@@ -495,15 +514,8 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       chart.setStyles({
         candle: {
           tooltip: {
-            legend: {
-              template: [
-                { title: 'time', value: '{time}' },
-                { title: 'open', value: '{open}' },
-                { title: 'high', value: '{high}' },
-                { title: 'low', value: '{low}' },
-                { title: 'close', value: '{close}' },
-              ],
-            },
+            title: { show: false },
+            legend: { template: [] },
           },
         },
       } as never);
@@ -958,6 +970,11 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   return (
     <div className="absolute inset-0 bg-background overflow-hidden">
       <div ref={chartContainerRef} id={chartIdRef.current} className="absolute inset-0" />
+      {clock && (
+        <div className="absolute top-2 left-2 z-20 px-2 py-1 rounded-md bg-background/70 backdrop-blur border border-border/50 text-[10px] font-mono font-bold text-foreground tabular-nums pointer-events-none">
+          {clock}
+        </div>
+      )}
     </div>
   );
 });

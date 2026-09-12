@@ -9,6 +9,7 @@ import type { ChartHandle, ActiveIndicator } from '../../../components/Chart';
 import { readStoredIndicators, writeStoredIndicators, type StoredIndicator } from '@/lib/indicator-store';
 const Chart = dynamic(() => import('../../../components/Chart').then(m => m.Chart), { ssr: false });
 import { TradingPanel } from '../../../components/TradingPanel';
+import { AccountMenu } from '../../../components/AccountMenu';
 import { usePairWS, type CandleData } from '@/lib/use-ws';
 import { useBalance } from '../../balance-context';
 import { getServerNow, syncWithServer } from '@/lib/server-time';
@@ -317,40 +318,10 @@ function TopBar({
 }
 
 function MobileTopBarRight() {
-  const { balance, accountType } = useBalance();
-  const [open, setOpen] = useState(false);
-  const label = accountType.charAt(0).toUpperCase() + accountType.slice(1);
-  const options = [
-    { id: 'demo', label: 'Demo', color: 'text-blue' },
-    { id: 'real', label: 'Real', color: 'text-green' },
-  ];
+  const { balance, demoBalance, realBalance, accountType } = useBalance();
   return (
     <div className="lg:hidden flex items-center gap-2 ml-auto flex-shrink-0">
-      <div className="relative">
-        <button onClick={() => setOpen((v) => !v)} className="flex flex-col items-end leading-tight rounded-lg px-1.5 py-0.5 active:bg-surface-hover transition-colors">
-          <span className="text-[9px] text-text-dark font-semibold uppercase tracking-wide flex items-center gap-1">
-            {label}
-            <svg className={`w-2.5 h-2.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-              <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <span className="text-sm font-bold text-foreground tabular-nums">${balance.toFixed(2)}</span>
-        </button>
-        {open && (
-          <>
-            <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
-            <div className="absolute right-0 top-full mt-2 w-44 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden z-[61] p-1.5">
-              {options.map((o) => (
-                <Link key={o.id} href={`/trade/${o.id}`} onClick={() => setOpen(false)}
-                  className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition-colors ${o.id === accountType ? 'bg-blue/15 text-blue' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
-                  <span className={`w-2 h-2 rounded-full ${o.id === accountType ? 'bg-blue' : 'bg-text-dark/40'}`} />
-                  {o.label}
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+      <AccountMenu balance={balance} demoBalance={demoBalance} realBalance={realBalance} accountType={accountType as 'demo' | 'real' | 'funded' | 'tournament'} compact />
       <Link href="/deposit" className="bg-green text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1 active:scale-95 transition-transform">
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} />
@@ -388,7 +359,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
 
   return (
     <div className="absolute left-2 bottom-2 z-40 flex flex-col items-center gap-1.5">
-      <div className={`flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${toolsOpen ? 'max-lg:max-h-[420px] max-lg:opacity-100' : 'max-lg:max-h-0 max-lg:opacity-0 max-lg:py-0 max-lg:border-transparent max-lg:pointer-events-none'}`}>
+      <div className={`flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all duration-300 ease-in-out ${toolsOpen ? 'max-lg:max-h-[420px] max-lg:opacity-100' : 'max-lg:max-h-0 max-lg:opacity-0 max-lg:py-0 max-lg:border-transparent max-lg:pointer-events-none max-lg:overflow-hidden'}`}>
       <div className="relative">
         <button title="Drawing Tools" onClick={() => setDrawOpen(!drawOpen)}
           className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${drawOpen ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
@@ -620,7 +591,6 @@ function IndDialog({ open, onClose, supported, active, onAdd, onToggle, onSettin
   onSettings: (ind: PageActiveInd) => void;
   onRemove: (id: string) => void;
 }) {
-  const [search, setSearch] = useState('');
   if (!open) return null;
 
   const allowed = supported.length > 0 ? new Set(supported) : null;
@@ -628,7 +598,6 @@ function IndDialog({ open, onClose, supported, active, onAdd, onToggle, onSettin
   const cats: Array<{ cat: string; items: CatalogInd[] }> = [];
   for (const c of INDICATOR_CATALOG) {
     if (allowed && !allowed.has(c.name)) continue;
-    if (!c.label.toLowerCase().includes(search.toLowerCase())) continue;
     let g = cats.find(g => g.cat === c.cat);
     if (!g) {
       g = { cat: c.cat, items: [] };
@@ -641,20 +610,13 @@ function IndDialog({ open, onClose, supported, active, onAdd, onToggle, onSettin
     <div className="absolute inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
       <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[420px] max-w-[calc(100vw-2rem)] max-h-[480px] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="px-5 pt-5 pb-3">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-foreground">Indicators</h3>
             <button onClick={onClose} className="w-7 h-7 flex items-center justify-center text-text hover:text-foreground rounded-lg hover:bg-surface-hover transition-colors">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                 <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-          </div>
-          <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <input type="text" placeholder="Search indicators..." value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full bg-background border border-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-foreground placeholder:text-text-dark/50 focus:outline-none focus:border-blue/50 transition-colors" autoFocus />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-5">
@@ -1178,7 +1140,6 @@ export default function TradingPage() {
   priceRef.current = price;
   const payout = activePair ? (payoutMap[activePair.id] ?? effectivePayout ?? activePair.payoutPercent) : 80;
   const payoutAmount = (investment * (1 + payout / 100)).toFixed(2);
-  const timeStr = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}:00`;
 
   const refreshTrades = useCallback(async () => {
     try {
@@ -1698,7 +1659,7 @@ export default function TradingPage() {
                 {selectedOverlay && (
                   <div className="absolute z-[60] bg-background/95 backdrop-blur-md border border-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden"
                     style={{ left: `calc(50% + ${editPanelPos.x}px)`, top: `calc(8px + ${editPanelPos.y}px)`, transform: 'translateX(-50%)' }}>
-                    <div onMouseDown={onEditDragStart} className="h-7 bg-background border-b border-border flex items-center justify-between px-2.5 cursor-move select-none">
+                    <div onMouseDown={isCompact ? undefined : onEditDragStart} className="h-7 bg-background border-b border-border flex items-center justify-between px-2.5 cursor-default lg:cursor-move select-none">
                       <div className="flex items-center gap-1.5">
                         <svg className="w-3 h-3 text-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                           <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeLinecap="round" strokeLinejoin="round" />
@@ -1756,7 +1717,7 @@ export default function TradingPage() {
                     </div>
                   </div>
                 )}
-                {isFullscreen && (
+                {isFullscreen && !isCompact && (
                   <div className="absolute z-50 w-[220px] bg-surface/95 backdrop-blur-sm border border-border rounded-xl shadow-2xl overflow-hidden"
                     style={{ right: 16 + panelPos.x, top: `calc(50% + ${panelPos.y}px)`, transform: 'translateY(-50%)' }}>
                     <div onMouseDown={onDragStart} className="h-7 bg-background border-b border-border flex items-center justify-center cursor-move select-none">
@@ -1861,10 +1822,8 @@ export default function TradingPage() {
         </div>
         {!isFullscreen && activePair && (
           <TradingPanel
-            symbol={activePair}
             investment={investment}
             setInvestment={setInvestment}
-            timeStr={timeStr}
             timeMinutes={timeMinutes}
             timeSeconds={timeSeconds}
             onTimeChange={handleTimeChange}

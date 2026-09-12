@@ -86,7 +86,7 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
         <div className="flex-1 min-h-0 overflow-hidden">
           {children}
         </div>
-        <div className="lg:hidden flex-shrink-0" style={{ height: 'calc(60px + env(safe-area-inset-bottom))' }} />
+        <div className="lg:hidden flex-shrink-0" style={{ height: 'calc(54px + env(safe-area-inset-bottom))' }} />
       </div>
       <BottomNav />
       <Toaster position="bottom-left" theme="dark" richColors closeButton />

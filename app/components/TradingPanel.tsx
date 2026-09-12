@@ -1,18 +1,8 @@
 import { useState, type ReactNode } from 'react';
 
-interface SymbolLike {
-  name: string;
-  payoutPercent?: number;
-  payout?: number;
-  spread?: number;
-  basePrice?: number;
-}
-
 interface TradingPanelProps {
-  symbol: SymbolLike;
   investment: number;
   setInvestment: (v: number) => void;
-  timeStr: string;
   timeMinutes: number;
   timeSeconds: number;
   onTimeChange: (delta: number) => void;
@@ -41,10 +31,8 @@ function QuickSheet({ title, onClose, children }: { title: string; onClose: () =
 }
 
 export function TradingPanel({
-  symbol,
   investment,
   setInvestment,
-  timeStr,
   timeMinutes,
   timeSeconds,
   onTimeChange,
@@ -187,26 +175,6 @@ export function TradingPanel({
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Payout */}
-        <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2.5 max-lg:py-1.5 max-lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider block mb-0.5 max-lg:mb-0">Potential Payout</span>
-              <span className="text-green font-bold text-lg max-lg:text-base">+{payoutAmount}$</span>
-            </div>
-            <div className="w-10 h-10 max-lg:hidden rounded-lg bg-green/10 flex items-center justify-center">
-              <svg className="w-5 h-5 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-          </div>
-          {symbol.spread != null && Number(symbol.spread) > 0 && symbol.basePrice ? (
-            <p className="text-[10px] text-textDark mt-1.5">
-              Entry includes {(Number(symbol.spread) / 2 / Number(symbol.basePrice) * 100).toFixed(3)}% spread
-            </p>
-          ) : null}
         </div>
 
         {/* Up/Down buttons */}
