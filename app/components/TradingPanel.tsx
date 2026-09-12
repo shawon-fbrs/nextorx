@@ -56,11 +56,6 @@ export function TradingPanel({
   const [amountSheet, setAmountSheet] = useState(false);
   const [timeSheet, setTimeSheet] = useState(false);
 
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   const quickTimes = ['00:30', '01:00', '03:00', '05:00'];
   const currentQuick = `${String(timeMinutes).padStart(2, '0')}:${String(timeSeconds).padStart(2, '0')}`;
 

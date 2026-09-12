@@ -82,7 +82,7 @@ function PositionsSheet({ onClose }: { onClose: () => void }) {
       <div className="absolute inset-x-0 bottom-0 bg-surface rounded-t-2xl max-h-[70vh] flex flex-col overflow-hidden">
         <div className="relative px-4 pt-2.5 pb-2 flex items-center justify-center border-b border-border flex-shrink-0">
           <span className="absolute top-1 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-text-dark/40" />
-          <span className="text-sm font-bold text-foreground mt-1">Positions</span>
+          <span className="text-sm font-bold text-foreground mt-1">All Trades</span>
           <button onClick={onClose} className="absolute right-3 top-2 p-1.5 text-text-dark">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
@@ -205,7 +205,7 @@ export function BottomNav() {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span className="text-[10px] font-bold">Positions</span>
+          <span className="text-[10px] font-bold">All Trades</span>
         </button>
         <button onClick={() => setBoardOpen(true)} className={btn(boardOpen)}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
