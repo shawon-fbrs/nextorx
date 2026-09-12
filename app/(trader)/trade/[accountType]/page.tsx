@@ -187,7 +187,7 @@ function TopBar({
   }, [trades, currentPrice, activePair, payoutMap]);
 
   return (
-    <div className="h-14 flex items-center gap-2 px-3 bg-surface border-b border-border flex-shrink-0 relative z-50">
+    <div className="h-14 max-lg:h-12 flex items-center gap-2 px-3 max-lg:px-2.5 bg-surface border-b border-border flex-shrink-0 relative z-50">
       <div className="relative">
         <button onClick={() => { setAddOpen(!addOpen); setSearch(''); }}
           className={`lg:hidden h-10 flex items-center gap-2 rounded-xl pl-1.5 pr-2.5 bg-background border border-border transition-all ${addOpen ? 'border-blue/50' : ''}`}>
@@ -333,10 +333,9 @@ function MobileTopBarRight() {
 }
 
 function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChange, onIndToggle, onDrawTool, onRemoveDrawings }: { timeframe: string; onTimeframeChange: (tf: string) => void; chartType: 'candle' | 'line' | 'area'; onChartTypeChange: (t: 'candle' | 'line' | 'area') => void; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void }) {
-  const [drawOpen, setDrawOpen] = useState(false);
-  const [ctOpen, setCtOpen] = useState(false);
-  const [tfOpen, setTfOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<'draw' | 'chart' | 'tf' | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const toggleMenu = (m: 'draw' | 'chart' | 'tf') => setOpenMenu((cur) => (cur === m ? null : m));
 
   const toolIcons: Record<string, React.ReactNode> = {
     'Trend Line': <TrendingUp size={14} />,
@@ -361,39 +360,23 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
     <div className="absolute left-2 bottom-2 z-40 flex flex-col items-center gap-1.5">
       <div className={`flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all duration-300 ease-in-out ${toolsOpen ? 'max-lg:max-h-[420px] max-lg:opacity-100' : 'max-lg:max-h-0 max-lg:opacity-0 max-lg:py-0 max-lg:border-transparent max-lg:pointer-events-none max-lg:overflow-hidden'}`}>
       <div className="relative">
-        <button title="Drawing Tools" onClick={() => setDrawOpen(!drawOpen)}
-          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${drawOpen ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
+        <button title="Drawing Tools" onClick={() => toggleMenu('draw')}
+          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${openMenu === 'draw' ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
           <PenLine size={20} />
         </button>
-        {drawOpen && (
-          <div className="absolute left-full top-0 ml-1 w-52 max-h-[320px] overflow-y-auto bg-surface border border-border rounded-xl shadow-2xl p-1.5 z-50">
-            {drawSections.map(sec => (
-              <div key={sec.name} className="mb-1 last:mb-0">
-                <div className="px-2.5 py-1.5 text-[9px] font-bold text-text-dark uppercase tracking-wider">{sec.name}</div>
-                {sec.items.map(item => (
-                  <button key={item} onClick={() => { setDrawOpen(false); onDrawTool(item); }}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[11px] font-medium text-text hover:text-foreground hover:bg-surface-hover rounded-lg transition-colors text-left">
-                    <span className="text-text-dark">{toolIcons[item]}</span>
-                    {item}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="w-6 h-px bg-border my-1" />
 
       <div className="relative">
-        <button title="Chart Type" onClick={() => setCtOpen(!ctOpen)}
-          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${ctOpen ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
+        <button title="Chart Type" onClick={() => toggleMenu('chart')}
+          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${openMenu === 'chart' ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
           <CandlestickChart size={20} />
         </button>
-        {ctOpen && (
+        {openMenu === 'chart' && (
           <div className="absolute left-full top-0 ml-1 w-32 bg-surface border border-border rounded-lg shadow-2xl p-1.5 z-50">
             {(['candle', 'line', 'area'] as const).map(t => (
-              <button key={t} onClick={() => { onChartTypeChange(t); setCtOpen(false); }}
+              <button key={t} onClick={() => { onChartTypeChange(t); setOpenMenu(null); }}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-all capitalize ${chartType === t ? 'bg-blue-500 text-white' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
@@ -403,16 +386,16 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
       </div>
 
       <div className="relative">
-        <button title="Timeframe" onClick={() => setTfOpen(!tfOpen)}
-          className={`w-9 h-9 flex items-center justify-center rounded-lg text-[10px] font-bold font-mono transition-all ${tfOpen ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
+        <button title="Timeframe" onClick={() => toggleMenu('tf')}
+          className={`w-9 h-9 flex items-center justify-center rounded-lg text-[10px] font-bold font-mono transition-all ${openMenu === 'tf' ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
           {timeframe}
         </button>
-        {tfOpen && (
+        {openMenu === 'tf' && (
           <div className="absolute left-full top-0 ml-1 w-40 bg-surface border border-border rounded-lg shadow-2xl p-1.5 z-50">
             <div className="text-[9px] font-bold text-text-dark uppercase tracking-wider mb-1.5 px-1">Timeframe</div>
             <div className="grid grid-cols-3 gap-1">
               {['5s', '30s', '1m', '5m', '15m', '30m', '1h', '4h'].map(tf => (
-                <button key={tf} onClick={() => { onTimeframeChange(tf); setTfOpen(false); }}
+                <button key={tf} onClick={() => { onTimeframeChange(tf); setOpenMenu(null); }}
                   className={`py-1.5 text-[11px] font-semibold rounded-md transition-all ${timeframe === tf ? 'bg-blue-500 text-white' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
                   {tf}
                 </button>
@@ -448,6 +431,32 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
         className={`lg:hidden w-11 h-11 flex items-center justify-center rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all active:scale-95 ${toolsOpen ? 'text-foreground' : 'text-text'}`}>
         <Settings2 size={20} />
       </button>
+      {openMenu === 'draw' && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4" onClick={() => setOpenMenu(null)}>
+          <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[300px] max-w-full max-h-[70vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 pt-4 pb-2 flex items-center justify-between flex-shrink-0">
+              <h3 className="text-sm font-bold text-foreground">Drawing Tools</h3>
+              <button onClick={() => setOpenMenu(null)} className="w-7 h-7 flex items-center justify-center text-text hover:text-foreground rounded-lg hover:bg-surface-hover transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 pb-4">
+              {drawSections.map((sec) => (
+                <div key={sec.name} className="mb-1 last:mb-0">
+                  <div className="px-2.5 py-1.5 text-[9px] font-bold text-text-dark uppercase tracking-wider">{sec.name}</div>
+                  {sec.items.map((item) => (
+                    <button key={item} onClick={() => { setOpenMenu(null); onDrawTool(item); }}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2.5 text-xs font-medium text-text hover:text-foreground hover:bg-surface-hover rounded-lg transition-colors text-left active:scale-[0.99]">
+                      <span className="text-text-dark">{toolIcons[item]}</span>
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1822,6 +1831,7 @@ export default function TradingPage() {
         </div>
         {!isFullscreen && activePair && (
           <TradingPanel
+            symbol={activePair}
             investment={investment}
             setInvestment={setInvestment}
             timeMinutes={timeMinutes}
@@ -1831,6 +1841,7 @@ export default function TradingPage() {
             onTrade={handleTrade}
             onDirectionHover={setHoverDir}
             payoutAmount={payoutAmount}
+            trades={trades}
           />
         )}
       </div>

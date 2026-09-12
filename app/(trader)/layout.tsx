@@ -6,6 +6,7 @@ import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 import { BottomNav } from '../components/BottomNav';
 import { BalanceProvider } from './balance-context';
+import { useFullscreenActive } from './use-fullscreen';
 import { useAuth } from '@/lib/auth-context';
 import { Toaster } from 'sonner';
 
@@ -18,6 +19,7 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
   const { user, loading } = useAuth();
   const accountType = (params.accountType as string) || 'real';
   const isTradeRoute = pathname.startsWith('/trade/');
+  const isFs = useFullscreenActive();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [balance, setBalance] = useState(0);
   const [demoBalance, setDemoBalance] = useState(0);
@@ -72,7 +74,7 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
 
   return (
     <BalanceProvider value={{ balance: shownBalance, demoBalance, realBalance: balance, accountType }}>
-    <div className="h-screen w-screen overflow-hidden flex bg-background text-text text-sm">
+    <div className="w-screen overflow-hidden flex bg-background text-text text-sm h-[100vh] supports-[height:100dvh]:h-[100dvh]">
       <div className="contents max-lg:hidden">
       <Sidebar
         expanded={sidebarExpanded}
@@ -86,7 +88,9 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
         <div className="flex-1 min-h-0 overflow-hidden">
           {children}
         </div>
-        <div className="lg:hidden flex-shrink-0" style={{ height: 'calc(54px + env(safe-area-inset-bottom))' }} />
+        {!isFs && (
+          <div className="lg:hidden flex-shrink-0" style={{ height: 'calc(54px + env(safe-area-inset-bottom))' }} />
+        )}
       </div>
       <BottomNav />
       <Toaster position="bottom-left" theme="dark" richColors closeButton />

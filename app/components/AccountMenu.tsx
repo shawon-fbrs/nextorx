@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import type { AccountType } from './Header';
@@ -19,15 +19,19 @@ export function AccountMenu({ balance, demoBalance = 0, realBalance, accountType
   const [hidden, setHidden] = useState(false);
   const [editingDemo, setEditingDemo] = useState(false);
   const [demoValue, setDemoValue] = useState('');
+  const menuId = useRef(`menu-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
-    const close = () => setExpanded(false);
+    const id = menuId.current;
+    const close = (e: Event) => {
+      if ((e as CustomEvent).detail !== id) setExpanded(false);
+    };
     window.addEventListener('menu:open', close);
     return () => window.removeEventListener('menu:open', close);
   }, []);
 
   const toggle = () => {
-    window.dispatchEvent(new Event('menu:open'));
+    window.dispatchEvent(new CustomEvent('menu:open', { detail: menuId.current }));
     setExpanded((v) => !v);
   };
 
