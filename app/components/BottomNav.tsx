@@ -188,6 +188,17 @@ export function LandscapeDrawer({ open, onClose }: { open: boolean; onClose: () 
   const { signOut } = useAuth();
   const [boardOpen, setBoardOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
+  const [bottomPrice, setBottomPrice] = useState<number | null>(null);
+  const [bottomPayouts, setBottomPayouts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const onTick = (e: Event) => {
+      const d = (e as CustomEvent).detail as { price?: number };
+      if (d?.price != null) setBottomPrice(d.price);
+    };
+    window.addEventListener('trade:price', onTick as EventListener);
+    fetch('/api/market/payouts').then((r) => r.json()).then((d) => setBottomPayouts(d.payouts ?? {})).catch(() => {});
+    return () => window.removeEventListener('trade:price', onTick as EventListener);
+  }, []);
 
   const tradeHref = `/trade/${accountType}`;
   const row = 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-colors active:scale-[0.99]';
