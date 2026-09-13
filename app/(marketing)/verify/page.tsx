@@ -233,7 +233,7 @@ export default function VerifyPage() {
         const utcHour = new Date(row.timestamp).getUTCHours();
         const d = await hmacSha512ServerKey(seed, `${pairId}:${day}:${secondOfDay}`);
         const sched = regimeMap[utcHour];
-        const mult = sched && row.timestamp >= sched.from ? sched.mult : 1;
+        const mult = sched ? sched.mult : 1;
         const sigma = vol * mult * sessionMult(category, utcHour) * SIGMA_PER_SECOND;
         const z = gauss(u64(d, 0), u64(d, 8));
         let exp = sigma * z;
@@ -243,7 +243,7 @@ export default function VerifyPage() {
         }
         const floor = Math.max(base * 0.5, 0.01);
         const ceiling = base * 2;
-        const close = Math.min(ceiling, Math.max(floor, prevClose * Math.exp(exp)));
+        const close = Math.min(ceiling, Math.max(floor, Number((prevClose * Math.exp(exp)).toFixed(8))));
         const step = (close - prevClose) / TICKS_PER_SECOND;
         const range = Math.max(Math.abs(close - prevClose), prevClose * sigma * 0.25);
         let high = Math.max(prevClose, close);
