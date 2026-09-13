@@ -78,6 +78,49 @@ export function AccountMenu({ balance, demoBalance = 0, realBalance, accountType
       </button>
 
       <div className={`absolute top-full right-0 mt-2 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top z-[200] ${compact ? 'w-[300px] max-w-[calc(100vw-2rem)]' : 'w-[340px]'} ${expanded ? 'opacity-100 scale-y-100 translate-y-0' : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'}`}>
+        <div className="px-4 py-3 border-b border-border">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] text-text font-bold uppercase tracking-wider">Details</span>
+          </div>
+          <div className="bg-background rounded-lg p-3 space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-[11px] text-text-dark">Email</span>
+              <span className="text-[11px] text-foreground font-semibold max-w-[160px] truncate">{user?.email || '—'}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[11px] text-text-dark">ID</span>
+              <span className="text-[11px] text-foreground font-semibold font-mono">{user?.uid || '—'}</span>
+            </div>
+            {accountType === 'demo' && (
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] text-text-dark">Balance</span>
+                {editingDemo ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={demoValue}
+                      onChange={(e) => setDemoValue(e.target.value)}
+                      className="w-20 bg-surface border border-border rounded px-2 py-0.5 text-[11px] text-foreground focus:outline-none focus:border-blue"
+                      min={100}
+                      max={100000}
+                      step={100}
+                    />
+                    <button onClick={handleDemoSave} className="text-[10px] text-green font-bold">Save</button>
+                    <button onClick={() => setEditingDemo(false)} className="text-[10px] text-text-dark font-bold">X</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setDemoValue(String(Math.round(balance))); setEditingDemo(true); }}
+                    className="text-[11px] text-blue hover:text-blue-hover font-semibold"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] text-text font-bold uppercase tracking-wider">Accounts</span>
@@ -133,49 +176,6 @@ export function AccountMenu({ balance, demoBalance = 0, realBalance, accountType
                 </Link>
               );
             })}
-          </div>
-        </div>
-
-        <div className="px-4 py-3 border-b border-border">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] text-text font-bold uppercase tracking-wider">Details</span>
-          </div>
-          <div className="bg-background rounded-lg p-3 space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-[11px] text-text-dark">Email</span>
-              <span className="text-[11px] text-foreground font-semibold max-w-[160px] truncate">{user?.email || '—'}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[11px] text-text-dark">ID</span>
-              <span className="text-[11px] text-foreground font-semibold font-mono">{user?.uid || '—'}</span>
-            </div>
-            {accountType === 'demo' && (
-              <div className="flex justify-between items-center">
-                <span className="text-[11px] text-text-dark">Balance</span>
-                {editingDemo ? (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      value={demoValue}
-                      onChange={(e) => setDemoValue(e.target.value)}
-                      className="w-20 bg-surface border border-border rounded px-2 py-0.5 text-[11px] text-foreground focus:outline-none focus:border-blue"
-                      min={100}
-                      max={100000}
-                      step={100}
-                    />
-                    <button onClick={handleDemoSave} className="text-[10px] text-green font-bold">Save</button>
-                    <button onClick={() => setEditingDemo(false)} className="text-[10px] text-text-dark font-bold">X</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => { setDemoValue(String(Math.round(balance))); setEditingDemo(true); }}
-                    className="text-[11px] text-blue hover:text-blue-hover font-semibold"
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         </div>
 

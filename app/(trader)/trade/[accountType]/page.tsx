@@ -11,6 +11,7 @@ const Chart = dynamic(() => import('../../../components/Chart').then(m => m.Char
 import { TradingPanel } from '../../../components/TradingPanel';
 import { AccountMenu } from '../../../components/AccountMenu';
 import { LandscapeDrawer } from '../../../components/BottomNav';
+import { useLivePnL, type TradeCardData } from '../../../components/TradeCard';
 import { usePairWS, type CandleData } from '@/lib/use-ws';
 import { useBalance } from '../../balance-context';
 import { getServerNow, syncWithServer } from '@/lib/server-time';
@@ -784,6 +785,7 @@ export default function TradingPage() {
   const isCompact = useCompactLayout();
   const isLandscape = useLandscapeCompact();
   const [landNavOpen, setLandNavOpen] = useState(false);
+  const livePnls = useLivePnL(trades as unknown as TradeCardData[], price, payoutMap[activePair?.id ?? ''] ?? null);
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
   const [timeframe, setTimeframe] = useState('1m');
@@ -1170,6 +1172,7 @@ export default function TradingPage() {
 
   const price = currentPrice ?? activePair?.basePrice ?? 1.0;
   priceRef.current = price;
+  useEffect(() => { if (price != null) window.dispatchEvent(new CustomEvent('trade:price', { detail: { price } })); }, [price]);
   const payout = activePair ? (payoutMap[activePair.id] ?? effectivePayout ?? activePair.payoutPercent) : 80;
   const minTrade = activePair?.minTrade ?? 1;
   const maxTrade = activePair?.maxTrade ?? 5000;
@@ -1875,6 +1878,9 @@ export default function TradingPage() {
             onDirectionHover={setHoverDir}
             payoutAmount={payoutAmount}
             trades={trades}
+            livePnls={livePnls}
+            currentPrice={price}
+            pairsData={pairs}
             minTrade={minTrade}
             maxTrade={maxTrade}
           />

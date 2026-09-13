@@ -8,6 +8,7 @@ import { useTheme } from '@/lib/theme';
 import { LeaderboardDrawer } from './LeaderboardDrawer';
 import { Podium, Trophy, BanknoteArrowDown, BanknoteArrowUp, ArrowLeftRight, ChartSpline, TicketPercent } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { TradeCard, useTradeCountdown, useLivePnL, type TradeCardData } from './TradeCard';
 function getAccountTypeFromPath(pathname: string): string {
   const match = pathname.match(/\/trade\/(\w+)/);
   return match ? match[1] : 'real';
@@ -28,22 +29,27 @@ const MORE_LINKS: Array<{ icon: ReactNode; label: string; href: string }> = [
 interface PositionTrade {
   id: string;
   symbol: string;
+  pairId?: string;
   type: 'up' | 'down';
   amount: number;
   payout: number;
+  payoutPercent?: number;
   profit: number;
+  time: string;
   status: string;
+  openPrice?: number;
+  closePrice?: number;
   expiresAt: number;
 }
 
-function PositionsSheet({ onClose }: { onClose: () => void }) {
+function PositionsSheet({ onClose, currentPrice, payoutMap }: { onClose: () => void; currentPrice: number | null; payoutMap: Record<string, number> }) {
   const pathname = usePathname();
+  const now = useTradeCountdown();
   const [trades, setTrades] = useState<PositionTrade[]>([]);
-  const [now, setNow] = useState(() => Date.now());
-
+  const [expanded, setExpanded] = useState<string | number | null>(null);
+  const [pairs, setPairs] = useState<Array<{ id: string; name: string; iconUrl?: string | null; category?: string }>>([]);
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
+    fetch('/api/market/pairs').then((r) => r.json()).then((d) => setPairs(d.pairs ?? [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -58,11 +64,16 @@ function PositionsSheet({ onClose }: { onClose: () => void }) {
           return {
             id: String(t.id),
             symbol: ((t.pair as Record<string, unknown> | undefined)?.name as string) ?? '',
+            pairId: String((t as Record<string, unknown>).pairId ?? (t.pair as Record<string, unknown> | undefined)?.id ?? ''),
             type: (String(t.direction).toLowerCase() === 'up' ? 'up' : 'down') as 'up' | 'down',
             amount: Number(t.amount) / 100,
             payout: Number(t.payoutPercent ?? 0),
+            payoutPercent: Number(t.payoutPercent ?? 0),
             profit: t.profit == null ? 0 : Number(t.profit) / 100,
             status: String(t.status).toLowerCase(),
+            time: new Date(createdAt).toLocaleTimeString(),
+            openPrice: (t as Record<string, unknown>).openPrice != null ? Number((t as Record<string, unknown>).openPrice) : undefined,
+            closePrice: (t as Record<string, unknown>).closePrice != null ? Number((t as Record<string, unknown>).closePrice) : undefined,
             expiresAt: createdAt + Number(t.durationSeconds ?? 0) * 1000,
           };
         });
@@ -76,6 +87,9 @@ function PositionsSheet({ onClose }: { onClose: () => void }) {
 
   const active = trades.filter((t) => t.status === 'active');
   const settled = trades.filter((t) => t.status !== 'active');
+  const ordered = [...active, ...settled];
+  const live = useLivePnL(trades as unknown as TradeCardData[], currentPrice, null);
+  const pairsById = new Map(pairs.map((p) => [p.id, p]));
 
   return (
     <div className="fixed inset-0 z-[90]">
@@ -90,38 +104,22 @@ function PositionsSheet({ onClose }: { onClose: () => void }) {
         </div>
         <div className="overflow-y-auto px-4 py-3 space-y-2">
           {trades.length === 0 && <p className="text-xs text-text-dark text-center py-6">No positions yet.</p>}
-          {active.map((t) => {
-            const left = Math.max(0, t.expiresAt - now);
-            const mm = String(Math.floor(left / 60000)).padStart(2, '0');
-            const ss = String(Math.floor((left % 60000) / 1000)).padStart(2, '0');
-            return (
-              <div key={t.id} className="flex items-center gap-3 bg-background border border-border rounded-xl px-3 py-2.5">
-                <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${t.type === 'up' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                    {t.type === 'up'
-                      ? <path d="M5 10l7-7m0 0l7 7m-7-7v18" strokeLinecap="round" strokeLinejoin="round" />
-                      : <path d="M19 14l-7 7m0 0l-7-7m7 7V3" strokeLinecap="round" strokeLinejoin="round" />}
-                  </svg>
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-bold text-foreground truncate">{t.symbol || 'Trade'}</div>
-                  <div className="text-[10px] text-text-dark font-mono tabular-nums">${t.amount.toFixed(2)} · {t.payout}%</div>
-                </div>
-                <span className="text-xs font-bold text-blue font-mono tabular-nums">{mm}:{ss}</span>
-              </div>
-            );
-          })}
-          {settled.map((t) => (
-            <div key={t.id} className="flex items-center gap-3 bg-background border border-border/50 rounded-xl px-3 py-2 opacity-70">
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex-shrink-0 ${t.status === 'won' ? 'bg-green/15 text-green' : 'bg-red/15 text-red'}`}>
-                {t.status === 'won' ? `+$${t.profit.toFixed(2)}` : 'LOST'}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold text-foreground truncate">{t.symbol || 'Trade'}</div>
-                <div className="text-[10px] text-text-dark font-mono tabular-nums">${t.amount.toFixed(2)}</div>
-              </div>
+          {ordered.length > 0 ? (
+            <div className="bg-background rounded-xl border border-border overflow-hidden">
+              {ordered.map((t) => (
+                <TradeCard
+                  key={String(t.id)}
+                  t={t as unknown as TradeCardData}
+                  now={now}
+                  livePnl={live[String(t.id)] ?? null}
+                  pair={pairsById.get(String(t.pairId ?? '')) ?? null}
+                  fallbackPayout={t.payoutPercent ?? payoutMap[String(t.pairId ?? '')] ?? 0}
+                  expanded={expanded === t.id}
+                  onToggle={() => setExpanded(expanded === t.id ? null : t.id)}
+                />
+              ))}
             </div>
-          ))}
+          ) : null}
         </div>
       </div>
     </div>
@@ -270,6 +268,17 @@ export function BottomNav() {
   const [boardOpen, setBoardOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
+  const [bottomPrice, setBottomPrice] = useState<number | null>(null);
+  const [bottomPayouts, setBottomPayouts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const onTick = (e: Event) => {
+      const d = (e as CustomEvent).detail as { price?: number };
+      if (d?.price != null) setBottomPrice(d.price);
+    };
+    window.addEventListener('trade:price', onTick as EventListener);
+    fetch('/api/market/payouts').then((r) => r.json()).then((d) => setBottomPayouts(d.payouts ?? {})).catch(() => {});
+    return () => window.removeEventListener('trade:price', onTick as EventListener);
+  }, []);
 
   const tradeHref = `/trade/${accountType}`;
   const isTrade = pathname === tradeHref;
@@ -309,7 +318,7 @@ export function BottomNav() {
           <span className="text-[10px] font-bold">More</span>
         </button>
       </nav>
-      {positionsOpen && <PositionsSheet onClose={() => setPositionsOpen(false)} />}
+      {positionsOpen && <PositionsSheet onClose={() => setPositionsOpen(false)} currentPrice={bottomPrice} payoutMap={bottomPayouts} />}
       {moreOpen && <MoreSheet onClose={() => setMoreOpen(false)} />}
       <LeaderboardDrawer open={boardOpen} onClose={() => setBoardOpen(false)} />
     </>
