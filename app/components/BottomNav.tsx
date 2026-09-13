@@ -47,7 +47,7 @@ function PositionsSheet({ onClose, currentPrice, payoutMap }: { onClose: () => v
   const now = useTradeCountdown();
   const [trades, setTrades] = useState<PositionTrade[]>([]);
   const [expanded, setExpanded] = useState<string | number | null>(null);
-  const [pairs, setPairs] = useState<Array<{ id: string; name: string; iconUrl?: string | null; category?: string }>>([]);
+  const [pairs, setPairs] = useState<Array<{ id: string; name: string; iconUrl?: string | null; iconUrl2?: string | null; category?: string }>>([]);
   useEffect(() => {
     fetch('/api/market/pairs').then((r) => r.json()).then((d) => setPairs(d.pairs ?? [])).catch(() => {});
   }, []);

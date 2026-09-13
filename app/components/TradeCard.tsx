@@ -63,6 +63,27 @@ export function useLivePnL(
   return live;
 }
 
+function PairAvatarMini({ pair }: { pair: PairLite }) {
+  let left: string | null = pair.iconUrl ?? null;
+  let right: string | null = pair.iconUrl2 ?? null;
+  if (!left && !right && pair.category === 'forex' && pair.id && /^[A-Z]{6}$/.test(pair.id)) {
+    left = `/api/resources/by-filename/${pair.id.slice(0, 3).toLowerCase()}.svg`;
+    right = `/api/resources/by-filename/${pair.id.slice(3).toLowerCase()}.svg`;
+  }
+  if (left && right) {
+    return (
+      <span className="flex items-center flex-shrink-0">
+        <img src={left} alt="" className="w-4 h-4 rounded-full object-cover bg-background border border-border relative" style={{ zIndex: 2 }} />
+        <img src={right} alt="" className="w-4 h-4 rounded-full object-cover bg-background border border-border relative -ml-1.5" style={{ zIndex: 1 }} />
+      </span>
+    );
+  }
+  if (left) {
+    return <img src={left} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />;
+  }
+  return null;
+}
+
 export function TradeCard({
   t,
   now,
@@ -83,7 +104,6 @@ export function TradeCard({
   const isActive = t.status === 'active';
   const pnl = livePnl ?? (t.status === 'won' ? t.profit : t.status === 'lost' ? -t.amount : null);
   const countdown = t.expiresAt ? formatCountdown(t.expiresAt, now) : '--:--';
-  const avatarSrc = pair?.iconUrl ?? (pair?.category === 'forex' && pair?.id && /^[A-Z]{6}$/.test(pair.id) ? `/api/resources/by-filename/${pair.id.slice(0, 3).toLowerCase()}.svg` : null);
   return (
     <div className={`border-b border-border/50 last:border-b-0 ${expanded ? 'bg-surface/50' : ''}`}>
       <button
@@ -103,7 +123,7 @@ export function TradeCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 min-w-0">
-                {avatarSrc && <img src={avatarSrc} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />}
+                {pair && <PairAvatarMini pair={pair} />}
                 <span className="text-foreground text-[11px] font-semibold truncate leading-tight">{t.symbol || pair?.name || 'Trade'}</span>
               </div>
               <span className={`text-[11px] font-mono font-bold tabular-nums flex-shrink-0 ${isActive ? 'text-blue' : 'text-text-dark'}`}>
