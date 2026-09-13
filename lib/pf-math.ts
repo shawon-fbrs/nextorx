@@ -107,7 +107,7 @@ export function computeSecond(
   const refHigh = basePrice;
   const floor = Math.max(refLow * 0.5, 0.01);
   const ceiling = refHigh * 2;
-  const close = Math.min(ceiling, Math.max(floor, prevClose * Math.exp(exponent)));
+  const close = Math.min(ceiling, Math.max(floor, Number(Number(prevClose * Math.exp(exponent)).toFixed(8))));
 
   const step = (close - prevClose) / TICKS_PER_SECOND;
   const range = Math.max(Math.abs(close - prevClose), prevClose * sigma * 0.25);
