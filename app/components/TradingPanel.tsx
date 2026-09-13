@@ -101,7 +101,7 @@ export function TradingPanel({
   return (
     <aside className="w-[260px] 2xl:w-[300px] bg-surface border-border flex flex-col z-30 flex-shrink-0 border-l
       max-lg:w-full max-lg:border-l-0 max-lg:border-t max-lg:max-h-[44vh] max-lg:overflow-y-auto
-      max-lg:landscape:w-[240px] max-lg:landscape:border-t-0 max-lg:landscape:border-l max-lg:landscape:max-h-none">
+      max-lg:landscape:w-[120px] max-lg:landscape:border-t-0 max-lg:landscape:border-l max-lg:landscape:max-h-none">
       <div className="px-3 py-3 max-lg:px-2.5 max-lg:py-2 flex-1 min-h-0 flex flex-col max-lg:grid max-lg:grid-cols-2 max-lg:landscape:flex max-lg:landscape:flex-col gap-2.5 max-lg:gap-1.5 overflow-hidden max-lg:overflow-visible">
         {/* Time Section */}
         <div>
@@ -126,7 +126,7 @@ export function TradingPanel({
                 }}
                 min={0}
                 max={60}
-                className="w-12 max-lg:w-10 h-9 bg-surface border border-border rounded-lg px-1 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-12 max-lg:w-10 max-lg:landscape:w-auto max-lg:landscape:flex-1 max-lg:landscape:min-w-0 max-lg:landscape:px-0 h-9 bg-surface border border-border rounded-lg px-1 text-foreground font-bold text-lg max-lg:text-base max-lg:landscape:text-sm text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <span className="text-foreground font-bold">:</span>
               <input
@@ -139,7 +139,7 @@ export function TradingPanel({
                 }}
                 min={0}
                 max={59}
-                className="w-12 max-lg:w-10 h-9 bg-surface border border-border rounded-lg px-1 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-12 max-lg:w-10 max-lg:landscape:w-auto max-lg:landscape:flex-1 max-lg:landscape:min-w-0 max-lg:landscape:px-0 h-9 bg-surface border border-border rounded-lg px-1 text-foreground font-bold text-lg max-lg:text-base max-lg:landscape:text-sm text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
             <button onClick={() => setTimeSheet(true)} title="Quick times"
@@ -177,7 +177,7 @@ export function TradingPanel({
         <div>
           <div className="flex items-center justify-between mb-1.5 px-1">
             <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Investment</span>
-            <span className="text-[9px] text-textDark whitespace-nowrap">Min ${minTrade} – Max ${maxTrade}</span>
+            <span className="text-[9px] text-textDark whitespace-nowrap max-lg:landscape:hidden">Min ${minTrade} – Max ${maxTrade}</span>
           </div>
           <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2 max-lg:py-2">
           <div className="flex items-center gap-2">

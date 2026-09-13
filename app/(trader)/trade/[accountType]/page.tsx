@@ -137,6 +137,18 @@ function useCompactLayout() {
   return compact;
 }
 
+function useLandscapeCompact() {
+  const [v, setV] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023.5px) and (orientation: landscape)');
+    const onChange = () => setV(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return v;
+}
+
 function TopBar({
   pairs,
   visibleIds,
@@ -366,8 +378,8 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
   ];
 
   return (
-    <div className="absolute left-2 bottom-8 z-40 flex flex-col items-center gap-1.5">
-      <div className={`flex flex-col items-center py-2 gap-1 w-11 rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all duration-300 ease-in-out ${toolsOpen ? 'max-lg:max-h-[420px] max-lg:opacity-100' : 'max-lg:max-h-0 max-lg:opacity-0 max-lg:py-0 max-lg:border-transparent max-lg:pointer-events-none max-lg:overflow-hidden'}`}>
+    <div className="absolute left-2 bottom-8 z-40 flex flex-col max-lg:landscape:flex-row-reverse items-center gap-1.5">
+      <div className={`flex flex-col max-lg:landscape:flex-row items-center py-2 max-lg:landscape:py-1.5 gap-1 max-lg:landscape:gap-1.5 max-lg:landscape:px-1.5 w-11 max-lg:landscape:w-auto rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all duration-300 ease-in-out ${toolsOpen ? 'max-lg:max-h-[420px] max-lg:opacity-100' : 'max-lg:max-h-0 max-lg:opacity-0 max-lg:py-0 max-lg:border-transparent max-lg:pointer-events-none max-lg:overflow-hidden'}`}>
       <div className="relative">
         <button title="Drawing Tools" onClick={() => toggleMenu('draw')}
           className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${openMenu === 'draw' ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
@@ -375,7 +387,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
         </button>
       </div>
 
-      <div className="w-6 h-px bg-border my-1" />
+      <div className="w-6 h-px max-lg:landscape:w-px max-lg:landscape:h-6 bg-border my-1 max-lg:landscape:my-0 max-lg:landscape:mx-0.5" />
 
       <div className="relative">
         <button title="Chart Type" onClick={() => toggleMenu('chart')}
@@ -383,7 +395,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
           <AlignHorizontalDistributeCenter size={20} />
         </button>
         {openMenu === 'chart' && (
-          <div className="absolute left-full top-0 ml-1 w-32 bg-surface border border-border rounded-lg shadow-2xl p-1.5 z-50">
+          <div className="absolute left-full top-0 ml-1 max-lg:landscape:left-0 max-lg:landscape:top-auto max-lg:landscape:bottom-full max-lg:landscape:ml-0 max-lg:landscape:mb-1 w-32 bg-surface border border-border rounded-lg shadow-2xl p-1.5 z-50">
             {(['candle', 'line', 'area'] as const).map(t => (
               <button key={t} onClick={() => { onChartTypeChange(t); setOpenMenu(null); }}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-all capitalize ${chartType === t ? 'bg-blue-500 text-white' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
@@ -400,7 +412,7 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
           {timeframe}
         </button>
         {openMenu === 'tf' && (
-          <div className="absolute left-full top-0 ml-1 w-40 bg-surface border border-border rounded-lg shadow-2xl p-1.5 z-50">
+          <div className="absolute left-full top-0 ml-1 max-lg:landscape:left-0 max-lg:landscape:top-auto max-lg:landscape:bottom-full max-lg:landscape:ml-0 max-lg:landscape:mb-1 w-40 bg-surface border border-border rounded-lg shadow-2xl p-1.5 z-50">
             <div className="text-[9px] font-bold text-text-dark uppercase tracking-wider mb-1.5 px-1">Timeframe</div>
             <div className="grid grid-cols-3 gap-1">
               {['5s', '30s', '1m', '5m', '10m', '15m', '30m', '1h', '4h'].map(tf => (
@@ -414,14 +426,14 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
         )}
       </div>
 
-      <div className="w-6 h-px bg-border my-1" />
+      <div className="w-6 h-px max-lg:landscape:w-px max-lg:landscape:h-6 bg-border my-1 max-lg:landscape:my-0 max-lg:landscape:mx-0.5" />
 
       <button title="Indicators" onClick={onIndToggle}
         className="w-9 h-9 flex items-center justify-center rounded-lg text-text hover:bg-surface-hover hover:text-foreground transition-all">
         <DraftingCompass size={20} />
       </button>
 
-      <div className="w-6 h-px bg-border my-1" />
+      <div className="w-6 h-px max-lg:landscape:w-px max-lg:landscape:h-6 bg-border my-1 max-lg:landscape:my-0 max-lg:landscape:mx-0.5" />
 
       <button title="Remove Drawings" onClick={onRemoveDrawings}
         className="w-9 h-9 flex items-center justify-center rounded-lg text-text hover:bg-surface-hover hover:text-red transition-all">
@@ -770,6 +782,7 @@ export default function TradingPage() {
   const [effectivePayout, setEffectivePayout] = useState<number | null>(null);
   const [payoutMap, setPayoutMap] = useState<Record<string, number>>({});
   const isCompact = useCompactLayout();
+  const isLandscape = useLandscapeCompact();
   const [landNavOpen, setLandNavOpen] = useState(false);
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
@@ -1460,6 +1473,9 @@ export default function TradingPage() {
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden 2xl:max-w-[1920px] 2xl:mx-auto 2xl:w-full">
+      {isLandscape && (
+        <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} onMenuClick={() => setLandNavOpen(true)} />
+      )}
       <div className="flex-1 flex max-lg:flex-col max-lg:landscape:flex-row min-w-0 overflow-hidden">
         <div className="flex-1 flex min-w-0 max-lg:min-h-0 overflow-hidden" data-chart-area>
           <IndDialog
@@ -1482,7 +1498,9 @@ export default function TradingPage() {
           <InsufficientDialog open={insufficientOpen} isDemo={accountType === 'demo'} onClose={() => setInsufficientOpen(false)} />
           <TradeFailDialog open={!!tradeError} message={tradeError} onClose={() => setTradeError('')} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            {!isLandscape && (
             <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} onMenuClick={() => setLandNavOpen(true)} />
+            )}
             <LandscapeDrawer open={landNavOpen} onClose={() => setLandNavOpen(false)} />
             {!activePair ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
