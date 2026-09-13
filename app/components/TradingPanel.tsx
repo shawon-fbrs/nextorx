@@ -101,7 +101,7 @@ export function TradingPanel({
   return (
     <aside className="w-[260px] 2xl:w-[300px] bg-surface border-border flex flex-col z-30 flex-shrink-0 border-l
       max-lg:w-full max-lg:border-l-0 max-lg:border-t max-lg:max-h-[44vh] max-lg:overflow-y-auto
-      max-lg:landscape:w-[120px] max-lg:landscape:border-t-0 max-lg:landscape:border-l max-lg:landscape:max-h-none">
+      max-lg:landscape:w-[150px] max-lg:landscape:border-t-0 max-lg:landscape:border-l max-lg:landscape:max-h-none">
       <div className="px-3 py-3 max-lg:px-2.5 max-lg:py-2 flex-1 min-h-0 flex flex-col max-lg:grid max-lg:grid-cols-2 max-lg:landscape:flex max-lg:landscape:flex-col gap-2.5 max-lg:gap-1.5 overflow-hidden max-lg:overflow-visible">
         {/* Time Section */}
         <div>
