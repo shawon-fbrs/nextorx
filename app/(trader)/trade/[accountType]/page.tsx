@@ -785,7 +785,6 @@ export default function TradingPage() {
   const isCompact = useCompactLayout();
   const isLandscape = useLandscapeCompact();
   const [landNavOpen, setLandNavOpen] = useState(false);
-  const livePnls = useLivePnL(trades as unknown as TradeCardData[], price, payoutMap[activePair?.id ?? ''] ?? null);
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const [seed, setSeed] = useState<{ pairId: string; bars: CandleData[] } | null>(null);
   const [timeframe, setTimeframe] = useState('1m');
@@ -1179,6 +1178,7 @@ export default function TradingPage() {
   const miniAmts = [1, 5, 10, 25, 100].filter((a) => a >= minTrade && a <= maxTrade);
   const miniAmtList = miniAmts.length > 0 ? miniAmts : [minTrade];
   const payoutAmount = (investment * (1 + payout / 100)).toFixed(2);
+  const livePnls = useLivePnL(trades as unknown as TradeCardData[], price, payoutMap[activePair?.id ?? ''] ?? null);
 
   const refreshTrades = useCallback(async () => {
     try {

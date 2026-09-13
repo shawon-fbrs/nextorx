@@ -256,7 +256,7 @@ export function LandscapeDrawer({ open, onClose }: { open: boolean; onClose: () 
           </button>
         </div>
       </aside>
-      {positionsOpen && <PositionsSheet onClose={() => setPositionsOpen(false)} />}
+      {positionsOpen && <PositionsSheet onClose={() => setPositionsOpen(false)} currentPrice={bottomPrice} payoutMap={bottomPayouts} />}
       <LeaderboardDrawer open={boardOpen} onClose={() => setBoardOpen(false)} />
     </div>
   );
