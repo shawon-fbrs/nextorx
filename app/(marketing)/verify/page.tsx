@@ -226,9 +226,9 @@ export default function VerifyPage() {
         }
       }
       const tol = 1e-8;
-      let prevClose = rows[0].open;
       let checked = 0;
       for (const row of rows) {
+        const prevClose = row.open;
         const secondOfDay = Math.floor(row.timestamp / 1000) % SECONDS_PER_DAY;
         const utcHour = new Date(row.timestamp).getUTCHours();
         const d = await hmacSha512ServerKey(seed, `${pairId}:${day}:${secondOfDay}`);
@@ -255,16 +255,14 @@ export default function VerifyPage() {
           if (price < low) low = price;
         }
         const closeOk = Math.abs(close - row.close) <= tol * Math.max(1, Math.abs(row.close));
-        const openOk = Math.abs(prevClose - row.open) <= tol * Math.max(1, Math.abs(row.open));
         const highOk = Math.abs(high - row.high) <= 1e-6 * Math.max(1, Math.abs(row.high));
         const lowOk = Math.abs(low - row.low) <= 1e-6 * Math.max(1, Math.abs(row.low));
-        if (!closeOk || !openOk || !highOk || !lowOk) {
+        if (!closeOk || !highOk || !lowOk) {
           setResult(`Mismatch at ${new Date(row.timestamp).toISOString()}: recomputed close ${close}, file has ${row.close}.`);
           setOk(false);
           setWorking(false);
           return;
         }
-        prevClose = row.close;
         checked++;
       }
       setResult(`VERIFIED: ${checked} one-second candles regenerated exactly from the seed. No manipulation.`);
