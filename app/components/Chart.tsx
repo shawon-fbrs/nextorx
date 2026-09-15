@@ -332,57 +332,97 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       const pid = pairIdRef.current;
       const tf = timeframeRef.current;
       if (!chart || !pid) return;
-      const applyDrawings = (arr: Array<{ name: string; points: unknown; styles: unknown; lock?: boolean; visible?: boolean }>) => {
-        if (!Array.isArray(arr) || arr.length === 0) return;
-        const existing = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
-        const existingSig = new Set(existing.map(o => {
-          const cleaned = cleanPoints((o as unknown as { points?: unknown }).points);
-          return `${o.name}:${JSON.stringify(cleaned)}`;
-        }));
-        for (const o of arr) {
-          if (!o.name || !o.points) continue;
-          try {
-            const pts = cleanPoints(o.points);
-            if (pts.length === 0) continue;
-            if (existingSig.has(`${o.name}:${JSON.stringify(pts)}`)) continue;
-            existingSig.add(`${o.name}:${JSON.stringify(pts)}`);
-            const points = pts;
-            chart.createOverlay({
-              name: o.name,
-              points: points as never,
-              styles: o.styles as never,
-              lock: o.lock,
-              visible: o.visible,
-              needDefaultPointFigure: true,
-              needDefaultXAxisFigure: true,
-              needDefaultYAxisFigure: true,
-              onSelected: (event: any) => {
-                const oid = (event as { overlay?: { id?: string } }).overlay?.id ?? '';
-                onOverlaySelectedRef.current?.({ id: oid, name: o.name });
-                return true;
-              },
-              onDeselected: () => {
-                onOverlaySelectedRef.current?.(null);
-                return true;
-              },
-              onDrawEnd: () => persistDrawings(),
-              onRemoved: () => persistDrawings(),
-              onPressedMoveEnd: () => persistDrawings(),
-            } as never);
-          } catch {}
-        }
-      };
       fetch(`/api/drawing?pairId=${encodeURIComponent(pid)}&timeframe=${encodeURIComponent(tf)}`)
         .then(r => r.json())
         .then((data: { drawings?: Array<{ name: string; points: unknown; styles: unknown; lock?: boolean; visible?: boolean }> }) => {
           const drawings = data.drawings ?? [];
-          applyDrawings(drawings);
+          const currentOverlays = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment' && o.name !== 'demoWatermark');
+          const serverSigs = new Set(drawings.map(o => {
+            const pts = cleanPoints(o.points);
+            return `${o.name}:${JSON.stringify(pts)}`;
+          }));
+          for (const o of currentOverlays) {
+            const cleaned = cleanPoints((o as unknown as { points?: unknown }).points);
+            const sig = `${o.name}:${JSON.stringify(cleaned)}`;
+            if (!serverSigs.has(sig)) {
+              try { chart.removeOverlay({ id: o.id! }); } catch {}
+            }
+          }
+          const existingAfterRemove = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment');
+          const existingSig = new Set(existingAfterRemove.map(o => {
+            const cleaned = cleanPoints((o as unknown as { points?: unknown }).points);
+            return `${o.name}:${JSON.stringify(cleaned)}`;
+          }));
+          for (const o of drawings) {
+            if (!o.name || !o.points) continue;
+            try {
+              const pts = cleanPoints(o.points);
+              if (pts.length === 0) continue;
+              if (existingSig.has(`${o.name}:${JSON.stringify(pts)}`)) continue;
+              existingSig.add(`${o.name}:${JSON.stringify(pts)}`);
+              chart.createOverlay({
+                name: o.name,
+                points: pts as never,
+                styles: o.styles as never,
+                lock: o.lock,
+                visible: o.visible,
+                needDefaultPointFigure: true,
+                needDefaultXAxisFigure: true,
+                needDefaultYAxisFigure: true,
+                onSelected: (event: any) => {
+                  const oid = (event as { overlay?: { id?: string } }).overlay?.id ?? '';
+                  onOverlaySelectedRef.current?.({ id: oid, name: o.name });
+                  return true;
+                },
+                onDeselected: () => {
+                  onOverlaySelectedRef.current?.(null);
+                  return true;
+                },
+                onDrawEnd: () => persistDrawings(),
+                onRemoved: () => persistDrawings(),
+                onPressedMoveEnd: () => persistDrawings(),
+              } as never);
+            } catch {}
+          }
           try { localStorage.setItem(storageKey(pid, tf), JSON.stringify(drawings)); } catch {}
         })
         .catch(() => {
           try {
             const raw = localStorage.getItem(storageKey(pid, tf));
-            if (raw) applyDrawings(JSON.parse(raw));
+            if (raw) {
+              const arr = JSON.parse(raw);
+              if (Array.isArray(arr) && arr.length > 0) {
+                for (const o of arr) {
+                  if (!o.name || !o.points) continue;
+                  try {
+                    const pts = cleanPoints(o.points);
+                    if (pts.length === 0) continue;
+                    chart.createOverlay({
+                      name: o.name,
+                      points: pts as never,
+                      styles: o.styles as never,
+                      lock: o.lock,
+                      visible: o.visible,
+                      needDefaultPointFigure: true,
+                      needDefaultXAxisFigure: true,
+                      needDefaultYAxisFigure: true,
+                      onSelected: (event: any) => {
+                        const oid = (event as { overlay?: { id?: string } }).overlay?.id ?? '';
+                        onOverlaySelectedRef.current?.({ id: oid, name: o.name });
+                        return true;
+                      },
+                      onDeselected: () => {
+                        onOverlaySelectedRef.current?.(null);
+                        return true;
+                      },
+                      onDrawEnd: () => persistDrawings(),
+                      onRemoved: () => persistDrawings(),
+                      onPressedMoveEnd: () => persistDrawings(),
+                    } as never);
+                  } catch {}
+                }
+              }
+            }
           } catch {}
         });
     } catch {}
@@ -910,6 +950,15 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
     };
     document.addEventListener('visibilitychange', handler);
     return () => document.removeEventListener('visibilitychange', handler);
+  }, [restoreDrawings]);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        restoreDrawings();
+      }
+    }, 5000);
+    return () => clearInterval(iv);
   }, [restoreDrawings]);
 
   useEffect(() => {
