@@ -101,7 +101,7 @@ export function TradingPanel({
   const amtList = amtChips.length > 0 ? amtChips : [minTrade];
 
   return (
-    <aside className="flex-shrink-0 w-[280px] min-w-[240px] max-w-[420px] lg:w-[22%] lg:min-w-[280px] lg:max-w-[420px] bg-surface border-border flex flex-col z-30 border-l
+    <aside className="flex-shrink-0 w-[240px] min-w-[200px] max-w-[320px] lg:w-[17%] lg:min-w-[240px] lg:max-w-[340px] bg-surface border-border flex flex-col z-30 border-l
       max-lg:w-full max-lg:min-w-0 max-lg:max-w-none max-lg:border-l-0 max-lg:border-t max-lg:max-h-[44vh] max-lg:overflow-y-auto
       max-lg:landscape:w-[150px] max-lg:landscape:min-w-0 max-lg:landscape:max-w-none max-lg:landscape:border-t-0 max-lg:landscape:border-l max-lg:landscape:max-h-none">
       <div className="px-3 py-3 max-lg:px-2.5 max-lg:py-2 flex-1 min-h-0 flex flex-col max-lg:grid max-lg:grid-cols-2 max-lg:landscape:flex max-lg:landscape:flex-col gap-2.5 max-lg:gap-1.5 overflow-hidden max-lg:overflow-visible">
@@ -113,7 +113,7 @@ export function TradingPanel({
           <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2 max-lg:py-2">
           <div className="flex items-center gap-2">
             <button onClick={() => onTimeChange(-10)}
-              className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -151,13 +151,13 @@ export function TradingPanel({
               </svg>
             </button>
             <button onClick={() => onTimeChange(10)}
-              className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>
-          <div className="flex gap-1.5 mt-2 max-lg:hidden">
+          <div className="flex gap-1.5 mt-2 hidden">
             {quickTimes.map((t) => {
               const [m, s] = t.split(':').map(Number);
               return (
@@ -184,7 +184,7 @@ export function TradingPanel({
           <div className="bg-background rounded-xl border border-border px-3 py-2.5 max-lg:px-2 max-lg:py-2">
           <div className="flex items-center gap-2">
             <button onClick={() => setInvestment(Math.max(minTrade, investment - 1))}
-              className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M20 12H4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -206,13 +206,13 @@ export function TradingPanel({
               $
             </button>
             <button onClick={() => setInvestment(Math.min(maxTrade, investment + 1))}
-              className="w-9 h-9 max-lg:hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
+              className="w-9 h-9 hidden rounded-lg bg-surface border border-border flex items-center justify-center text-text hover:text-foreground hover:bg-surface-hover hover:border-text-dark/30 transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>
-          <div className="flex gap-1.5 mt-2 max-lg:hidden">
+          <div className="flex gap-1.5 mt-2 hidden">
             {amtList.map((amt) => (
               <button key={amt} onClick={() => setInvestment(amt)}
                 className={`flex-1 py-1 text-[9px] font-semibold rounded-md transition-all border ${
@@ -228,7 +228,7 @@ export function TradingPanel({
         </div>
 
         {/* Payout */}
-        <div className="max-lg:hidden">
+        <div className="hidden">
           <div className="flex items-center justify-between mb-1.5 px-1">
             <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Potential Payout</span>
           </div>
