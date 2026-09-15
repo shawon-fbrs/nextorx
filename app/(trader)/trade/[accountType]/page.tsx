@@ -1140,6 +1140,7 @@ export default function TradingPage() {
   const onEditDragStart = (e: React.PointerEvent) => {
     e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    setColorPickerOpen(false);
     editDragRef.current = { startX: e.clientX, startY: e.clientY, startPosX: editPanelPos.x, startPosY: editPanelPos.y };
     const chartArea = document.querySelector('[data-chart-area]') as HTMLElement | null;
     const panelEl = (e.target as HTMLElement).closest('[data-edit-panel]') as HTMLElement | null;
@@ -1149,13 +1150,12 @@ export default function TradingPage() {
       let ny = editDragRef.current.startPosY + (ev.clientY - editDragRef.current.startY);
       if (chartArea && panelEl) {
         const chartRect = chartArea.getBoundingClientRect();
-        const panelW = panelEl.offsetWidth;
-        const panelH = panelEl.offsetHeight;
+        const panelH = 36;
         const centerX = chartRect.width / 2;
-        const minX = -(centerX - panelW / 2 - 8);
-        const maxX = centerX - panelW / 2 - 8;
+        const minX = -(centerX - 24);
+        const maxX = centerX - 24;
         nx = Math.max(minX, Math.min(maxX, nx));
-        ny = Math.max(-4, Math.min(chartRect.height - panelH - 4, ny));
+        ny = Math.max(0, Math.min(chartRect.height - panelH, ny));
       }
       setEditPanelPos({ x: nx, y: ny });
     };
@@ -1748,17 +1748,20 @@ export default function TradingPage() {
                           className="w-6 h-6 rounded-md border border-foreground/15 hover:scale-110 transition-all duration-150 flex-shrink-0"
                           style={{ backgroundColor: selectedOverlayColorRef.current }} />
                         {colorPickerOpen && (
-                          <div className="absolute top-full left-0 mt-1 bg-background border border-border rounded-xl shadow-2xl p-2 z-[70]"
-                            onClick={(e) => e.stopPropagation()}>
-                            <div className="grid grid-cols-4 gap-1.5">
-                              {['#00c365', '#ff4954', '#007aff', '#ff8c00', '#e4e8f0', '#ffff00', '#a855f7', '#ec4899',
-                                '#ffffff', '#6b7280', '#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4'].map(c => (
-                                <button key={c} onClick={() => { handleOverlayStyle('color', c); setColorPickerOpen(false); }}
-                                  className="w-5 h-5 rounded-md border border-foreground/10 hover:scale-125 transition-all duration-150"
-                                  style={{ backgroundColor: c }} />
-                              ))}
+                          <>
+                            <div className="fixed inset-0 z-[69]" onClick={() => setColorPickerOpen(false)} />
+                            <div className="absolute top-full left-0 mt-1.5 bg-background border border-border rounded-xl shadow-2xl p-2.5 z-[70]"
+                              onClick={(e) => e.stopPropagation()}>
+                              <div className="grid grid-cols-4 gap-2">
+                                {['#00c365', '#ff4954', '#007aff', '#ff8c00', '#e4e8f0', '#ffff00', '#a855f7', '#ec4899',
+                                  '#ffffff', '#6b7280', '#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4'].map(c => (
+                                  <button key={c} onClick={() => { handleOverlayStyle('color', c); setColorPickerOpen(false); }}
+                                    className="w-6 h-6 rounded-lg border border-foreground/10 hover:scale-125 transition-all duration-150"
+                                    style={{ backgroundColor: c }} />
+                                ))}
+                              </div>
                             </div>
-                          </div>
+                          </>
                         )}
                       </div>
                       <select value={selectedOverlayWeightRef.current}
