@@ -985,7 +985,10 @@ export default function TradingPage() {
   const selectedOverlayWeightRef = useRef(1);
   const selectedOverlayStyleRef = useRef('solid');
   const [editPanelPos, setEditPanelPos] = useState({ x: 0, y: 0 });
-  const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [editPopover, setEditPopover] = useState<'color' | 'weight' | 'style' | null>(null);
+  const colorBtnRef = useRef<HTMLButtonElement>(null);
+  const weightBtnRef = useRef<HTMLButtonElement>(null);
+  const styleBtnRef = useRef<HTMLButtonElement>(null);
   const editDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
 
   useEffect(() => {
@@ -1093,7 +1096,7 @@ export default function TradingPage() {
     if (overlayName) chartRef.current?.createOverlay(overlayName);
   }, []);
 
-  useEffect(() => { setEditPanelPos({ x: 0, y: 0 }); setColorPickerOpen(false); }, [selectedOverlay?.id]);
+  useEffect(() => { setEditPanelPos({ x: 0, y: 0 }); setEditPopover(null); }, [selectedOverlay?.id]);
 
   const handleRemoveDrawings = useCallback(() => {
     chartRef.current?.removeAllOverlays();
@@ -1140,7 +1143,7 @@ export default function TradingPage() {
   const onEditDragStart = (e: React.PointerEvent) => {
     e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    setColorPickerOpen(false);
+    setEditPopover(null);
     editDragRef.current = { startX: e.clientX, startY: e.clientY, startPosX: editPanelPos.x, startPosY: editPanelPos.y };
     const chartArea = document.querySelector('[data-chart-area]') as HTMLElement | null;
     const panelEl = (e.target as HTMLElement).closest('[data-edit-panel]') as HTMLElement | null;
@@ -1740,61 +1743,95 @@ export default function TradingPage() {
                 )}
 
                 {selectedOverlay && (
-                  <div data-edit-panel className="absolute z-[60] bg-surface/95 backdrop-blur-md border border-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-visible"
-                    style={{ left: `calc(50% + ${editPanelPos.x}px)`, top: `calc(8px + ${editPanelPos.y}px)`, transform: 'translateX(-50%)' }}>
-                    <div onPointerDown={onEditDragStart} className="h-9 bg-background border-b border-border flex items-center px-2 gap-1.5 cursor-default lg:cursor-move select-none touch-none">
-                      <div className="relative">
-                        <button onClick={() => setColorPickerOpen(!colorPickerOpen)}
+                  <>
+                    {editPopover && <div className="fixed inset-0 z-[59]" onClick={() => setEditPopover(null)} />}
+                    <div data-edit-panel className="absolute z-[60] bg-surface/95 backdrop-blur-md border border-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-visible"
+                      style={{ left: `calc(50% + ${editPanelPos.x}px)`, top: `calc(8px + ${editPanelPos.y}px)`, transform: 'translateX(-50%)' }}>
+                      <div onPointerDown={onEditDragStart} className="h-9 bg-background border-b border-border flex items-center px-2 gap-1.5 cursor-default lg:cursor-move select-none touch-none">
+                        <button ref={colorBtnRef} onClick={(e) => { e.stopPropagation(); setEditPopover(editPopover === 'color' ? null : 'color'); }}
                           className="w-6 h-6 rounded-md border border-foreground/15 hover:scale-110 transition-all duration-150 flex-shrink-0"
                           style={{ backgroundColor: selectedOverlayColorRef.current }} />
-                        {colorPickerOpen && (
-                          <>
-                            <div className="fixed inset-0 z-[69]" onClick={() => setColorPickerOpen(false)} />
-                            <div className="absolute top-full left-0 mt-1.5 bg-background border border-border rounded-xl shadow-2xl p-2.5 z-[70]"
-                              onClick={(e) => e.stopPropagation()}>
-                              <div className="grid grid-cols-4 gap-2.5 p-0.5">
-                                {['#00c365', '#ff4954', '#007aff', '#ff8c00', '#e4e8f0', '#ffff00', '#a855f7', '#ec4899',
-                                  '#ffffff', '#6b7280', '#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4'].map(c => (
-                                  <button key={c} onClick={() => { handleOverlayStyle('color', c); setColorPickerOpen(false); }}
-                                    className="w-8 h-8 rounded-lg border border-foreground/10 hover:scale-110 transition-all duration-150"
-                                    style={{ backgroundColor: c }} />
-                                ))}
-                              </div>
-                            </div>
-                          </>
-                        )}
+                        <button ref={weightBtnRef} onClick={(e) => { e.stopPropagation(); setEditPopover(editPopover === 'weight' ? null : 'weight'); }}
+                          className="h-6 px-1.5 text-[10px] font-semibold text-foreground bg-background border border-border rounded-md hover:border-foreground/30 transition-colors flex-shrink-0">
+                          {selectedOverlayWeightRef.current}px
+                        </button>
+                        <button ref={styleBtnRef} onClick={(e) => { e.stopPropagation(); setEditPopover(editPopover === 'style' ? null : 'style'); }}
+                          className="h-6 px-1.5 text-[10px] font-semibold text-foreground bg-background border border-border rounded-md hover:border-foreground/30 transition-colors flex-shrink-0 capitalize">
+                          {selectedOverlayStyleRef.current}
+                        </button>
+                        <div className="w-px h-5 bg-border flex-shrink-0" />
+                        <button onClick={handleCopyOverlay} title="Copy"
+                          className="w-6 h-6 rounded-md hover:bg-foreground/5 flex items-center justify-center text-foreground/40 hover:text-blue transition-all duration-150 flex-shrink-0">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button onClick={handleDeleteOverlay} title="Delete (Del)"
+                          className="w-6 h-6 rounded-md hover:bg-red/10 flex items-center justify-center text-foreground/40 hover:text-red transition-all duration-150 flex-shrink-0">
+                          <Trash2 size={12} />
+                        </button>
+                        <button onClick={() => setSelectedOverlay(null)} title="Close"
+                          className="w-6 h-6 rounded-md hover:bg-foreground/5 flex items-center justify-center text-foreground/30 hover:text-foreground/60 transition-all duration-150 flex-shrink-0">
+                          <X size={12} />
+                        </button>
                       </div>
-                      <select value={selectedOverlayWeightRef.current}
-                        onChange={(e) => handleOverlayStyle('size', Number(e.target.value))}
-                        className="h-6 px-1 text-[10px] font-semibold text-foreground bg-background border border-border rounded-md outline-none cursor-pointer hover:border-foreground/30 transition-colors">
-                        <option value="1">1px</option>
-                        <option value="2">2px</option>
-                        <option value="3">3px</option>
-                        <option value="4">4px</option>
-                      </select>
-                      <select value={selectedOverlayStyleRef.current}
-                        onChange={(e) => handleOverlayStyle('style', e.target.value)}
-                        className="h-6 px-1 text-[10px] font-semibold text-foreground bg-background border border-border rounded-md outline-none cursor-pointer hover:border-foreground/30 transition-colors">
-                        <option value="solid">Solid</option>
-                        <option value="dashed">Dashed</option>
-                      </select>
-                      <div className="w-px h-5 bg-border flex-shrink-0" />
-                      <button onClick={handleCopyOverlay} title="Copy"
-                        className="w-6 h-6 rounded-md hover:bg-foreground/5 flex items-center justify-center text-foreground/40 hover:text-blue transition-all duration-150 flex-shrink-0">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                          <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                      <button onClick={handleDeleteOverlay} title="Delete (Del)"
-                        className="w-6 h-6 rounded-md hover:bg-red/10 flex items-center justify-center text-foreground/40 hover:text-red transition-all duration-150 flex-shrink-0">
-                        <Trash2 size={12} />
-                      </button>
-                      <button onClick={() => setSelectedOverlay(null)} title="Close"
-                        className="w-6 h-6 rounded-md hover:bg-foreground/5 flex items-center justify-center text-foreground/30 hover:text-foreground/60 transition-all duration-150 flex-shrink-0">
-                        <X size={12} />
-                      </button>
                     </div>
-                  </div>
+                    {editPopover === 'color' && (() => {
+                      const el = colorBtnRef.current;
+                      const r = el?.getBoundingClientRect();
+                      if (!r) return null;
+                      return (
+                        <div className="fixed z-[130] bg-surface border border-border rounded-xl shadow-2xl p-2.5" style={{ top: r.bottom + 6, left: Math.max(8, r.left - 60) }}>
+                          <div className="grid grid-cols-4 gap-2">
+                            {['#00c365', '#ff4954', '#007aff', '#ff8c00', '#e4e8f0', '#ffff00', '#a855f7', '#ec4899',
+                              '#ffffff', '#6b7280', '#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4'].map(c => (
+                              <button key={c} onClick={() => { handleOverlayStyle('color', c); setEditPopover(null); }}
+                                className="w-7 h-7 rounded-lg border border-foreground/10 hover:scale-110 transition-all duration-150"
+                                style={{ backgroundColor: c }} />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {editPopover === 'weight' && (() => {
+                      const el = weightBtnRef.current;
+                      const r = el?.getBoundingClientRect();
+                      if (!r) return null;
+                      return (
+                        <div className="fixed z-[130] bg-surface border border-border rounded-xl shadow-2xl p-1.5" style={{ top: r.bottom + 6, left: r.left }}>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4].map(w => (
+                              <button key={w} onClick={() => { handleOverlayStyle('size', w); setEditPopover(null); }}
+                                className={`w-8 h-8 rounded-lg text-[11px] font-semibold border transition-all ${
+                                  selectedOverlayWeightRef.current === w
+                                    ? 'text-white bg-blue/20 border-blue/50'
+                                    : 'text-textDark bg-background border-border hover:text-foreground hover:bg-surface-hover'
+                                }`}>{w}px</button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {editPopover === 'style' && (() => {
+                      const el = styleBtnRef.current;
+                      const r = el?.getBoundingClientRect();
+                      if (!r) return null;
+                      return (
+                        <div className="fixed z-[130] bg-surface border border-border rounded-xl shadow-2xl p-1.5" style={{ top: r.bottom + 6, left: r.left }}>
+                          <div className="flex gap-1">
+                            {['solid', 'dashed'].map(s => (
+                              <button key={s} onClick={() => { handleOverlayStyle('style', s); setEditPopover(null); }}
+                                className={`w-14 h-8 rounded-lg text-[11px] font-semibold border transition-all capitalize ${
+                                  selectedOverlayStyleRef.current === s
+                                    ? 'text-white bg-blue/20 border-blue/50'
+                                    : 'text-textDark bg-background border-border hover:text-foreground hover:bg-surface-hover'
+                                }`}>{s}</button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </>
                 )}
                 {isFullscreen && !isCompact && (
                   <div className="absolute z-50 w-[220px] bg-surface/95 backdrop-blur-sm border border-border rounded-xl shadow-2xl overflow-hidden"
