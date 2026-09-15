@@ -981,7 +981,11 @@ export default function TradingPage() {
     refreshActiveIndicators();
   }, [indOpen, refreshActiveIndicators]);
   const [selectedOverlay, setSelectedOverlay] = useState<{ id: string; name: string } | null>(null);
+  const selectedOverlayColorRef = useRef('#00c365');
+  const selectedOverlayWeightRef = useRef(1);
+  const selectedOverlayStyleRef = useRef('solid');
   const [editPanelPos, setEditPanelPos] = useState({ x: 0, y: 0 });
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const editDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
 
   useEffect(() => {
@@ -1089,7 +1093,7 @@ export default function TradingPage() {
     if (overlayName) chartRef.current?.createOverlay(overlayName);
   }, []);
 
-  useEffect(() => { setEditPanelPos({ x: 0, y: 0 }); }, [selectedOverlay?.id]);
+  useEffect(() => { setEditPanelPos({ x: 0, y: 0 }); setColorPickerOpen(false); }, [selectedOverlay?.id]);
 
   const handleRemoveDrawings = useCallback(() => {
     chartRef.current?.removeAllOverlays();
@@ -1098,6 +1102,9 @@ export default function TradingPage() {
 
   const handleOverlayStyle = useCallback((key: string, value: unknown) => {
     if (!selectedOverlay) return;
+    if (key === 'color') selectedOverlayColorRef.current = value as string;
+    if (key === 'size') selectedOverlayWeightRef.current = value as number;
+    if (key === 'style') selectedOverlayStyleRef.current = value as string;
     const isRect = selectedOverlay.name === 'rect';
     const styleKey = isRect ? 'rect' : 'line';
     const mappedKey = isRect && key === 'size' ? 'borderSize' : key;
@@ -1134,12 +1141,23 @@ export default function TradingPage() {
     e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     editDragRef.current = { startX: e.clientX, startY: e.clientY, startPosX: editPanelPos.x, startPosY: editPanelPos.y };
+    const chartArea = document.querySelector('[data-chart-area]') as HTMLElement | null;
+    const panelEl = (e.target as HTMLElement).closest('[data-edit-panel]') as HTMLElement | null;
     const onMove = (ev: PointerEvent) => {
       if (!editDragRef.current) return;
-      setEditPanelPos({
-        x: editDragRef.current.startPosX + (ev.clientX - editDragRef.current.startX),
-        y: editDragRef.current.startPosY + (ev.clientY - editDragRef.current.startY),
-      });
+      let nx = editDragRef.current.startPosX + (ev.clientX - editDragRef.current.startX);
+      let ny = editDragRef.current.startPosY + (ev.clientY - editDragRef.current.startY);
+      if (chartArea && panelEl) {
+        const chartRect = chartArea.getBoundingClientRect();
+        const panelW = panelEl.offsetWidth;
+        const panelH = panelEl.offsetHeight;
+        const centerX = chartRect.width / 2;
+        const minX = -(centerX - panelW / 2 - 8);
+        const maxX = centerX - panelW / 2 - 8;
+        nx = Math.max(minX, Math.min(maxX, nx));
+        ny = Math.max(-4, Math.min(chartRect.height - panelH - 4, ny));
+      }
+      setEditPanelPos({ x: nx, y: ny });
     };
     const onUp = () => { editDragRef.current = null; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
     window.addEventListener('pointermove', onMove);
@@ -1722,67 +1740,56 @@ export default function TradingPage() {
                 )}
 
                 {selectedOverlay && (
-                  <div className="absolute z-[60] bg-surface/95 backdrop-blur-md border border-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden w-[180px]"
+                  <div data-edit-panel className="absolute z-[60] bg-surface/95 backdrop-blur-md border border-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-visible"
                     style={{ left: `calc(50% + ${editPanelPos.x}px)`, top: `calc(8px + ${editPanelPos.y}px)`, transform: 'translateX(-50%)' }}>
-                    <div onPointerDown={onEditDragStart} className="h-8 bg-background border-b border-border flex items-center justify-between px-2.5 cursor-default lg:cursor-move select-none touch-none">
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-3 h-3 text-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                          <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        <span className="text-[10px] font-semibold text-foreground/80 capitalize">{selectedOverlay.name}</span>
+                    <div onPointerDown={onEditDragStart} className="h-9 bg-background border-b border-border flex items-center px-2 gap-1.5 cursor-default lg:cursor-move select-none touch-none">
+                      <div className="relative">
+                        <button onClick={() => setColorPickerOpen(!colorPickerOpen)}
+                          className="w-6 h-6 rounded-md border border-foreground/15 hover:scale-110 transition-all duration-150 flex-shrink-0"
+                          style={{ backgroundColor: selectedOverlayColorRef.current }} />
+                        {colorPickerOpen && (
+                          <div className="absolute top-full left-0 mt-1 bg-background border border-border rounded-xl shadow-2xl p-2 z-[70]"
+                            onClick={(e) => e.stopPropagation()}>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {['#00c365', '#ff4954', '#007aff', '#ff8c00', '#e4e8f0', '#ffff00', '#a855f7', '#ec4899',
+                                '#ffffff', '#6b7280', '#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4'].map(c => (
+                                <button key={c} onClick={() => { handleOverlayStyle('color', c); setColorPickerOpen(false); }}
+                                  className="w-5 h-5 rounded-md border border-foreground/10 hover:scale-125 transition-all duration-150"
+                                  style={{ backgroundColor: c }} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
+                      <select value={selectedOverlayWeightRef.current}
+                        onChange={(e) => handleOverlayStyle('size', Number(e.target.value))}
+                        className="h-6 px-1 text-[10px] font-semibold text-foreground bg-background border border-border rounded-md outline-none cursor-pointer hover:border-foreground/30 transition-colors">
+                        <option value="1">1px</option>
+                        <option value="2">2px</option>
+                        <option value="3">3px</option>
+                        <option value="4">4px</option>
+                      </select>
+                      <select value={selectedOverlayStyleRef.current}
+                        onChange={(e) => handleOverlayStyle('style', e.target.value)}
+                        className="h-6 px-1 text-[10px] font-semibold text-foreground bg-background border border-border rounded-md outline-none cursor-pointer hover:border-foreground/30 transition-colors">
+                        <option value="solid">Solid</option>
+                        <option value="dashed">Dashed</option>
+                      </select>
+                      <div className="w-px h-5 bg-border flex-shrink-0" />
+                      <button onClick={handleCopyOverlay} title="Copy"
+                        className="w-6 h-6 rounded-md hover:bg-foreground/5 flex items-center justify-center text-foreground/40 hover:text-blue transition-all duration-150 flex-shrink-0">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      <button onClick={handleDeleteOverlay} title="Delete (Del)"
+                        className="w-6 h-6 rounded-md hover:bg-red/10 flex items-center justify-center text-foreground/40 hover:text-red transition-all duration-150 flex-shrink-0">
+                        <Trash2 size={12} />
+                      </button>
                       <button onClick={() => setSelectedOverlay(null)} title="Close"
-                        className="w-5 h-5 rounded flex items-center justify-center text-foreground/30 hover:text-foreground hover:bg-surface-hover transition-colors">
+                        className="w-6 h-6 rounded-md hover:bg-foreground/5 flex items-center justify-center text-foreground/30 hover:text-foreground/60 transition-all duration-150 flex-shrink-0">
                         <X size={12} />
                       </button>
-                    </div>
-                    <div className="px-2.5 py-2 flex flex-col gap-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-semibold text-textDark uppercase tracking-wider">Color</span>
-                        <div className="flex items-center gap-1">
-                          {['#00c365', '#ff4954', '#007aff', '#ff8c00', '#e4e8f0', '#ffff00', '#a855f7', '#ec4899'].map(c => (
-                            <button key={c} onClick={() => handleOverlayStyle('color', c)}
-                              className="w-4 h-4 rounded-full border border-foreground/10 hover:scale-125 transition-all duration-150" style={{ backgroundColor: c }} />
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-semibold text-textDark uppercase tracking-wider">Weight</span>
-                        <div className="flex items-center gap-0.5">
-                          {[1, 2, 3, 4].map(w => (
-                            <button key={w} onClick={() => handleOverlayStyle('size', w)}
-                              className="w-5 h-5 rounded bg-background border border-border flex items-center justify-center hover:border-foreground/30 transition-all duration-150">
-                              <div className="rounded-full bg-white" style={{ width: w + 1, height: w + 1 }} />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-semibold text-textDark uppercase tracking-wider">Style</span>
-                        <div className="flex items-center gap-0.5">
-                          {['solid', 'dashed'].map(s => (
-                            <button key={s} onClick={() => handleOverlayStyle('style', s)}
-                              className="w-5 h-5 rounded bg-background border border-border flex items-center justify-center hover:border-foreground/30 transition-all duration-150">
-                              <div className={`w-3 h-0 border-t-[1.5px] ${s === 'dashed' ? 'border-dashed' : 'border-solid'} border-foreground/60`} />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="h-px bg-border" />
-                      <div className="flex items-center gap-1">
-                        <button onClick={handleCopyOverlay} title="Copy"
-                          className="flex-1 h-7 rounded-lg hover:bg-foreground/5 flex items-center justify-center gap-1 text-foreground/40 hover:text-blue transition-all duration-150">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                            <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                          <span className="text-[9px] font-semibold">Copy</span>
-                        </button>
-                        <button onClick={handleDeleteOverlay} title="Delete (Del)"
-                          className="flex-1 h-7 rounded-lg hover:bg-red/10 flex items-center justify-center gap-1 text-foreground/40 hover:text-red transition-all duration-150">
-                          <Trash2 size={12} />
-                          <span className="text-[9px] font-semibold">Delete</span>
-                        </button>
-                      </div>
                     </div>
                   </div>
                 )}
