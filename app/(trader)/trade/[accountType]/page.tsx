@@ -354,10 +354,10 @@ function MobileTopBarRight() {
   );
 }
 
-function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChange, onIndToggle, onDrawTool, onRemoveDrawings, fullscreen = false }: { timeframe: string; onTimeframeChange: (tf: string) => void; chartType: 'candle' | 'line' | 'area'; onChartTypeChange: (t: 'candle' | 'line' | 'area') => void; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void; fullscreen?: boolean }) {
-  const [openMenu, setOpenMenu] = useState<'draw' | 'chart' | 'tf' | null>(null);
+function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChange, onIndToggle, onDrawTool, onRemoveDrawings, fullscreen = false, onDrawOpen }: { timeframe: string; onTimeframeChange: (tf: string) => void; chartType: 'candle' | 'line' | 'area'; onChartTypeChange: (t: 'candle' | 'line' | 'area') => void; onIndToggle: () => void; onDrawTool: (toolName: string) => void; onRemoveDrawings: () => void; fullscreen?: boolean; onDrawOpen?: () => void }) {
+  const [openMenu, setOpenMenu] = useState<'chart' | 'tf' | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
-  const toggleMenu = (m: 'draw' | 'chart' | 'tf') => setOpenMenu((cur) => (cur === m ? null : m));
+  const toggleMenu = (m: 'chart' | 'tf') => setOpenMenu((cur) => (cur === m ? null : m));
 
   const toolIcons: Record<string, React.ReactNode> = {
     'Trend Line': <TrendingUp size={14} />,
@@ -382,8 +382,8 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
     <div className="absolute left-2 bottom-8 z-40 flex flex-col max-lg:landscape:flex-row-reverse items-center gap-1.5">
       <div className={`flex flex-col max-lg:landscape:flex-row items-center py-2 max-lg:landscape:py-1.5 gap-1 max-lg:landscape:gap-1.5 max-lg:landscape:px-1.5 w-11 max-lg:landscape:w-auto rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all duration-300 ease-in-out ${toolsOpen ? 'max-lg:max-h-[420px] max-lg:opacity-100' : 'max-lg:max-h-0 max-lg:opacity-0 max-lg:py-0 max-lg:border-transparent max-lg:pointer-events-none max-lg:overflow-hidden'}`}>
       <div className="relative">
-        <button title="Drawing Tools" onClick={() => toggleMenu('draw')}
-          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${openMenu === 'draw' ? 'bg-surface-hover text-foreground' : 'text-text hover:bg-surface-hover hover:text-foreground'}`}>
+        <button title="Drawing Tools" onClick={onDrawOpen}
+          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all text-text hover:bg-surface-hover hover:text-foreground`}>
           <PencilRuler size={20} />
         </button>
       </div>
@@ -455,32 +455,6 @@ function SideToolbar({ timeframe, onTimeframeChange, chartType, onChartTypeChang
         className={`lg:hidden w-11 h-11 flex items-center justify-center rounded-2xl bg-background/70 backdrop-blur-xl border border-border/60 shadow-2xl transition-all active:scale-95 ${toolsOpen ? 'text-foreground' : 'text-text'}`}>
         <Settings2 size={20} />
       </button>
-      {openMenu === 'draw' && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4" onClick={() => setOpenMenu(null)}>
-          <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[300px] max-w-full max-h-[70vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-4 pt-4 pb-2 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-sm font-bold text-foreground">Drawing Tools</h3>
-              <button onClick={() => setOpenMenu(null)} className="w-7 h-7 flex items-center justify-center text-text hover:text-foreground rounded-lg hover:bg-surface-hover transition-colors">
-                <X size={14} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-3 pb-4">
-              {drawSections.map((sec) => (
-                <div key={sec.name} className="mb-1 last:mb-0">
-                  <div className="px-2.5 py-1.5 text-[9px] font-bold text-text-dark uppercase tracking-wider">{sec.name}</div>
-                  {sec.items.map((item) => (
-                    <button key={item} onClick={() => { setOpenMenu(null); onDrawTool(item); }}
-                      className="w-full flex items-center gap-2.5 px-2.5 py-2.5 text-xs font-medium text-text hover:text-foreground hover:bg-surface-hover rounded-lg transition-colors text-left active:scale-[0.99]">
-                      <span className="text-text-dark">{toolIcons[item]}</span>
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -777,6 +751,7 @@ export default function TradingPage() {
   const params = useParams();
   const accountType = (params.accountType as string) || 'demo';
   const [indOpen, setIndOpen] = useState(false);
+  const [drawDialogOpen, setDrawDialogOpen] = useState(false);
 
   const [pairs, setPairs] = useState<PairDef[]>([]);
   const [activePair, setActivePair] = useState<PairDef | null>(null);
@@ -1140,33 +1115,35 @@ export default function TradingPage() {
     chartRef.current?.copyOverlay(selectedOverlay.id);
   }, [selectedOverlay]);
 
-  const onDragStart = (e: React.MouseEvent) => {
+  const onDragStart = (e: React.PointerEvent) => {
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     dragRef.current = { startX: e.clientX, startY: e.clientY, startPosX: panelPos.x, startPosY: panelPos.y };
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       if (!dragRef.current) return;
       setPanelPos({
         x: dragRef.current.startPosX - (ev.clientX - dragRef.current.startX),
         y: dragRef.current.startPosY + (ev.clientY - dragRef.current.startY),
       });
     };
-    const onUp = () => { dragRef.current = null; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    const onUp = () => { dragRef.current = null; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   };
 
-  const onEditDragStart = (e: React.MouseEvent) => {
+  const onEditDragStart = (e: React.PointerEvent) => {
     e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     editDragRef.current = { startX: e.clientX, startY: e.clientY, startPosX: editPanelPos.x, startPosY: editPanelPos.y };
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       if (!editDragRef.current) return;
       setEditPanelPos({
         x: editDragRef.current.startPosX + (ev.clientX - editDragRef.current.startX),
         y: editDragRef.current.startPosY + (ev.clientY - editDragRef.current.startY),
       });
     };
-    const onUp = () => { editDragRef.current = null; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    const onUp = () => { editDragRef.current = null; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   };
 
   const price = currentPrice ?? activePair?.basePrice ?? 1.0;
@@ -1339,6 +1316,17 @@ export default function TradingPage() {
   }, []);
 
   useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedOverlay && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        handleDeleteOverlay();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedOverlay, handleDeleteOverlay]);
+
+  useEffect(() => {
     const intervalMsMap: Record<string, number> = { '5s': 5000, '30s': 30000, '1m': 60000, '5m': 300000, '10m': 600000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000 };
     const intervalMs = intervalMsMap[timeframe] ?? 60000;
     const update = () => {
@@ -1491,6 +1479,38 @@ export default function TradingPage() {
             onSettings={setIndSettings}
             onRemove={handleRemoveIndicator}
           />
+          {drawDialogOpen && (
+            <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4" onClick={() => setDrawDialogOpen(false)}>
+              <div className="bg-surface border border-border rounded-2xl shadow-2xl w-[300px] max-w-full max-h-[70vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="px-4 pt-4 pb-2 flex items-center justify-between flex-shrink-0">
+                  <h3 className="text-sm font-bold text-foreground">Drawing Tools</h3>
+                  <button onClick={() => setDrawDialogOpen(false)} className="w-7 h-7 flex items-center justify-center text-text hover:text-foreground rounded-lg hover:bg-surface-hover transition-colors">
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto px-3 pb-4">
+                  {[
+                    { name: 'Line', items: ['Trend Line', 'Horizontal Line', 'Horizontal Ray', 'Horizontal Segment', 'Ray Line', 'Extended Line'] },
+                    { name: 'Fibonacci', items: ['Fibonacci Retracement'] },
+                    { name: 'Shapes', items: ['Rectangle', 'Brush', 'Arrow Marker'] },
+                  ].map((sec) => (
+                    <div key={sec.name} className="mb-1 last:mb-0">
+                      <div className="px-2.5 py-1.5 text-[9px] font-bold text-text-dark uppercase tracking-wider">{sec.name}</div>
+                      {sec.items.map((item) => (
+                        <button key={item} onClick={() => { setDrawDialogOpen(false); handleDrawTool(item); }}
+                          className="w-full flex items-center gap-2.5 px-2.5 py-2.5 text-xs font-medium text-text hover:text-foreground hover:bg-surface-hover rounded-lg transition-colors text-left active:scale-[0.99]">
+                          <span className="text-text-dark">
+                            {({ 'Trend Line': <TrendingUp size={14} />, 'Horizontal Line': <Minus size={14} />, 'Horizontal Ray': <MoveHorizontal size={14} />, 'Horizontal Segment': <MoveHorizontal size={14} />, 'Ray Line': <ArrowRight size={14} />, 'Extended Line': <ChevronRight size={14} />, 'Fibonacci Retracement': <GitBranch size={14} />, 'Rectangle': <Square size={14} />, 'Brush': <Pencil size={14} />, 'Arrow Marker': <ArrowUpRight size={14} /> } as Record<string, React.ReactNode>)[item]}
+                          </span>
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {indSettings && (
             <IndSettingsDialog
               ind={indSettings}
@@ -1533,7 +1553,7 @@ export default function TradingPage() {
               </div>
               <div className="flex-1 relative overflow-hidden">
                 <Chart ref={chartRef} pairId={activePair.id} pairName={activePair.name} currentPrice={price} currentCandle={candle} seed={seed} timeframe={timeframe} serverTime={serverTime} onOverlaySelected={setSelectedOverlay} onViewChange={handleViewChange} watermark={accountType === 'demo' ? 'DEMO' : null} />
-                <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} chartType={chartType} onChartTypeChange={setChartType} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} fullscreen={isFullscreen} />
+                <SideToolbar timeframe={timeframe} onTimeframeChange={setTimeframe} chartType={chartType} onChartTypeChange={setChartType} onIndToggle={() => setIndOpen(!indOpen)} onDrawTool={handleDrawTool} onRemoveDrawings={handleRemoveDrawings} fullscreen={isFullscreen} onDrawOpen={() => setDrawDialogOpen(true)} />
                 {offLive && (
                   <button
                     onClick={() => {
@@ -1702,61 +1722,65 @@ export default function TradingPage() {
                 )}
 
                 {selectedOverlay && (
-                  <div className="absolute z-[60] bg-background/95 backdrop-blur-md border border-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden"
+                  <div className="absolute z-[60] bg-surface/95 backdrop-blur-md border border-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden w-[180px]"
                     style={{ left: `calc(50% + ${editPanelPos.x}px)`, top: `calc(8px + ${editPanelPos.y}px)`, transform: 'translateX(-50%)' }}>
-                    <div onMouseDown={isCompact ? undefined : onEditDragStart} className="h-7 bg-background border-b border-border flex items-center justify-between px-2.5 cursor-default lg:cursor-move select-none">
+                    <div onPointerDown={onEditDragStart} className="h-8 bg-background border-b border-border flex items-center justify-between px-2.5 cursor-default lg:cursor-move select-none touch-none">
                       <div className="flex items-center gap-1.5">
                         <svg className="w-3 h-3 text-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                           <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span className="text-[10px] font-semibold text-foreground/80">{selectedOverlay.name}</span>
+                        <span className="text-[10px] font-semibold text-foreground/80 capitalize">{selectedOverlay.name}</span>
                       </div>
-                      <div className="w-6 h-0.5 bg-border rounded-full" />
+                      <button onClick={() => setSelectedOverlay(null)} title="Close"
+                        className="w-5 h-5 rounded flex items-center justify-center text-foreground/30 hover:text-foreground hover:bg-surface-hover transition-colors">
+                        <X size={12} />
+                      </button>
                     </div>
-                    <div className="px-2.5 py-2 flex items-center gap-2">
+                    <div className="px-2.5 py-2 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-semibold text-textDark uppercase tracking-wider">Color</span>
+                        <div className="flex items-center gap-1">
+                          {['#00c365', '#ff4954', '#007aff', '#ff8c00', '#e4e8f0', '#ffff00', '#a855f7', '#ec4899'].map(c => (
+                            <button key={c} onClick={() => handleOverlayStyle('color', c)}
+                              className="w-4 h-4 rounded-full border border-foreground/10 hover:scale-125 transition-all duration-150" style={{ backgroundColor: c }} />
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-semibold text-textDark uppercase tracking-wider">Weight</span>
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4].map(w => (
+                            <button key={w} onClick={() => handleOverlayStyle('size', w)}
+                              className="w-5 h-5 rounded bg-background border border-border flex items-center justify-center hover:border-foreground/30 transition-all duration-150">
+                              <div className="rounded-full bg-white" style={{ width: w + 1, height: w + 1 }} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-semibold text-textDark uppercase tracking-wider">Style</span>
+                        <div className="flex items-center gap-0.5">
+                          {['solid', 'dashed'].map(s => (
+                            <button key={s} onClick={() => handleOverlayStyle('style', s)}
+                              className="w-5 h-5 rounded bg-background border border-border flex items-center justify-center hover:border-foreground/30 transition-all duration-150">
+                              <div className={`w-3 h-0 border-t-[1.5px] ${s === 'dashed' ? 'border-dashed' : 'border-solid'} border-foreground/60`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="h-px bg-border" />
                       <div className="flex items-center gap-1">
-                        {['#00c365', '#ff4954', '#007aff', '#ff8c00', '#e4e8f0', '#ffff00', '#a855f7', '#ec4899'].map(c => (
-                          <button key={c} onClick={() => handleOverlayStyle('color', c)}
-                            className="w-4 h-4 rounded-full border border-foreground/10 hover:scale-125 transition-all duration-150" style={{ backgroundColor: c }} />
-                        ))}
-                      </div>
-                      <div className="w-px h-5 bg-border" />
-                      <div className="flex items-center gap-0.5">
-                        {[1, 2, 3, 4].map(w => (
-                          <button key={w} onClick={() => handleOverlayStyle('size', w)}
-                            className="w-6 h-6 rounded-md bg-background border border-border flex items-center justify-center hover:border-foreground/30 transition-all duration-150">
-                            <div className="rounded-full bg-white" style={{ width: w + 1, height: w + 1 }} />
-                          </button>
-                        ))}
-                      </div>
-                      <div className="w-px h-5 bg-border" />
-                      <div className="flex items-center gap-0.5">
-                        {['solid', 'dashed'].map(s => (
-                          <button key={s} onClick={() => handleOverlayStyle('style', s)}
-                            className="w-6 h-6 rounded-md bg-background border border-border flex items-center justify-center hover:border-foreground/30 transition-all duration-150">
-                            <div className={`w-3 h-0 border-t-[1.5px] ${s === 'dashed' ? 'border-dashed' : 'border-solid'} border-foreground/60`} />
-                          </button>
-                        ))}
-                      </div>
-                      <div className="w-px h-5 bg-border" />
-                      <div className="flex items-center gap-0.5">
                         <button onClick={handleCopyOverlay} title="Copy"
-                          className="w-6 h-6 rounded-md hover:bg-foreground/5 flex items-center justify-center text-foreground/30 hover:text-blue transition-all duration-150">
+                          className="flex-1 h-7 rounded-lg hover:bg-foreground/5 flex items-center justify-center gap-1 text-foreground/40 hover:text-blue transition-all duration-150">
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                             <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
+                          <span className="text-[9px] font-semibold">Copy</span>
                         </button>
-                        <button onClick={handleDeleteOverlay} title="Delete"
-                          className="w-6 h-6 rounded-md hover:bg-red/10 flex items-center justify-center text-foreground/30 hover:text-red transition-all duration-150">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                            <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </button>
-                        <button onClick={() => setSelectedOverlay(null)} title="Close"
-                          className="w-6 h-6 rounded-md hover:bg-foreground/5 flex items-center justify-center text-foreground/30 hover:text-foreground/60 transition-all duration-150">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                            <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+                        <button onClick={handleDeleteOverlay} title="Delete (Del)"
+                          className="flex-1 h-7 rounded-lg hover:bg-red/10 flex items-center justify-center gap-1 text-foreground/40 hover:text-red transition-all duration-150">
+                          <Trash2 size={12} />
+                          <span className="text-[9px] font-semibold">Delete</span>
                         </button>
                       </div>
                     </div>
@@ -1765,7 +1789,7 @@ export default function TradingPage() {
                 {isFullscreen && !isCompact && (
                   <div className="absolute z-50 w-[220px] bg-surface/95 backdrop-blur-sm border border-border rounded-xl shadow-2xl overflow-hidden"
                     style={{ right: 16 + panelPos.x, top: `calc(50% + ${panelPos.y}px)`, transform: 'translateY(-50%)' }}>
-                    <div onMouseDown={onDragStart} className="h-7 bg-background border-b border-border flex items-center justify-center cursor-move select-none">
+                    <div onPointerDown={onDragStart} className="h-7 bg-background border-b border-border flex items-center justify-center cursor-move select-none touch-none">
                       <div className="w-8 h-1 bg-border rounded-full" />
                     </div>
                     <div className="p-2.5 flex flex-col gap-2.5">
