@@ -1752,11 +1752,11 @@ export default function TradingPage() {
                             <div className="fixed inset-0 z-[69]" onClick={() => setColorPickerOpen(false)} />
                             <div className="absolute top-full left-0 mt-1.5 bg-background border border-border rounded-xl shadow-2xl p-2.5 z-[70]"
                               onClick={(e) => e.stopPropagation()}>
-                              <div className="grid grid-cols-4 gap-2">
+                              <div className="grid grid-cols-4 gap-2.5 p-0.5">
                                 {['#00c365', '#ff4954', '#007aff', '#ff8c00', '#e4e8f0', '#ffff00', '#a855f7', '#ec4899',
                                   '#ffffff', '#6b7280', '#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4'].map(c => (
                                   <button key={c} onClick={() => { handleOverlayStyle('color', c); setColorPickerOpen(false); }}
-                                    className="w-6 h-6 rounded-lg border border-foreground/10 hover:scale-125 transition-all duration-150"
+                                    className="w-8 h-8 rounded-lg border border-foreground/10 hover:scale-110 transition-all duration-150"
                                     style={{ backgroundColor: c }} />
                                 ))}
                               </div>
