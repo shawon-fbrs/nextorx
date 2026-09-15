@@ -1475,7 +1475,7 @@ export default function TradingPage() {
   const isComingSoon = accountType === 'funded' || accountType === 'tournament';
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden 2xl:max-w-[1920px] 2xl:mx-auto 2xl:w-full">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden 2xl:max-w-[1920px] 4xl:max-w-full 2xl:mx-auto 2xl:w-full">
       {isLandscape && (
         <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} onMenuClick={() => setLandNavOpen(true)} />
       )}
