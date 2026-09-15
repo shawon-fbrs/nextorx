@@ -903,6 +903,16 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   }, [pairId, seed, timeframe, restoreDrawings, writeDrawings]);
 
   useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') {
+        restoreDrawings();
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, [restoreDrawings]);
+
+  useEffect(() => {
     if (!currentCandle) return;
     const chart = chartRef.current;
     const tf = timeframeRef.current;
