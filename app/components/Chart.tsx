@@ -372,20 +372,19 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
           } catch {}
         }
       };
-      const raw = localStorage.getItem(storageKey(pid, tf));
-      if (raw) {
-        const arr = JSON.parse(raw) as Array<{ name: string; points: unknown; styles: unknown; lock?: boolean; visible?: boolean }>;
-        applyDrawings(arr);
-      }
       fetch(`/api/drawing?pairId=${encodeURIComponent(pid)}&timeframe=${encodeURIComponent(tf)}`)
         .then(r => r.json())
         .then((data: { drawings?: Array<{ name: string; points: unknown; styles: unknown; lock?: boolean; visible?: boolean }> }) => {
-          if (data.drawings && data.drawings.length > 0) {
-            applyDrawings(data.drawings);
-          }
-          try { localStorage.setItem(storageKey(pid, tf), JSON.stringify(data.drawings ?? [])); } catch {}
+          const drawings = data.drawings ?? [];
+          applyDrawings(drawings);
+          try { localStorage.setItem(storageKey(pid, tf), JSON.stringify(drawings)); } catch {}
         })
-        .catch(() => {});
+        .catch(() => {
+          try {
+            const raw = localStorage.getItem(storageKey(pid, tf));
+            if (raw) applyDrawings(JSON.parse(raw));
+          } catch {}
+        });
     } catch {}
   }, [persistDrawings]);
 
