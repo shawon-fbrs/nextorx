@@ -658,10 +658,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         const toRemove = chart.getOverlays({}).filter(o => o.name !== 'horizontalSegment' && o.name !== 'demoWatermark');
         for (const o of toRemove) { if (o.id) chart.removeOverlay({ id: o.id }); }
         if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
-        try {
-          const pid = pairIdRef.current;
-          if (pid) localStorage.setItem(storageKey(pid, timeframeRef.current), JSON.stringify([]));
-        } catch {}
+        writeDrawings(pairIdRef.current, timeframeRef.current);
       }
     },
     overrideOverlay: (id: string, overlay: Record<string, unknown>) => {
