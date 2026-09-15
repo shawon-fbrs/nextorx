@@ -145,7 +145,7 @@ export function TradingPanel({
               />
             </div>
             <button onClick={() => setTimeSheet(true)} title="Quick times"
-              className="lg:hidden w-9 h-9 rounded-lg bg-blue/15 border border-blue/40 text-blue flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform">
+              className="w-9 h-9 rounded-lg bg-blue/15 border border-blue/40 text-blue flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -202,7 +202,7 @@ export function TradingPanel({
               className="flex-1 min-w-0 h-9 bg-surface border border-border rounded-lg px-2 text-foreground font-bold text-lg max-lg:text-base text-center focus:outline-none focus:border-blue [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             <button onClick={() => setAmountSheet(true)} title="Quick amounts"
-              className="lg:hidden w-9 h-9 rounded-lg bg-blue/15 border border-blue/40 text-blue text-sm font-bold flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform">
+              className="w-9 h-9 rounded-lg bg-blue/15 border border-blue/40 text-blue text-sm font-bold flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform">
               $
             </button>
             <button onClick={() => setInvestment(Math.min(maxTrade, investment + 1))}
@@ -228,7 +228,7 @@ export function TradingPanel({
         </div>
 
         {/* Payout */}
-        <div className="hidden">
+        <div className="hidden lg:block max-lg:landscape:block">
           <div className="flex items-center justify-between mb-1.5 px-1">
             <span className="text-[10px] text-textDark font-semibold uppercase tracking-wider">Potential Payout</span>
           </div>
@@ -265,6 +265,15 @@ export function TradingPanel({
             <span>Up</span>
             <span className="text-green-200 text-sm font-semibold ml-1">${(parseFloat(payoutAmount)).toFixed(2)}</span>
           </button>
+          {symbol.spread != null && Number(symbol.spread) > 0 && (
+            <div className="hidden max-lg:flex max-lg:landscape:hidden items-center justify-center gap-2 py-0.5 px-2 mx-auto">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[9px] font-mono font-bold text-textDark whitespace-nowrap">
+                Spread {Number(symbol.spread).toFixed(symbol.basePrice && symbol.basePrice < 10 ? 4 : 2)}
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+          )}
           <button
             onClick={() => onTrade('down')}
             onMouseEnter={() => onDirectionHover?.('down')}
