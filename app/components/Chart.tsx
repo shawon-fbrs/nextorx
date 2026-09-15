@@ -310,20 +310,12 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         visible: (o as unknown as { visible?: boolean }).visible,
       }));
       const key = storageKey(pid, tf);
-      if (toSave.length === 0) {
-        try {
-          const raw = localStorage.getItem(key);
-          if (raw && (JSON.parse(raw) as unknown[]).length > 0) return;
-        } catch {}
-      }
       localStorage.setItem(key, JSON.stringify(toSave));
-      try {
-        fetch('/api/drawing', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pairId: pid, timeframe: tf, drawings: toSave }),
-        }).catch(() => {});
-      } catch {}
+      fetch('/api/drawing', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pairId: pid, timeframe: tf, drawings: toSave }),
+      }).catch(() => {});
     } catch {}
   }, [cleanPoints]);
 
@@ -390,8 +382,8 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         .then((data: { drawings?: Array<{ name: string; points: unknown; styles: unknown; lock?: boolean; visible?: boolean }> }) => {
           if (data.drawings && data.drawings.length > 0) {
             applyDrawings(data.drawings);
-            try { localStorage.setItem(storageKey(pid, tf), JSON.stringify(data.drawings)); } catch {}
           }
+          try { localStorage.setItem(storageKey(pid, tf), JSON.stringify(data.drawings ?? [])); } catch {}
         })
         .catch(() => {});
     } catch {}
