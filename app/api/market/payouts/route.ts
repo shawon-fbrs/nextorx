@@ -14,8 +14,8 @@ export async function GET() {
         return [p.id, b] as const;
       }),
     );
-    const map: Record<string, { payout: number; base: number; adjustments: { reason: string; delta: number }[] }> = {};
-    for (const [id, b] of entries) map[id] = b;
+    const map: Record<string, { payout: number }> = {};
+    for (const [id, b] of entries) map[id] = { payout: b.payout };
     return Response.json({ payouts: map });
   } catch (e) {
     return toJsonError(e);

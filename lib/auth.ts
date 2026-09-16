@@ -17,7 +17,10 @@ function generateReferralCode(length = 8): string {
 }
 
 function generateUid(): string {
-  return String(10000000 + Math.floor(Math.random() * 90000000));
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  const num = (bytes[0] << 24 | bytes[1] << 16 | bytes[2] << 8 | bytes[3]) >>> 0;
+  return String(10000000 + (num % 90000000));
 }
 
 export const auth = betterAuth({

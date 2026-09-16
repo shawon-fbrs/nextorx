@@ -2,7 +2,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, Delete
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 function getEnv(name: string): string | undefined {
-  return process.env[name] ?? process.env[`NEXT_PUBLIC_${name}`];
+  return process.env[name];
 }
 
 function getS3Config() {

@@ -78,12 +78,11 @@ export function parseListQuery(
   return { status, limit };
 }
 
-export function toJsonError(e: unknown) {  if (e instanceof ApiError) {
+export function toJsonError(e: unknown) {
+  if (e instanceof ApiError) {
     return Response.json({ error: e.message }, { status: e.status });
   }
-  const message = e instanceof Error ? e.message : "Internal server error";
-  const status = e instanceof Error && "status" in e ? 400 : 500;
-  return Response.json({ error: message }, { status });
+  return Response.json({ error: "Internal server error" }, { status: 500 });
 }
 
 export async function getUserWithProfile(userId: string) {
