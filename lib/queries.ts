@@ -1,10 +1,27 @@
 import { prisma } from "@/lib/db";
-import { requirePermission, requireUser } from "@/lib/api";
+import { requireUser, getSessionUser } from "@/lib/api";
 import { getSettings, SETTING_DEFAULTS } from "@/lib/settings";
 import { getVaultSnapshot } from "@/lib/vault";
+import { redirect } from "next/navigation";
+
+async function requireAdmin() {
+  try {
+    return await requireAdmin();
+  } catch {
+    redirect("/login");
+  }
+}
+
+async function requireAuth() {
+  try {
+    return await requireUser();
+  } catch {
+    redirect("/login");
+  }
+}
 
 export async function getAdminDashboardStats() {
-  await requirePermission("user", "list");
+  await requireAdmin();
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -87,7 +104,7 @@ export async function getAdminDashboardStats() {
 }
 
 export async function getAdminUsers(params?: { q?: string; limit?: number }) {
-  await requirePermission("user", "list");
+  await requireAdmin();
   const q = params?.q ?? "";
   const limit = Math.min(params?.limit ?? 200, 200);
 
@@ -123,7 +140,7 @@ export async function getAdminUsers(params?: { q?: string; limit?: number }) {
 }
 
 export async function getAdminUserDetail(userId: string) {
-  await requirePermission("user", "list");
+  await requireAdmin();
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -177,7 +194,7 @@ export async function getAdminUserDetail(userId: string) {
 }
 
 export async function getAdminTrades(params?: { status?: string; limit?: number }) {
-  await requirePermission("trade", "list");
+  await requireAdmin();
   const limit = Math.min(params?.limit ?? 500, 500);
   const status = params?.status;
 
@@ -204,7 +221,7 @@ export async function getAdminTrades(params?: { status?: string; limit?: number 
 }
 
 export async function getAdminTreasury() {
-  await requirePermission("deposit", "list");
+  await requireAdmin();
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -310,7 +327,7 @@ export async function getAdminTreasury() {
 }
 
 export async function getAdminFinance() {
-  await requirePermission("deposit", "list");
+  await requireAdmin();
 
   const [deposits, withdrawals] = await Promise.all([
     prisma.depositRequest.findMany({
@@ -367,7 +384,7 @@ export async function getAdminFinance() {
 }
 
 export async function getAdminAuditLogs() {
-  await requirePermission("audit", "read");
+  await requireAdmin();
 
   const logs = await prisma.auditLog.findMany({
     orderBy: { createdAt: "desc" },
@@ -392,7 +409,7 @@ export async function getAdminAuditLogs() {
 }
 
 export async function getAdminSettings() {
-  await requirePermission("settings", "read");
+  await requireAdmin();
   const settings = await getSettings();
   return Object.keys(SETTING_DEFAULTS).map((key) => ({
     key,
@@ -402,7 +419,7 @@ export async function getAdminSettings() {
 }
 
 export async function getAdminExposure() {
-  await requirePermission("trade", "list");
+  await requireAdmin();
 
   const rows = await prisma.trade.groupBy({
     by: ["pairId", "direction"],
@@ -459,7 +476,7 @@ export async function getAdminExposure() {
 }
 
 export async function getAdminPnl(days = 30) {
-  await requirePermission("deposit", "list");
+  await requireAdmin();
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
   const [dailyTrades, dailyFlows, byPair] = await Promise.all([
@@ -562,7 +579,7 @@ export async function getAdminPnl(days = 30) {
 }
 
 export async function getAdminPairs() {
-  await requirePermission("pair", "list");
+  await requireAdmin();
 
   const pairs = await prisma.pair.findMany({
     orderBy: { sortOrder: "asc" },
@@ -587,7 +604,7 @@ export async function getAdminPairs() {
 }
 
 export async function getAdminPromos() {
-  await requirePermission("promo", "read");
+  await requireAdmin();
 
   const promos = await prisma.promoCode.findMany({
     orderBy: { createdAt: "desc" },
@@ -604,7 +621,7 @@ export async function getAdminPromos() {
 }
 
 export async function getAdminKyc(status?: string) {
-  await requirePermission("kyc", "list");
+  await requireAdmin();
 
   const where = status ? { status: status as "PENDING" } : {};
   const [submissions, counts] = await Promise.all([
@@ -639,7 +656,7 @@ export async function getAdminKyc(status?: string) {
 }
 
 export async function getAdminPaymentMethods() {
-  await requirePermission("payment", "list");
+  await requireAdmin();
 
   const methods = await prisma.paymentMethod.findMany({
     orderBy: { sortOrder: "asc" },
@@ -649,7 +666,7 @@ export async function getAdminPaymentMethods() {
 }
 
 export async function getAdminResources() {
-  await requirePermission("settings", "read");
+  await requireAdmin();
 
   const categories = await prisma.resourceCategory.findMany({
     orderBy: { name: "asc" },
@@ -675,8 +692,8 @@ export async function getAdminResources() {
 }
 
 export async function getUserTransactions(userId: string, limit = 100) {
-  const user = await requireUser();
-  if (user.id !== userId) throw new Error("UNAUTHORIZED");
+  const user = await requireAuth();
+  if (user.id !== userId) redirect("/");
 
   const entries = await prisma.ledgerEntry.findMany({
     where: { userId },
@@ -688,8 +705,8 @@ export async function getUserTransactions(userId: string, limit = 100) {
 }
 
 export async function getUserNotifications(userId: string, limit = 50) {
-  const user = await requireUser();
-  if (user.id !== userId) throw new Error("UNAUTHORIZED");
+  const user = await requireAuth();
+  if (user.id !== userId) redirect("/");
 
   const [notifications, unread] = await Promise.all([
     prisma.notification.findMany({
