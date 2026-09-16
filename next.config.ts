@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   output: "standalone",
   productionBrowserSourceMaps: false,
-  serverExternalPackages: ["bcryptjs", "ws"],
+  serverExternalPackages: ["bcryptjs", "ws", "ioredis"],
   allowedDevOrigins: ["localhost:3000", "127.0.0.1:3000"],
   headers: async () => [
     { source: "/(.*)", headers: securityHeaders },

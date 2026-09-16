@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { withCache, cacheDel, cacheDelPattern } from "@/lib/redis";
 
 export const SETTING_DEFAULTS: Record<string, { value: number; label: string }> = {
   bonusTurnoverMultiplier: { value: 30, label: "Bonus turnover multiplier" },
@@ -16,31 +17,39 @@ export const SETTING_DEFAULTS: Record<string, { value: number; label: string }> 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 
 export async function getSettings(): Promise<Record<string, number>> {
-  const rows = await prisma.platformSetting.findMany();
-  const found = new Map(rows.map((r: any) => [r.key, r.value]));
-  const missing = Object.keys(SETTING_DEFAULTS).filter((k) => !found.has(k));
-  if (missing.length > 0) {
-    await prisma.platformSetting.createMany({
-      data: missing.map((k) => ({
-        key: k,
-        value: SETTING_DEFAULTS[k].value,
-        label: SETTING_DEFAULTS[k].label,
-      })),
-      skipDuplicates: true,
-    });
-    for (const k of missing) found.set(k, SETTING_DEFAULTS[k].value);
-  }
-  return Object.fromEntries(found);
+  return withCache("settings:all", 300, async () => {
+    const rows = await prisma.platformSetting.findMany();
+    const found = new Map(rows.map((r: any) => [r.key, r.value]));
+    const missing = Object.keys(SETTING_DEFAULTS).filter((k) => !found.has(k));
+    if (missing.length > 0) {
+      await prisma.platformSetting.createMany({
+        data: missing.map((k) => ({
+          key: k,
+          value: SETTING_DEFAULTS[k].value,
+          label: SETTING_DEFAULTS[k].label,
+        })),
+        skipDuplicates: true,
+      });
+      for (const k of missing) found.set(k, SETTING_DEFAULTS[k].value);
+    }
+    return Object.fromEntries(found);
+  });
 }
 
 export async function getSetting(key: SettingKey): Promise<number> {
-  const row = await prisma.platformSetting.findUnique({ where: { key } });
-  if (row) return row.value;
-  const def = SETTING_DEFAULTS[key];
-  await prisma.platformSetting.upsert({
-    where: { key },
-    create: { key, value: def.value, label: def.label },
-    update: {},
+  return withCache(`settings:${key}`, 300, async () => {
+    const row = await prisma.platformSetting.findUnique({ where: { key } });
+    if (row) return row.value;
+    const def = SETTING_DEFAULTS[key];
+    await prisma.platformSetting.upsert({
+      where: { key },
+      create: { key, value: def.value, label: def.label },
+      update: {},
+    });
+    return def.value;
   });
-  return def.value;
+}
+
+export async function invalidateSettingsCache(): Promise<void> {
+  await cacheDelPattern("settings:*");
 }

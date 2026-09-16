@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/services/audit";
-import { getSettings, SETTING_DEFAULTS } from "@/lib/settings";
+import { getSettings, SETTING_DEFAULTS, invalidateSettingsCache } from "@/lib/settings";
+import { cacheDelPattern } from "@/lib/redis";
 import { verifyDeposit, rejectDeposit } from "@/lib/services/deposits";
 import { approveWithdrawal, rejectWithdrawal } from "@/lib/services/withdrawals";
 import { credit, debit } from "@/lib/ledger";
@@ -29,6 +30,7 @@ export async function updatePairPayout(pairId: string, payout: number) {
     });
 
     await logAudit(admin.id, "pair.update-payout", "Pair", pairId, { payoutPercent: payout });
+    await cacheDelPattern("market:pairs:*");
     revalidatePath("/console-panel/otc");
     revalidatePath("/console-panel/settings");
     return { ok: true };
@@ -68,6 +70,7 @@ export async function updatePairStatus(pairId: string, isActive: boolean) {
     }
 
     await logAudit(admin.id, "pair.toggle", "Pair", pairId, { isActive });
+    await cacheDelPattern("market:pairs:*");
     revalidatePath("/console-panel/otc");
     return { ok: true };
   } catch (e) {
@@ -100,6 +103,7 @@ export async function updatePlatformSettings(values: Record<string, number>) {
       after: await getSettings(),
     });
 
+    await invalidateSettingsCache();
     revalidatePath("/console-panel/settings");
     return { ok: true };
   } catch (e) {

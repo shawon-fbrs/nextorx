@@ -2,16 +2,14 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { toJsonError } from "@/lib/api";
 import { getOTCEngine } from "@/lib/otc-engine";
-
-let cache: { ts: number; category: string; body: unknown } | null = null;
-const CACHE_TTL_MS = 30000;
+import { cacheGet, cacheSet, cacheDelPattern } from "@/lib/redis";
 
 export async function GET(request: NextRequest) {
   try {
     const category = request.nextUrl.searchParams.get("category") ?? "";
-    if (cache && Date.now() - cache.ts < CACHE_TTL_MS && cache.category === category) {
-      return Response.json(cache.body);
-    }
+    const cacheKey = `market:pairs:${category}`;
+    const cached = await cacheGet<{ pairs: unknown[] }>(cacheKey);
+    if (cached) return Response.json(cached);
     const pairs = await prisma.pair.findMany({
       where: {
         isActive: true,
@@ -64,7 +62,7 @@ export async function GET(request: NextRequest) {
       };
     });
     const body = { pairs: out };
-    cache = { ts: Date.now(), category, body };
+    await cacheSet(cacheKey, body, 30);
     return Response.json(body);
   } catch (e) {
     return toJsonError(e);

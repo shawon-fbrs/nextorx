@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { withCache, cacheDel } from "@/lib/redis";
 
 const PEAK_HOURS_UTC = new Set([8, 9, 10, 14, 15, 16, 17, 20, 21]);
 const PEAK_ADJUSTMENT = -2;
@@ -23,19 +24,25 @@ export interface PayoutBreakdown {
 }
 
 async function getVaultReservePercent(): Promise<number> {
-  const [balanceAgg, exposureAgg, pendingAgg] = await Promise.all([
-    prisma.user.aggregate({
-      where: { deposits: { some: { status: "VERIFIED" } } },
-      _sum: { balance: true },
-    }),
-    prisma.trade.aggregate({ where: { status: "ACTIVE" }, _sum: { amount: true } }),
-    prisma.withdrawalRequest.aggregate({ where: { status: "PENDING" }, _sum: { amount: true } }),
-  ]);
-  const total = Number(balanceAgg._sum.balance ?? 0);
-  if (total <= 0) return 100;
-  const committed =
-    Number(exposureAgg._sum.amount ?? 0) + Number(pendingAgg._sum.amount ?? 0);
-  return ((total - committed) / total) * 100;
+  return withCache("vault:reservePercent", 15, async () => {
+    const [balanceAgg, exposureAgg, pendingAgg] = await Promise.all([
+      prisma.user.aggregate({
+        where: { deposits: { some: { status: "VERIFIED" } } },
+        _sum: { balance: true },
+      }),
+      prisma.trade.aggregate({ where: { status: "ACTIVE" }, _sum: { amount: true } }),
+      prisma.withdrawalRequest.aggregate({ where: { status: "PENDING" }, _sum: { amount: true } }),
+    ]);
+    const total = Number(balanceAgg._sum.balance ?? 0);
+    if (total <= 0) return 100;
+    const committed =
+      Number(exposureAgg._sum.amount ?? 0) + Number(pendingAgg._sum.amount ?? 0);
+    return ((total - committed) / total) * 100;
+  });
+}
+
+export async function invalidateVaultCache(): Promise<void> {
+  await cacheDel("vault:reservePercent");
 }
 
 export async function getPayoutBreakdown(pairId: string, now = new Date()): Promise<PayoutBreakdown> {
