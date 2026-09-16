@@ -957,7 +957,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
       if (document.visibilityState === 'visible') {
         restoreDrawings();
       }
-    }, 5000);
+    }, 30000);
     return () => clearInterval(iv);
   }, [restoreDrawings]);
 
