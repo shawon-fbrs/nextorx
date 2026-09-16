@@ -168,7 +168,7 @@ function TopBar({
   activePair: PairDef | null;
   effectivePayout: number | null;
   payoutMap: Record<string, number>;
-  payoutDetails: Record<string, { base: number; payout: number; adjustments: { reason: string; delta: number }[] }>;
+  payoutDetails: Record<string, { base: number; payout: number; adjustments?: { reason: string; delta: number }[] }>;
   trades: Trade[];
   currentPrice: number | null;
   onSelect: (p: PairDef) => void;
@@ -268,7 +268,7 @@ function TopBar({
               const isOpen = visibleIds.includes(pair.id);
               const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
               const detail = payoutDetails[pair.id];
-              const title = detail ? `Base ${detail.base}%${detail.adjustments.length ? ' ' + detail.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${detail.payout}%` : `${shownPayout}%`;
+              const title = detail ? `Base ${detail.base}%${detail.adjustments?.length ? ' ' + detail.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${detail.payout}%` : `${shownPayout}%`;
               const chg = pair.changePct24h;
               return (
                 <button key={pair.id} onClick={() => { onSelect(pair); setAddOpen(false); }}
@@ -322,7 +322,7 @@ function TopBar({
             <div className="flex flex-col flex-1 min-w-0">
               <span className="text-xs font-bold text-foreground leading-tight truncate">{pair.name}</span>
               <div className="flex items-center gap-1 leading-tight">
-                <span className="text-[10px] font-bold text-orange" title={(() => { const d = payoutDetails[pair.id]; return d ? `Base ${d.base}%${d.adjustments.length ? ' ' + d.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${d.payout}%` : `${shownPayout}%`; })()}>{shownPayout}%</span>
+                <span className="text-[10px] font-bold text-orange" title={(() => { const d = payoutDetails[pair.id]; return d ? `Base ${d.base}%${d.adjustments?.length ? ' ' + d.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${d.payout}%` : `${shownPayout}%`; })()}>{shownPayout}%</span>
                 {unrealized !== null ? (
                   <span className={`text-[10px] font-bold ${!showLive ? 'opacity-60' : ''} ${unrealized >= 0 ? 'text-green' : 'text-red'}`}>• {unrealized >= 0 ? '+' : ''}{unrealized.toFixed(2)}$</span>
                 ) : pairActiveTrades.length > 0 ? (
@@ -1287,7 +1287,7 @@ export default function TradingPage() {
     };
   }, [refreshTrades, activePair, timeframe]);
 
-  const [payoutDetails, setPayoutDetails] = useState<Record<string, { base: number; payout: number; adjustments: { reason: string; delta: number }[] }>>({});
+  const [payoutDetails, setPayoutDetails] = useState<Record<string, { base: number; payout: number; adjustments?: { reason: string; delta: number }[] }>>({});
 
   useEffect(() => {
     if (pairs.length === 0) return;
@@ -1299,7 +1299,7 @@ export default function TradingPage() {
         const data = await res.json();
         if (cancelled) return;
         const map: Record<string, number> = {};
-        const details: Record<string, { base: number; payout: number; adjustments: { reason: string; delta: number }[] }> = {};
+        const details: Record<string, { base: number; payout: number; adjustments?: { reason: string; delta: number }[] }> = {};
         for (const p of pairs) {
           const b = data.payouts?.[p.id];
           if (b && typeof b.payout === 'number') {
