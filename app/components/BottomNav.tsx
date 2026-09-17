@@ -9,6 +9,8 @@ import { LeaderboardDrawer } from './LeaderboardDrawer';
 import { Podium, Trophy, BanknoteArrowDown, BanknoteArrowUp, ArrowLeftRight, ChartSpline, TicketPercent } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { TradeCard, useTradeCountdown, useLivePnL, type TradeCardData } from './TradeCard';
+import { usePairs } from '@/app/(trader)/pairs-context';
+
 function getAccountTypeFromPath(pathname: string): string {
   const match = pathname.match(/\/trade\/(\w+)/);
   return match ? match[1] : 'real';
@@ -47,10 +49,7 @@ function PositionsSheet({ onClose, currentPrice, payoutMap }: { onClose: () => v
   const now = useTradeCountdown();
   const [trades, setTrades] = useState<PositionTrade[]>([]);
   const [expanded, setExpanded] = useState<string | number | null>(null);
-  const [pairs, setPairs] = useState<Array<{ id: string; name: string; iconUrl?: string | null; iconUrl2?: string | null; category?: string }>>([]);
-  useEffect(() => {
-    fetch('/api/market/pairs').then((r) => r.json()).then((d) => setPairs(d.pairs ?? [])).catch(() => {});
-  }, []);
+  const { pairs } = usePairs();
 
   useEffect(() => {
     let cancelled = false;
@@ -189,14 +188,13 @@ export function LandscapeDrawer({ open, onClose }: { open: boolean; onClose: () 
   const [boardOpen, setBoardOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [bottomPrice, setBottomPrice] = useState<number | null>(null);
-  const [bottomPayouts, setBottomPayouts] = useState<Record<string, number>>({});
+  const { payoutMap: bottomPayouts } = usePairs();
   useEffect(() => {
     const onTick = (e: Event) => {
       const d = (e as CustomEvent).detail as { price?: number };
       if (d?.price != null) setBottomPrice(d.price);
     };
     window.addEventListener('trade:price', onTick as EventListener);
-    fetch('/api/market/payouts').then((r) => r.json()).then((d) => setBottomPayouts(d.payouts ?? {})).catch(() => {});
     return () => window.removeEventListener('trade:price', onTick as EventListener);
   }, []);
 
@@ -280,14 +278,13 @@ export function BottomNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [bottomPrice, setBottomPrice] = useState<number | null>(null);
-  const [bottomPayouts, setBottomPayouts] = useState<Record<string, number>>({});
+  const { payoutMap: bottomPayouts } = usePairs();
   useEffect(() => {
     const onTick = (e: Event) => {
       const d = (e as CustomEvent).detail as { price?: number };
       if (d?.price != null) setBottomPrice(d.price);
     };
     window.addEventListener('trade:price', onTick as EventListener);
-    fetch('/api/market/payouts').then((r) => r.json()).then((d) => setBottomPayouts(d.payouts ?? {})).catch(() => {});
     return () => window.removeEventListener('trade:price', onTick as EventListener);
   }, []);
 

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { postEntryInTx } from "@/lib/ledger";
+import { broadcastToUser } from "@/lib/ws-broadcast";
 
 export async function getSnapshotPrice(pairId: string, fallbackBase: number): Promise<number> {  try {
     const { getOTCEngine } = await import("@/lib/otc-engine");
@@ -107,6 +108,38 @@ export async function settleTradeById(tradeId: string): Promise<boolean> {
         }
       }
     });
+
+    // Broadcast trade:settled to user's WS connections
+    broadcastToUser(trade.userId, {
+      type: "trade:settled",
+      trade: {
+        id: trade.id,
+        pairId: trade.pairId,
+        direction: trade.direction,
+        amount: trade.amount / 100,
+        payout: payout / 100,
+        profit: profit / 100,
+        status: won ? "won" : "lost",
+        openPrice: Number(trade.openPrice),
+        closePrice,
+        expiresAt: new Date(trade.createdAt).getTime() + trade.durationSeconds * 1000,
+      },
+    });
+
+    // Fetch updated balance and broadcast
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: trade.userId },
+        select: { balance: true, demoBalance: true },
+      });
+      if (user) {
+        broadcastToUser(trade.userId, {
+          type: "balance:updated",
+          balance: user.balance / 100,
+          demoBalance: user.demoBalance / 100,
+        });
+      }
+    } catch {}
 
     return true;
   } catch (error) {

@@ -9,7 +9,7 @@ A full-stack binary options trading platform with a Quotex-style trader frontend
 | Framework | Next.js 16 (App Router, Turbopack) |
 | Language | TypeScript 5 |
 | UI | React 19, TailwindCSS 4 |
-| Charts | Recharts (admin), Lightweight Charts (trader — planned) |
+| Charts | Recharts (admin), KLineCharts v10 (trader) |
 | State | React hooks (useState, useContext) |
 | Package Manager | pnpm |
 
@@ -18,51 +18,55 @@ A full-stack binary options trading platform with a Quotex-style trader frontend
 ```
 nextorx/
 ├── app/                          # Next.js App Router
-│   ├── page.tsx                  # Trader frontend (main trading page)
 │   ├── layout.tsx                # Root layout (Roboto font)
 │   ├── globals.css               # TailwindCSS v4 theme config
-│   ├── components/               # Trader frontend components
+│   ├── components/               # Shared React components
 │   │   ├── Header.tsx            # Top nav (balance, notifications, level)
 │   │   ├── Sidebar.tsx           # Collapsible left sidebar
-│   │   ├── AssetTabs.tsx         # Floating asset tabs + add dropdown
-│   │   ├── Chart.tsx             # SVG candlestick chart + toolbar + fullscreen
-│   │   └── TradingPanel.tsx      # Right panel (trade controls, history)
-│   ├── lib/                      # Shared types & utilities
-│   │   └── types.ts              # Trade, SymbolDef, Candle, 35 SYMBOLS
-│   └── console-panel/            # Admin panel
-│       ├── op/page.tsx           # Admin login
-│       └── (dashboard)/          # Admin dashboard (with layout)
-│           ├── layout.tsx        # Admin layout (sidebar + header)
-│           ├── page.tsx          # Dashboard (stats + charts)
-│           ├── users/page.tsx    # Users list with data table
-│           ├── users/[id]/page.tsx # User detail
-│           ├── trades/page.tsx   # Trades (placeholder)
-│           ├── finance/page.tsx  # Finance (placeholder)
-│           ├── otc/page.tsx      # OTC Pairs (placeholder)
-│           ├── reports/page.tsx  # Reports (placeholder)
-│           └── settings/page.tsx # Settings (placeholder)
+│   │   ├── BottomNav.tsx         # Mobile bottom navigation
+│   │   ├── Chart.tsx             # KLineCharts candlestick chart
+│   │   ├── TradingPanel.tsx      # Right panel (trade controls, history)
+│   │   ├── TradeCard.tsx         # Active trade card with live PnL
+│   │   ├── AccountMenu.tsx       # User account menu
+│   │   ├── LeaderboardDrawer.tsx # Leaderboard slide-out
+│   │   ├── ResourcePicker.tsx    # Resource/asset picker
+│   │   ├── FileUploader.tsx      # Drag & drop file upload
+│   │   ├── CookieConsent.tsx     # Cookie consent banner
+│   │   └── GlobalError.tsx       # Global error boundary
+│   ├── (marketing)/              # Public pages (login, register, etc.)
+│   ├── (trader)/                 # Authenticated trader pages
+│   ├── (admin)/                  # Admin console panel
+│   └── api/                      # API routes
 ├── components/                   # Shared components
 │   └── admin/                    # Admin UI components
-│       ├── layout/
-│       │   ├── sidebar.tsx       # Admin sidebar navigation
-│       │   └── header.tsx        # Admin top header
-│       └── ui/                   # Reusable UI primitives
-│           ├── button.tsx        # Button (primary/secondary/danger/ghost/outline)
-│           ├── input.tsx         # Input with label/error/icon
-│           ├── badge.tsx         # Status badges (success/warning/danger/info)
-│           ├── card.tsx          # Card container components
-│           ├── stats-card.tsx    # Stats card with change indicator
-│           ├── data-table.tsx    # Simple data table with pagination
-│           ├── dialog.tsx        # Modal dialog
-│           ├── dropdown-menu.tsx # Dropdown menu
-│           ├── search-input.tsx  # Search input with icon
-│           └── file-upload.tsx   # Drag & drop file upload
-└── lib/                          # Utilities
-    ├── utils.ts                  # cn(), formatCurrency(), etc.
-    └── mock-data/
-        ├── users.ts              # 20 mock users
-        ├── trades.ts             # 15 mock trades
-        └── stats.ts              # Dashboard stats & chart data
+│       ├── layout/               # Admin layout (sidebar, header)
+│       ├── ui/                   # Reusable UI primitives
+│       ├── dashboard/            # Dashboard widgets
+│       ├── context/              # Admin context providers
+│       └── users/                # User management components
+├── lib/                          # Utilities & business logic
+│   ├── api.ts                    # API helpers (auth, permissions)
+│   ├── auth.ts                   # better-auth server config
+│   ├── auth-client.ts            # better-auth client config
+│   ├── db.ts                     # Prisma client
+│   ├── queries.ts                # Database queries (admin, user)
+│   ├── actions/admin.ts          # Server actions (admin operations)
+│   ├── otc-engine.ts             # OTC price generation engine
+│   ├── settlement-worker.ts      # Trade settlement worker
+│   ├── vault.ts                  # Platform vault/reserve system
+│   ├── ledger.ts                 # Double-entry ledger
+│   ├── rbac.ts                   # Role-based access control
+│   ├── redis.ts                  # Redis client
+│   ├── services/                 # Business logic services
+│   │   ├── audit.ts              # Audit logging
+│   │   ├── deposits.ts           # Deposit processing
+│   │   └── withdrawals.ts        # Withdrawal processing
+│   └── ...                       # Other utility modules
+├── prisma/                       # Database schema & migrations
+├── scripts/                      # DB seed & reset scripts
+├── server.ts                     # Custom Next.js server + WebSocket
+├── proxy.ts                      # Edge proxy for RBAC
+└── docker-compose.yml            # Docker configuration
 ```
 
 ## Clone
@@ -165,7 +169,7 @@ docs: update README with team guidelines
 1. Create page file in `app/console-panel/(dashboard)/your-page/page.tsx`
 2. Add nav item in `components/admin/layout/sidebar.tsx`
 3. Use existing UI components (Card, DataTable, Badge, etc.)
-4. Add mock data in `lib/mock-data/` if needed
+4. Add server actions in `lib/actions/admin.ts` if needed
 
 ### Adding New Components
 1. Place in `components/admin/ui/` for shared components

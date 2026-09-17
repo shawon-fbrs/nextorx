@@ -34,16 +34,48 @@ export interface CandleCloseMessage {
   candle: CandleData;
 }
 
-type WSMessage = TickMessage | SnapshotMessage | CandleCloseMessage;
+export interface TradeSettledMessage {
+  type: 'trade:settled';
+  trade: {
+    id: string;
+    pairId: string;
+    direction: string;
+    amount: number;
+    payout: number;
+    profit: number;
+    status: string;
+    openPrice: number;
+    closePrice: number;
+    expiresAt: number;
+  };
+}
+
+export interface BalanceUpdatedMessage {
+  type: 'balance:updated';
+  balance: number;
+  demoBalance: number;
+}
+
+export interface SentimentUpdatedMessage {
+  type: 'sentiment:updated';
+  pairId: string;
+  upPct: number;
+  downPct: number;
+}
+
+type WSMessage = TickMessage | SnapshotMessage | CandleCloseMessage | TradeSettledMessage | BalanceUpdatedMessage | SentimentUpdatedMessage;
 
 interface UsePairWSOptions {
   pairId: string | null;
   onTick?: (msg: TickMessage) => void;
   onCandleClose?: (msg: CandleCloseMessage) => void;
   onSnapshot?: (msg: SnapshotMessage) => void;
+  onTradeSettled?: (trade: TradeSettledMessage['trade']) => void;
+  onBalanceUpdated?: (msg: BalanceUpdatedMessage) => void;
+  onSentimentUpdated?: (msg: SentimentUpdatedMessage) => void;
 }
 
-export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePairWSOptions) {
+export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot, onTradeSettled, onBalanceUpdated, onSentimentUpdated }: UsePairWSOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
@@ -57,9 +89,15 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
   const onTickRef = useRef(onTick);
   const onCandleCloseRef = useRef(onCandleClose);
   const onSnapshotRef = useRef(onSnapshot);
+  const onTradeSettledRef = useRef(onTradeSettled);
+  const onBalanceUpdatedRef = useRef(onBalanceUpdated);
+  const onSentimentUpdatedRef = useRef(onSentimentUpdated);
   onTickRef.current = onTick;
   onCandleCloseRef.current = onCandleClose;
   onSnapshotRef.current = onSnapshot;
+  onTradeSettledRef.current = onTradeSettled;
+  onBalanceUpdatedRef.current = onBalanceUpdated;
+  onSentimentUpdatedRef.current = onSentimentUpdated;
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -113,6 +151,18 @@ export function usePairWS({ pairId, onTick, onCandleClose, onSnapshot }: UsePair
 
         if (msg.type === 'candle:close') {
           onCandleCloseRef.current?.(msg);
+        }
+
+        if (msg.type === 'trade:settled') {
+          onTradeSettledRef.current?.(msg.trade);
+        }
+
+        if (msg.type === 'balance:updated') {
+          onBalanceUpdatedRef.current?.(msg);
+        }
+
+        if (msg.type === 'sentiment:updated') {
+          onSentimentUpdatedRef.current?.(msg);
         }
       } catch {}
     };

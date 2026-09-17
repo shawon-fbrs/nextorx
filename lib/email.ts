@@ -30,7 +30,6 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
       return { success: false, error: error.message };
     }
 
-    console.log('[Email] Sent successfully:', data?.id);
     return { success: true };
   } catch (error) {
     console.error('[Email] Unexpected error:', error);

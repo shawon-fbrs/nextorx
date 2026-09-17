@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 import { BottomNav } from '../components/BottomNav';
 import { BalanceProvider } from './balance-context';
+import { PairsProvider } from './pairs-context';
 import { useAuth } from '@/lib/auth-context';
+import { usePairWS } from '@/lib/use-ws';
 import { Toaster } from 'sonner';
 
 const ADMIN_ROLES = new Set(['super_admin', 'finance', 'support', 'risk']);
@@ -29,6 +31,7 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
     }
   }, [loading, user, router]);
 
+  // Initial balance fetch on mount
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -48,14 +51,41 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
       } catch {}
     };
     load();
-    const timer = setInterval(load, 10000);
+    return () => { cancelled = true; };
+  }, [accountType]);
+
+  // WS balance updates — primary channel
+  const handleBalanceUpdated = useCallback((msg: { balance: number; demoBalance: number }) => {
+    setBalance(msg.balance);
+    setDemoBalance(msg.demoBalance);
+  }, []);
+
+  usePairWS({
+    pairId: null,
+    onBalanceUpdated: handleBalanceUpdated,
+  });
+
+  // Fallback: refresh on visibility change or custom event
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await fetch('/api/trade/balance').then((r) => r.json());
+        const real = data.available ?? data.wallet?.balance ?? 0;
+        let demo = data.demoAvailable ?? data.wallet?.demoBalance ?? 0;
+        if (demo === 0) {
+          const res = await fetch('/api/trade/demo-balance', { method: 'POST' });
+          const demoRes = await res.json();
+          demo = demoRes.balance ?? demo;
+        }
+        setBalance(real / 100);
+        setDemoBalance(demo / 100);
+      } catch {}
+    };
     const onFocus = () => load();
     const onRefresh = () => load();
     window.addEventListener('focus', onFocus);
     window.addEventListener('balance-refresh', onRefresh);
     return () => {
-      cancelled = true;
-      clearInterval(timer);
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('balance-refresh', onRefresh);
     };
@@ -72,6 +102,7 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
 
   return (
     <BalanceProvider value={{ balance: shownBalance, demoBalance, realBalance: balance, accountType }}>
+    <PairsProvider>
     <div className="w-screen overflow-hidden flex bg-background text-text text-sm h-[100vh] supports-[height:100dvh]:h-[100dvh]">
       <div className="contents max-lg:hidden">
       <Sidebar
@@ -91,6 +122,7 @@ export default function TraderLayout({ children }: { children: React.ReactNode }
       <BottomNav />
       <Toaster position="bottom-left" theme="dark" richColors closeButton />
     </div>
+    </PairsProvider>
     </BalanceProvider>
   );
 }

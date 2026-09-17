@@ -14,6 +14,7 @@ import { LandscapeDrawer } from '../../../components/BottomNav';
 import { useLivePnL, type TradeCardData } from '../../../components/TradeCard';
 import { usePairWS, type CandleData } from '@/lib/use-ws';
 import { useBalance } from '../../balance-context';
+import { usePairs, type PairDef } from '../../pairs-context';
 import { getServerNow, syncWithServer } from '@/lib/server-time';
 import { useTheme } from '@/lib/theme';
 import {
@@ -22,20 +23,6 @@ import {
   GitBranch, Pencil, DraftingCompass, Trash2, Maximize, Minimize, AlignHorizontalDistributeCenter,
   PencilRuler, ArrowRight, ChevronsRight,   Eye, EyeOff, Settings, Settings2, SquareFunction, X, Menu,
 } from 'lucide-react';
-
-interface PairDef {
-  id: string;
-  name: string;
-  category: string;
-  payoutPercent: number;
-  basePrice: number;
-  spread: number;
-  minTrade: number;
-  maxTrade: number;
-  iconUrl?: string | null;
-  iconUrl2?: string | null;
-  changePct24h?: number | null;
-}
 
 interface Trade {
   id: string;
@@ -753,10 +740,9 @@ export default function TradingPage() {
   const [indOpen, setIndOpen] = useState(false);
   const [drawDialogOpen, setDrawDialogOpen] = useState(false);
 
-  const [pairs, setPairs] = useState<PairDef[]>([]);
+  const { pairs, payoutMap, payoutDetails, loaded: pairsLoaded } = usePairs();
   const [activePair, setActivePair] = useState<PairDef | null>(null);
   const [effectivePayout, setEffectivePayout] = useState<number | null>(null);
-  const [payoutMap, setPayoutMap] = useState<Record<string, number>>({});
   const isCompact = useCompactLayout();
   const isLandscape = useLandscapeCompact();
   const [landNavOpen, setLandNavOpen] = useState(false);
@@ -802,28 +788,6 @@ export default function TradingPage() {
   }, [activePair, timeframe]);
 
   const [sentiment, setSentiment] = useState<{ upPct: number } | null>(null);
-
-  useEffect(() => {
-    if (!activePair) {
-      setSentiment(null);
-      return;
-    }
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await fetch(`/api/market/sentiment?pairId=${activePair.id}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && Number.isFinite(data.upPct)) setSentiment({ upPct: data.upPct });
-      } catch {}
-    };
-    load();
-    const timer = setInterval(load, 2000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [activePair]);
 
   const readStoredTabs = (): string[] | null => {
     try {
@@ -991,40 +955,26 @@ export default function TradingPage() {
   const styleBtnRef = useRef<HTMLButtonElement>(null);
   const editDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
 
+  // Initialize pairs from context
   useEffect(() => {
-    fetch('/api/market/pairs')
-      .then(r => r.json())
-      .then((data: { pairs: Array<Record<string, unknown>> }) => {
-        const normalized = (data.pairs || []).map(p => ({
-          ...p,
-          payoutPercent: Number(p.payoutPercent),
-          basePrice: Number(p.basePrice),
-          spread: Number(p.spread ?? 0),
-          minTrade: Number(p.minTrade),
-          maxTrade: Number(p.maxTrade),
-        })) as PairDef[];
-        setPairs(normalized);
-        if (normalized.length > 0) {
-          setVisibleIds((prev) => {
-            if (prev !== null) return prev.filter((id) => normalized.some((p) => p.id === id));
-            const stored = readStoredTabs();
-            if (stored) return stored.filter((id) => normalized.some((p) => p.id === id));
-            return normalized.map((p) => p.id);
-          });
-          setActivePair((cur) => {
-            if (cur && normalized.some((p) => p.id === cur.id)) return cur;
-            try {
-              const last = localStorage.getItem('nextorx-active-pair');
-              const found = last ? normalized.find((p) => p.id === last) : undefined;
-              if (found) return found;
-            } catch {}
-            return normalized[0];
-          });
-        }
-      })
-      .catch(() => {});
+    if (!pairsLoaded || pairs.length === 0) return;
+    setVisibleIds((prev) => {
+      if (prev !== null) return prev.filter((id) => pairs.some((p) => p.id === id));
+      const stored = readStoredTabs();
+      if (stored) return stored.filter((id) => pairs.some((p) => p.id === id));
+      return pairs.map((p) => p.id);
+    });
+    setActivePair((cur) => {
+      if (cur && pairs.some((p) => p.id === cur.id)) return cur;
+      try {
+        const last = localStorage.getItem('nextorx-active-pair');
+        const found = last ? pairs.find((p) => p.id === last) : undefined;
+        if (found) return found;
+      } catch {}
+      return pairs[0];
+    });
     setMounted(true);
-  }, []);
+  }, [pairsLoaded, pairs]);
 
   const clearMarkers = useCallback(() => {
     for (const overlayIds of Array.from(markerRef.current.values())) {
@@ -1078,12 +1028,66 @@ export default function TradingPage() {
   const handleCandleClose = useCallback(() => {}, []);
   const handleSnapshot = useCallback(() => {}, []);
 
+  // WS callback: sentiment updated
+  const handleSentimentUpdated = useCallback((msg: { pairId: string; upPct: number }) => {
+    if (activePair && msg.pairId === activePair.id) {
+      setSentiment({ upPct: msg.upPct });
+    }
+  }, [activePair]);
+
+  // WS callback: trade settled — uses refs to avoid stale closure issues
+  const activePairRef = useRef<PairDef | null>(null);
+  const currentPriceRef = useRef<number | null>(null);
+
+  const handleTradeSettled = useCallback((trade: { id: string; pairId: string; direction: string; amount: number; payout: number; profit: number; status: string; openPrice: number; closePrice: number; expiresAt: number }) => {
+    setTrades((prev) => {
+      const idx = prev.findIndex((t) => t.id === trade.id);
+      if (idx === -1) return prev;
+      const updated = { ...prev[idx], status: trade.status as 'won' | 'lost', profit: trade.profit, closePrice: trade.closePrice };
+      const next = [...prev];
+      next[idx] = updated;
+      return next;
+    });
+    const profitText = trade.status === 'won' ? `+$${trade.profit.toFixed(2)}` : `−$${trade.amount.toFixed(2)}`;
+    if (trade.status === 'won') {
+      toast.success(`Won ${profitText}`);
+    } else {
+      toast.error(`Lost $${trade.amount.toFixed(2)}`);
+    }
+    window.dispatchEvent(new Event('balance-refresh'));
+    try {
+      const live = priceRef.current || (currentPriceRef.current ?? 1);
+      const ap = activePairRef.current;
+      const pt = (!ap || !trade.pairId || trade.pairId === ap.id)
+        ? (chartRef.current?.chartPixel(Date.now(), live) ?? null)
+        : null;
+      if (pt) {
+        const rid = `res:${trade.id}`;
+        const px = ap && ap.id.includes('JPY') ? 3 : 5;
+        setResults((prev) => [...prev.slice(-2), { id: rid, x: pt.x, y: pt.y, text: profitText, atPrice: live.toFixed(px), won: trade.status === 'won' }]);
+        setTimeout(() => setResults((prev) => prev.filter((r) => r.id !== rid)), 4000);
+      }
+    } catch {}
+    const overlayIds = markerRef.current.get(trade.id);
+    if (overlayIds) {
+      for (const oid of overlayIds) {
+        try { chartRef.current?.removeOverlay(oid); } catch {}
+      }
+      markerRef.current.delete(trade.id);
+    }
+  }, []);
+
   const { isConnected, currentPrice, candle, serverTime } = usePairWS({
     pairId: activePair?.id ?? null,
     onTick: handleTick,
     onCandleClose: handleCandleClose,
     onSnapshot: handleSnapshot,
+    onTradeSettled: handleTradeSettled,
+    onSentimentUpdated: handleSentimentUpdated,
   });
+
+  activePairRef.current = activePair;
+  currentPriceRef.current = currentPrice;
 
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -1258,25 +1262,12 @@ export default function TradingPage() {
     } catch {}
   }, [accountType, activePair, timeframe]);
 
+  // Initial fetch on mount + fallback on visibility change
   useEffect(() => {
     refreshTrades();
-    const timer = setInterval(refreshTrades, 2000);
-    return () => clearInterval(timer);
-  }, [refreshTrades]);
-
-  useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         refreshTrades();
-        if (activePair) {
-          fetch(`/api/market/pairs/${activePair.id}/candles?limit=300&interval=${encodeURIComponent(timeframe)}`)
-            .then((r) => r.json())
-            .then((data) => {
-              const bars = ((data.candles ?? []) as CandleData[]).sort((a, b) => a.timestamp - b.timestamp);
-              setSeed({ pairId: activePair.id, bars });
-            })
-            .catch(() => {});
-        }
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -1285,40 +1276,9 @@ export default function TradingPage() {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [refreshTrades, activePair, timeframe]);
+  }, [refreshTrades]);
 
-  const [payoutDetails, setPayoutDetails] = useState<Record<string, { base: number; payout: number; adjustments?: { reason: string; delta: number }[] }>>({});
-
-  useEffect(() => {
-    if (pairs.length === 0) return;
-    let cancelled = false;
-    const loadAll = async () => {
-      try {
-        const res = await fetch('/api/market/payouts');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled) return;
-        const map: Record<string, number> = {};
-        const details: Record<string, { base: number; payout: number; adjustments?: { reason: string; delta: number }[] }> = {};
-        for (const p of pairs) {
-          const b = data.payouts?.[p.id];
-          if (b && typeof b.payout === 'number') {
-            map[p.id] = b.payout;
-            details[p.id] = b;
-          }
-        }
-        setPayoutMap(map);
-        setPayoutDetails(details);
-      } catch {}
-    };
-    loadAll();
-    const timer = setInterval(loadAll, 60000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [pairs]);
-
+  // Use payout data from context
   useEffect(() => {
     if (!activePair) {
       setEffectivePayout(null);
