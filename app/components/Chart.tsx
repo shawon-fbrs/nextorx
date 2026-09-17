@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
-import { init, dispose, registerOverlay, getSupportedIndicators as getLibSupportedIndicators, Chart as KLineChart, KLineData } from 'klinecharts';
+import { init, dispose, registerOverlay, registerFigure, getSupportedIndicators as getLibSupportedIndicators, Chart as KLineChart, KLineData } from 'klinecharts';
 import { readStoredIndicators } from '@/lib/indicator-store';
 import { getServerNow, syncWithServer } from '@/lib/server-time';
 
@@ -131,7 +131,7 @@ const CUSTOM_OVERLAYS: Array<{
       if (w < 50 || h < 50) return [];
       const size = Math.max(48, Math.min(120, Math.floor(Math.min(w, h) / 5)));
       return [
-        { type: 'text', key: 'wm', attrs: { x: Math.floor(w / 2), y: Math.floor(h / 2), text: 'DEMO', align: 'center', baseline: 'middle' }, styles: { style: 'stroke', color: 'rgba(148,163,184,0.18)', borderSize: 1, size, family: 'Roboto, Arial, sans-serif', weight: 'bold', backgroundColor: 'transparent', paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0 } },
+        { type: 'outlinedText', key: 'wm', attrs: { x: Math.floor(w / 2), y: Math.floor(h / 2), text: 'DEMO', align: 'center', baseline: 'middle' }, styles: { color: 'rgba(148,163,184,0.18)', size, family: 'Roboto, Arial, sans-serif', weight: 'bold', strokeWidth: 1.5 } },
       ];
     },
   },
@@ -181,6 +181,23 @@ const CUSTOM_OVERLAYS: Array<{
 ];
 
 CUSTOM_OVERLAYS.forEach(o => registerOverlay(o));
+
+registerFigure({
+  name: 'outlinedText',
+  draw: (ctx: CanvasRenderingContext2D, attrs: Record<string, unknown>, styles: Record<string, unknown>) => {
+    const { x, y, text, align = 'center', baseline = 'middle' } = attrs as { x: number; y: number; text: string; align?: CanvasTextAlign; baseline?: CanvasTextBaseline };
+    const { color = 'rgba(148,163,184,0.18)', size = 60, family = 'Roboto, Arial, sans-serif', weight = 'bold', strokeWidth = 1.5 } = styles as { color?: string; size?: number; family?: string; weight?: string | number; strokeWidth?: number };
+    ctx.save();
+    ctx.font = `${weight} ${size}px ${family}`;
+    ctx.textAlign = align;
+    ctx.textBaseline = baseline;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeText(String(text), x, y);
+    ctx.restore();
+  },
+  checkEventOn: () => false,
+});
 
 const PERIOD_MAP: Record<string, { span: number; type: 'second' | 'minute' | 'hour' }> = {
   '5s': { span: 5, type: 'second' },
