@@ -131,7 +131,7 @@ const CUSTOM_OVERLAYS: Array<{
       if (w < 50 || h < 50) return [];
       const size = Math.max(48, Math.min(120, Math.floor(Math.min(w, h) / 5)));
       return [
-        { type: 'text', key: 'wm', attrs: { x: Math.floor(w / 2), y: Math.floor(h / 2), text: 'DEMO', align: 'center', baseline: 'middle' }, styles: { color: 'rgba(148,163,184,0.16)', size, family: 'Roboto, Arial, sans-serif', weight: 'bold', backgroundColor: 'transparent', borderSize: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0 } },
+        { type: 'text', key: 'wm', attrs: { x: Math.floor(w / 2), y: Math.floor(h / 2), text: 'DEMO', align: 'center', baseline: 'middle' }, styles: { color: 'rgba(148,163,184,0.12)', size, family: 'Roboto, Arial, sans-serif', weight: 'bold', style: 'stroke', borderSize: 1.5, backgroundColor: 'transparent', paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0 } },
       ];
     },
   },
@@ -254,6 +254,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
 
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const watermarkIdRef = useRef<string | null>(null);
+  const watermarkPulseRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const ensureWatermark = useCallback((text: string | null) => {
     const chart = chartRef.current;
@@ -275,7 +276,18 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
           needDefaultYAxisFigure: false,
         } as never);
         if (typeof id === 'string') watermarkIdRef.current = id;
+        if (watermarkPulseRef.current) clearInterval(watermarkPulseRef.current);
+        let t = 0;
+        watermarkPulseRef.current = setInterval(() => {
+          const c = chartRef.current;
+          if (!c || !watermarkIdRef.current) return;
+          t += 0.03;
+          const v = Math.sin(t) * 0.5 + 0.5;
+          const visible = v > 0.15;
+          try { c.overrideOverlay({ id: watermarkIdRef.current, visible } as never); } catch {}
+        }, 60);
       } else if (found && found.id) {
+        if (watermarkPulseRef.current) { clearInterval(watermarkPulseRef.current); watermarkPulseRef.current = null; }
         try {
           chart.removeOverlay({ id: found.id });
         } catch {}
@@ -867,6 +879,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
 
     return () => {
       window.removeEventListener('pagehide', onPageHide);
+      if (watermarkPulseRef.current) { clearInterval(watermarkPulseRef.current); watermarkPulseRef.current = null; }
       ro.disconnect();
       try {
         chartRef.current?.unsubscribeAction('onZoom', notifyViewChange);
