@@ -198,7 +198,7 @@ export default function SupportPage() {
                 <div>
                   <h3 className="text-sm font-bold text-foreground mb-1">Email support</h3>
                   <p className="text-xs text-text-dark leading-relaxed">
-                    Write to <span className="text-white font-semibold">support@nextorx.247play.win</span> from
+                    Write to <span className="text-white font-semibold">support@nextorx.app</span> from
                     your account email. Include your UID (shown on the Account page) and screenshots
                     where relevant. We reply within 24 hours on business days.
                   </p>

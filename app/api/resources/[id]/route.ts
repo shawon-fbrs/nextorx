@@ -1,6 +1,6 @@
 import { toJsonError, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/db";
-import { s3PresignGet } from "@/lib/s3";
+import { s3Get } from "@/lib/s3";
 
 export async function GET(
   _request: Request,
@@ -14,9 +14,15 @@ export async function GET(
       return Response.json({ error: "Not found" }, { status: 404 });
     }
     if (asset.key) {
-      const url = await s3PresignGet(asset.key, 3600);
-      if (url) {
-        return Response.redirect(url, 302);
+      const data = await s3Get(asset.key);
+      if (data) {
+        return new Response(new Uint8Array(data), {
+          headers: {
+            "Content-Type": asset.mime,
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "Content-Length": String(asset.size),
+          },
+        });
       }
     }
     if (!asset.data) {
