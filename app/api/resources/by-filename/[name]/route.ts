@@ -1,4 +1,4 @@
-import { toJsonError, ApiError } from "@/lib/api";
+import { toJsonError, ApiError, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/db";
 
 export async function GET(
@@ -6,6 +6,7 @@ export async function GET(
   { params }: { params: Promise<{ name: string }> },
 ) {
   try {
+    await requireUser();
     const { name } = await params;
     const decoded = decodeURIComponent(name).slice(0, 200);
     if (!decoded || decoded.includes("/") || decoded.includes("\\")) {

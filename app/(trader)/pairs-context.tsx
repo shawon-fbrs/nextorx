@@ -16,23 +16,15 @@ export interface PairDef {
   changePct24h?: number | null;
 }
 
-export interface PayoutDetail {
-  base: number;
-  payout: number;
-  adjustments?: { reason: string; delta: number }[];
-}
-
 interface PairsState {
   pairs: PairDef[];
   payoutMap: Record<string, number>;
-  payoutDetails: Record<string, PayoutDetail>;
   loaded: boolean;
 }
 
 const PairsContext = createContext<PairsState>({
   pairs: [],
   payoutMap: {},
-  payoutDetails: {},
   loaded: false,
 });
 
@@ -43,7 +35,6 @@ export function usePairs() {
 export function PairsProvider({ children }: { children: React.ReactNode }) {
   const [pairs, setPairs] = useState<PairDef[]>([]);
   const [payoutMap, setPayoutMap] = useState<Record<string, number>>({});
-  const [payoutDetails, setPayoutDetails] = useState<Record<string, PayoutDetail>>({});
   const [loaded, setLoaded] = useState(false);
   const fetchedRef = useRef(false);
 
@@ -72,16 +63,13 @@ export function PairsProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) return;
       const data = await res.json();
       const map: Record<string, number> = {};
-      const details: Record<string, PayoutDetail> = {};
       for (const p of pairList) {
-        const b = data.payouts?.[p.id];
-        if (b && typeof b.payout === 'number') {
-          map[p.id] = b.payout;
-          details[p.id] = b;
+        const payout = data.payouts?.[p.id];
+        if (typeof payout === 'number') {
+          map[p.id] = payout;
         }
       }
       setPayoutMap(map);
-      setPayoutDetails(details);
     } catch {}
   }, []);
 
@@ -100,7 +88,7 @@ export function PairsProvider({ children }: { children: React.ReactNode }) {
   }, [pairs, loadPayouts]);
 
   return (
-    <PairsContext.Provider value={{ pairs, payoutMap, payoutDetails, loaded }}>
+    <PairsContext.Provider value={{ pairs, payoutMap, loaded }}>
       {children}
     </PairsContext.Provider>
   );

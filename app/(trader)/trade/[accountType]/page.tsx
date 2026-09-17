@@ -143,7 +143,6 @@ function TopBar({
   activePair,
   effectivePayout,
   payoutMap,
-  payoutDetails,
   trades,
   currentPrice,
   onSelect,
@@ -155,7 +154,6 @@ function TopBar({
   activePair: PairDef | null;
   effectivePayout: number | null;
   payoutMap: Record<string, number>;
-  payoutDetails: Record<string, { base: number; payout: number; adjustments?: { reason: string; delta: number }[] }>;
   trades: Trade[];
   currentPrice: number | null;
   onSelect: (p: PairDef) => void;
@@ -254,8 +252,6 @@ function TopBar({
               const isActive = pair.id === activePair?.id;
               const isOpen = visibleIds.includes(pair.id);
               const shownPayout = payoutMap[pair.id] ?? pair.payoutPercent;
-              const detail = payoutDetails[pair.id];
-              const title = detail ? `Base ${detail.base}%${detail.adjustments?.length ? ' ' + detail.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${detail.payout}%` : `${shownPayout}%`;
               const chg = pair.changePct24h;
               return (
                 <button key={pair.id} onClick={() => { onSelect(pair); setAddOpen(false); }}
@@ -269,7 +265,7 @@ function TopBar({
                     {chg == null ? '—' : `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`}
                   </span>
                   <span className="w-[76px] text-right text-[10px] text-text-dark font-mono flex-shrink-0 truncate" title="Spread">{String(pair.spread)}</span>
-                  <span className="w-[48px] text-right text-sm font-bold text-green flex-shrink-0" title={title}>{shownPayout}%</span>
+                  <span className="w-[48px] text-right text-sm font-bold text-green flex-shrink-0" title={`${shownPayout}%`}>{shownPayout}%</span>
                 </button>
               );
             })}
@@ -309,7 +305,7 @@ function TopBar({
             <div className="flex flex-col flex-1 min-w-0">
               <span className="text-xs font-bold text-foreground leading-tight truncate">{pair.name}</span>
               <div className="flex items-center gap-1 leading-tight">
-                <span className="text-[10px] font-bold text-orange" title={(() => { const d = payoutDetails[pair.id]; return d ? `Base ${d.base}%${d.adjustments?.length ? ' ' + d.adjustments.map((a) => `${a.reason} ${a.delta > 0 ? '+' : ''}${a.delta}%`).join(' ') : ''} => ${d.payout}%` : `${shownPayout}%`; })()}>{shownPayout}%</span>
+                <span className="text-[10px] font-bold text-orange" title={`${shownPayout}%`}>{shownPayout}%</span>
                 {unrealized !== null ? (
                   <span className={`text-[10px] font-bold ${!showLive ? 'opacity-60' : ''} ${unrealized >= 0 ? 'text-green' : 'text-red'}`}>• {unrealized >= 0 ? '+' : ''}{unrealized.toFixed(2)}$</span>
                 ) : pairActiveTrades.length > 0 ? (
@@ -740,7 +736,7 @@ export default function TradingPage() {
   const [indOpen, setIndOpen] = useState(false);
   const [drawDialogOpen, setDrawDialogOpen] = useState(false);
 
-  const { pairs, payoutMap, payoutDetails, loaded: pairsLoaded } = usePairs();
+  const { pairs, payoutMap, loaded: pairsLoaded } = usePairs();
   const [activePair, setActivePair] = useState<PairDef | null>(null);
   const [effectivePayout, setEffectivePayout] = useState<number | null>(null);
   const isCompact = useCompactLayout();
@@ -772,7 +768,7 @@ export default function TradingPage() {
       return;
     }
     let cancelled = false;
-    fetch(`/api/market/pairs/${activePair.id}/candles?limit=300&interval=${encodeURIComponent(timeframe)}`)
+    fetch(`/api/market/pairs/${activePair.id}/candles?limit=100&interval=${encodeURIComponent(timeframe)}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -1446,7 +1442,7 @@ export default function TradingPage() {
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden w-full">
       {isLandscape && (
-        <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} onMenuClick={() => setLandNavOpen(true)} />
+        <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} onMenuClick={() => setLandNavOpen(true)} />
       )}
       <div className="flex-1 flex max-lg:flex-col max-lg:landscape:flex-row min-w-0 overflow-hidden">
         <div className="flex-1 flex min-w-0 max-lg:min-h-0 overflow-hidden" data-chart-area>
@@ -1503,7 +1499,7 @@ export default function TradingPage() {
           <TradeFailDialog open={!!tradeError} message={tradeError} onClose={() => setTradeError('')} />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {!isLandscape && (
-            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} payoutDetails={payoutDetails} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} onMenuClick={() => setLandNavOpen(true)} />
+            <TopBar pairs={pairs} visibleIds={visibleIds ?? []} activePair={activePair} effectivePayout={effectivePayout} payoutMap={payoutMap} trades={trades} currentPrice={price} onSelect={(p) => { if (isCompact) handleSelectSingle(p); else handleSelectPair(p); }} onClose={handleClosePair} onMenuClick={() => setLandNavOpen(true)} />
             )}
             <LandscapeDrawer open={landNavOpen} onClose={() => setLandNavOpen(false)} />
             {!activePair ? (
@@ -1552,7 +1548,7 @@ export default function TradingPage() {
                 <button
                   onClick={() => {
                     if (!activePair) return;
-                    fetch(`/api/market/pairs/${activePair.id}/candles?limit=300&interval=${encodeURIComponent(timeframe)}`)
+    fetch(`/api/market/pairs/${activePair.id}/candles?limit=100&interval=${encodeURIComponent(timeframe)}`)
                       .then((r) => r.json())
                       .then((data) => {
                         const bars = ((data.candles ?? []) as CandleData[]).sort((a, b) => a.timestamp - b.timestamp);

@@ -1,4 +1,4 @@
-import { toJsonError } from "@/lib/api";
+import { toJsonError, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { s3PresignGet } from "@/lib/s3";
 
@@ -7,6 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    await requireUser();
     const { id } = await params;
     const asset = await prisma.resourceAsset.findUnique({ where: { id } });
     if (!asset) {

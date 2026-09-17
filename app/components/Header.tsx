@@ -28,7 +28,7 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !notifOpen) return;
     fetch('/api/notifications?limit=10')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -38,7 +38,7 @@ export function Header({ balance, demoBalance = 0, realBalance }: HeaderProps) {
         }
       })
       .catch(() => {});
-  }, [user]);
+  }, [user, notifOpen]);
 
   const markAllRead = async () => {
     try {

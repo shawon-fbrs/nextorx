@@ -13,11 +13,11 @@ export async function GET() {
       const entries = await Promise.all(
         pairs.map(async (p) => {
           const b = await getPayoutBreakdown(p.id);
-          return [p.id, { payout: b.payout }] as const;
+          return [p.id, b.payout] as const;
         }),
       );
-      const result: Record<string, { payout: number }> = {};
-      for (const [id, b] of entries) result[id] = b;
+      const result: Record<string, number> = {};
+      for (const [id, payout] of entries) result[id] = payout;
       return result;
     });
     return Response.json({ payouts: map });

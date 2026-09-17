@@ -231,6 +231,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
   const bucketStartRef = useRef<number | null>(null);
   const bucketBaseRef = useRef<KLineData | null>(null);
   const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRenderRef = useRef(true);
   const [clock, setClock] = useState('');
 
   useEffect(() => {
@@ -452,7 +453,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         return;
       }
       try {
-        const res = await fetch(`/api/market/pairs/${pid}/candles?limit=300&interval=${encodeURIComponent(tf)}`);
+        const res = await fetch(`/api/market/pairs/${pid}/candles?limit=100&interval=${encodeURIComponent(tf)}`);
         const data = await res.json();
         const bars = toBars(data.candles);
         barsCacheRef.current.set(cacheKey, bars);
@@ -827,9 +828,7 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         },
       });
 
-      chart.resetData();
       chart.setBarSpace(6);
-      chart.scrollToRealTime(0);
       try {
         const stored = localStorage.getItem('nextorx:chart-type');
         if (stored === 'line' || stored === 'area') applyChartType(stored);
@@ -924,18 +923,15 @@ export const Chart = forwardRef<ChartHandle, ChartProps>(function Chart({ pairId
         restoreTimerRef.current = setTimeout(() => {
           restoreDrawings();
         }, 180);
-      } else {
+      } else if (!isFirstRenderRef.current) {
         chart.resetData();
         chart.scrollToRealTime(0);
         if (restoreTimerRef.current) clearTimeout(restoreTimerRef.current);
         restoreTimerRef.current = setTimeout(() => {
-          const cacheKey = `${pairId}:${timeframe}`;
-          if (!barsCacheRef.current.has(cacheKey)) {
-            // no seed yet, still restore drawings after load will happen on next seed; keep placeholder
-          }
           restoreDrawings();
         }, 250);
       }
+      isFirstRenderRef.current = false;
     }
     return () => {
       if (restoreTimerRef.current) clearTimeout(restoreTimerRef.current);
