@@ -6,6 +6,7 @@ export interface SeedInfo {
   day: string;
   seedHash: string;
   revealed: boolean;
+  gistUrl?: string | null;
 }
 
 function encKey(): Buffer | null {
@@ -49,10 +50,73 @@ export async function readSeedValue(row: { seed: string | null; seedEnc: string 
   return row.seed;
 }
 
+async function publishSeedHashToGist(day: string, seedHash: string): Promise<{ id: string; url: string } | null> {
+  const token = process.env.GITHUB_GIST_TOKEN;
+  if (!token) return null;
+  try {
+    const filename = `nextorx-seed-${day}.json`;
+    const payload = JSON.stringify({
+      platform: "nextorx",
+      version: 1,
+      day,
+      seedHash,
+      committedAt: new Date().toISOString(),
+      algorithm: "HMAC-SHA512",
+      description: "Provably fair seed commitment. Verify at https://nextorx.247play.win/verify",
+    }, null, 2);
+
+    const res = await fetch("https://api.github.com/gists", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/vnd.github+json",
+      },
+      body: JSON.stringify({
+        description: `NextOrx provably fair seed commitment — ${day}`,
+        public: true,
+        files: { [filename]: { content: payload } },
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { id: string; html_url: string };
+    return { id: data.id, url: data.html_url };
+  } catch {
+    return null;
+  }
+}
+
+async function publishSeedHashToFile(day: string, seedHash: string): Promise<{ id: string; url: string } | null> {
+  const { writeFile, mkdir } = await import("fs/promises");
+  const { join } = await import("path");
+  try {
+    const dir = join(process.cwd(), "public", "seeds");
+    await mkdir(dir, { recursive: true });
+    const filename = `nextorx-seed-${day}.json`;
+    const payload = JSON.stringify({
+      platform: "nextorx",
+      version: 1,
+      day,
+      seedHash,
+      committedAt: new Date().toISOString(),
+      algorithm: "HMAC-SHA512",
+      description: "Provably fair seed commitment. Verify at /verify",
+    }, null, 2);
+    await writeFile(join(dir, filename), payload, "utf8");
+    return { id: filename, url: `/seeds/${filename}` };
+  } catch {
+    return null;
+  }
+}
+
 export async function ensureSeedDay(day: string): Promise<SeedInfo> {
   const seed = randomBytes(32).toString("hex");
   const seedHash = createHash("sha256").update(seed, "utf8").digest("hex");
   const seedEnc = encryptSeed(seed);
+
+  // Capture regime snapshot at seed creation time
+  const regimeSnapshot = await captureRegimeSnapshot();
+
   const row = await prisma.serverSeed.upsert({
     where: { day },
     update: {},
@@ -62,14 +126,51 @@ export async function ensureSeedDay(day: string): Promise<SeedInfo> {
       seed: seedEnc ? null : seed,
       seedEnc: seedEnc ?? null,
       revealed: false,
+      regimeSnapshot: regimeSnapshot != null ? (regimeSnapshot as any) : undefined,
     },
   });
   if (row.seedHash === seedHash) {
+    // Publish to external commitment (gist or file)
+    const commitResult = process.env.GITHUB_GIST_TOKEN
+      ? await publishSeedHashToGist(day, seedHash)
+      : await publishSeedHashToFile(day, seedHash);
+
+    if (commitResult) {
+      await prisma.serverSeed.update({
+        where: { id: row.id },
+        data: {
+          gistId: commitResult.id,
+          gistUrl: commitResult.url,
+          committedAt: new Date(),
+        },
+      }).catch(() => {});
+    }
+
     try {
-      await logAudit(null, "seed.minted", "ServerSeed", day, { seedHash, encrypted: !!seedEnc });
+      await logAudit(null, "seed.minted", "ServerSeed", day, {
+        seedHash,
+        encrypted: !!seedEnc,
+        committed: !!commitResult,
+        gistUrl: commitResult?.url,
+      });
     } catch {}
   }
-  return { day, seedHash: row.seedHash, revealed: row.revealed };
+  return { day, seedHash: row.seedHash, revealed: row.revealed, gistUrl: row.gistUrl };
+}
+
+async function captureRegimeSnapshot(): Promise<Record<string, unknown> | null> {
+  try {
+    const { dayStringUTC } = await import("./pf-math");
+    const today = dayStringUTC(new Date());
+    const regimes = await prisma.pairVolRegime.findMany({
+      where: { day: today },
+      select: { pairId: true, sigmaMult: true, hour: true, measuredAt: true },
+    });
+    if (regimes.length === 0) return null;
+    return { regimes, capturedAt: new Date().toISOString() };
+  } catch {
+    return null;
+  }
 }
 
 export async function getDaySeed(day: string): Promise<string | null> {

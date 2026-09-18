@@ -54,7 +54,7 @@ function gauss(u1: number, u2: number): number {
   return Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b);
 }
 
-type Candle = { timestamp: number; open: number; high: number; low: number; close: number; ticks: number };
+type Candle = { timestamp: number; open: number; high: number; low: number; close: number; ticks: number; hash?: string; prevHash?: string };
 
 interface PairInfo {
   id: string;
@@ -195,8 +195,8 @@ export default function VerifyPage() {
       const lines = text.trim().split('\n');
       if (lines.length < 2) throw new Error('CSV is empty');
       const rows: Candle[] = lines.slice(1).map((l) => {
-        const [timestamp, open, high, low, close, ticks] = l.split(',');
-        return { timestamp: Number(timestamp), open: Number(open), high: Number(high), low: Number(low), close: Number(close), ticks: Number(ticks) };
+        const [timestamp, open, high, low, close, ticks, hash, prevHash] = l.split(',');
+        return { timestamp: Number(timestamp), open: Number(open), high: Number(high), low: Number(low), close: Number(close), ticks: Number(ticks), hash: hash || undefined, prevHash: prevHash || undefined };
       });
       const base = Number(basePrice);
       const vol = Number(volatility);
@@ -216,8 +216,10 @@ export default function VerifyPage() {
         }
       }
       const hashRes = await fetch(`/api/market/seed/hash?day=${encodeURIComponent(day)}`);
+      let gistUrl: string | null = null;
       if (hashRes.ok) {
-        const hashInfo = await hashRes.json() as { seedHash?: string };
+        const hashInfo = await hashRes.json() as { seedHash?: string; gistUrl?: string };
+        gistUrl = hashInfo.gistUrl ?? null;
         if (hashInfo.seedHash) {
           const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed.trim()));
           if (hexBytes(new Uint8Array(digest)) !== String(hashInfo.seedHash).toLowerCase()) {
@@ -227,6 +229,8 @@ export default function VerifyPage() {
       }
       const tol = 1e-8;
       let checked = 0;
+      let hashChainOk = true;
+      let prevHash = '';
       for (const row of rows) {
         const prevClose = row.open;
         const secondOfDay = Math.floor(row.timestamp / 1000) % SECONDS_PER_DAY;
@@ -263,9 +267,31 @@ export default function VerifyPage() {
           setWorking(false);
           return;
         }
+        // Verify hash chain if present
+        if (row.hash) {
+          const data = `${prevHash}|${pairId}|${row.timestamp}|${row.open}|${row.high}|${row.low}|${row.close}|${row.ticks}`;
+          const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+          const expectedHash = hexBytes(new Uint8Array(digest));
+          if (expectedHash !== row.hash) {
+            setResult(`Hash chain mismatch at ${new Date(row.timestamp).toISOString()}: expected ${expectedHash}, got ${row.hash}. Candle data may have been tampered.`);
+            setOk(false);
+            setWorking(false);
+            return;
+          }
+          if (row.prevHash !== prevHash) {
+            setResult(`PrevHash mismatch at ${new Date(row.timestamp).toISOString()}: expected ${prevHash || '(empty)'}, got ${row.prevHash || '(empty)'}. Chain broken.`);
+            setOk(false);
+            setWorking(false);
+            return;
+          }
+          prevHash = row.hash;
+          hashChainOk = true;
+        }
         checked++;
       }
-      setResult(`VERIFIED: ${checked} one-second candles regenerated exactly from the seed. No manipulation.`);
+      const chainNote = hashChainOk && rows.some(r => r.hash) ? ' Hash chain verified — no candle tampering.' : '';
+      const gistNote = gistUrl ? ` External commitment: ${gistUrl}` : '';
+      setResult(`VERIFIED: ${checked} one-second candles regenerated exactly from the seed. No manipulation.${chainNote}${gistNote}`);
       setOk(true);
     } catch (e) {
       setResult(e instanceof Error ? e.message : 'Verification failed.');
@@ -284,6 +310,8 @@ export default function VerifyPage() {
           <p className="text-sm text-text-dark mt-1">
             Pick an asset and a day, load everything with one click, and re-run the market math in your own browser.
             The page first compares the seed against the published commitment hash — mismatches abort.
+            Each candle is verified against the hash chain — any tampering is detected.
+            External commitment is published to a public gist before each trading day.
             Trade entries include a half-spread (shown on each pair); exits are the committed candle closes verified here.
           </p>
         </div>

@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { createHash } from "crypto";
 import { fetchMirrorQuotes } from "./mirror-feed";
 import {
   computeSecond,
@@ -21,6 +22,7 @@ export interface SeedInfo {
   day: string;
   seedHash: string;
   revealed: boolean;
+  gistUrl?: string | null;
 }
 
 export async function ensureSeedForDay(day: string): Promise<SeedInfo> {
@@ -72,6 +74,12 @@ export class OTCEngine {
   private mirrorTimer: ReturnType<typeof setInterval> | null = null;
   private regimes = new Map<string, number>();
   private lastMeasuredHour = -1;
+  private lastHashes = new Map<string, string>();
+
+  static computeCandleHash(prevHash: string, pairId: string, timestamp: number, open: number, high: number, low: number, close: number, ticks: number): string {
+    const data = `${prevHash}|${pairId}|${timestamp}|${open}|${high}|${low}|${close}|${ticks}`;
+    return createHash("sha256").update(data, "utf8").digest("hex");
+  }
 
   private regimeKey(pairId: string, day: string, hour: number): string {
     return `${pairId}:${day}:${hour}`;
@@ -208,8 +216,11 @@ export class OTCEngine {
     const lastSecond = await prisma.secondCandle.findFirst({
       where: { pairId },
       orderBy: { timestamp: "desc" },
-      select: { close: true },
+      select: { close: true, hash: true },
     });
+    if (lastSecond?.hash) {
+      this.lastHashes.set(pairId, lastSecond.hash);
+    }
     const lastMinute = lastSecond
       ? null
       : await prisma.candle.findFirst({
@@ -525,9 +536,13 @@ export class OTCEngine {
       low: number;
       close: number;
       ticks: number;
+      hash: string;
+      prevHash: string;
     }> = [];
     for (const [pairId, p] of Array.from(this.pendingSeconds.entries())) {
       if (Number(p.timestamp) !== secondStartMs) continue;
+      const prevHash = this.lastHashes.get(pairId) ?? "";
+      const hash = OTCEngine.computeCandleHash(prevHash, pairId, Number(p.timestamp), p.open, p.high, p.low, p.close, TICKS_PER_SECOND);
       rows.push({
         pairId,
         timestamp: p.timestamp,
@@ -536,7 +551,10 @@ export class OTCEngine {
         low: p.low,
         close: p.close,
         ticks: TICKS_PER_SECOND,
+        hash,
+        prevHash,
       });
+      this.lastHashes.set(pairId, hash);
       this.pendingSeconds.delete(pairId);
     }
     if (rows.length > 0) {
@@ -603,7 +621,7 @@ export class OTCEngine {
         }
       } catch {}
       await prisma.secondCandle.deleteMany({
-        where: { timestamp: { lt: BigInt(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },
+        where: { timestamp: { lt: BigInt(now.getTime() - 90 * 24 * 60 * 60 * 1000) } },
       }).catch(() => {});
       await prisma.candle.deleteMany({
         where: { timestamp: { lt: BigInt(now.getTime() - 32 * 24 * 60 * 60 * 1000) } },

@@ -448,14 +448,19 @@ model Notification {
 // ─────────────────────────── provably-fair engine ───────────────────────────
 
 model ServerSeed {
-  id         String    @id @default(uuid())
-  day        String    @unique
-  seedHash   String
-  seed       String?
-  seedEnc    String?
-  revealed   Boolean   @default(false)
-  revealedAt DateTime?
-  createdAt  DateTime  @default(now())
+  id             String    @id @default(uuid())
+  day            String    @unique
+  seedHash       String
+  seed           String?
+  seedEnc        String?
+  revealed       Boolean   @default(false)
+  revealedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  // Provably fair: external commitment
+  gistId         String?
+  gistUrl        String?
+  committedAt    DateTime?
+  regimeSnapshot Json?
 
   @@index([day])
 }
@@ -469,6 +474,9 @@ model SecondCandle {
   low       Decimal @db.Decimal(16, 8)
   close     Decimal @db.Decimal(16, 8)
   ticks     Int      @default(0)
+  // Provably fair: hash chain — SHA-256(prevHash + this candle data)
+  hash      String?
+  prevHash  String?
 
   @@unique([pairId, timestamp])
   @@index([pairId, timestamp(sort: Desc)])
