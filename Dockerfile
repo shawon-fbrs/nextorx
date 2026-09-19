@@ -50,4 +50,4 @@ COPY --from=builder /app ./
 RUN chown -R app:app .next
 USER app
 EXPOSE 3000
-CMD ["sh", "-c", "node_modules/.bin/prisma db push --skip-generate && npx tsx scripts/seed.ts && node_modules/.bin/tsx server.ts"]
+CMD ["sh", "-c", "npx tsx scripts/migrate-per-asset-seeds.ts 2>/dev/null; node_modules/.bin/prisma db push --skip-generate && npx tsx scripts/seed.ts && node_modules/.bin/tsx server.ts"]
