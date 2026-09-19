@@ -60,7 +60,7 @@ function ResetPasswordForm() {
 
   if (!token || !email) {
     return (
-      <div className="min-h-screen bg-background text-text flex items-center justify-center px-6">
+      <div className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md text-center">
           <p className="text-text-dark">Invalid reset link.</p>
           <Link href="/forgot-password" className="text-green hover:text-green-hover mt-4 inline-block">
@@ -72,7 +72,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-text flex items-center justify-center px-6">
+    <div className="flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
@@ -182,7 +182,7 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-background text-text flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <p className="text-text-dark">Loading...</p>
       </div>
     }>

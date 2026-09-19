@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useSession } from '@/lib/auth-client';
 
 const candles = [
   { x: 0, top: 90, bottom: 210, bodyTop: 100, bodyH: 80, up: true },
@@ -57,65 +56,10 @@ const stats = [
 ];
 
 export default function LandingPage() {
-  const { data: session } = useSession();
-  const user = session?.user ?? null;
   return (
-    <div className="min-h-screen bg-background text-text">
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2.5">
-              <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24">
-                <rect fill="currentColor" height="12" rx="1" width="3" x="2" y="6" />
-                <rect fill="currentColor" height="18" rx="1" width="3" x="7" y="3" />
-                <rect fill="currentColor" height="8" rx="1" width="3" x="12" y="8" />
-                <rect fill="currentColor" height="14" rx="1" width="3" x="17" y="5" />
-              </svg>
-              <span className="text-white font-bold text-lg tracking-wide">NEXTORX</span>
-            </Link>
-            <div className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-sm text-text hover:text-white transition-colors">Features</a>
-              <a href="#assets" className="text-sm text-text hover:text-white transition-colors">Assets</a>
-              <a href="#how-it-works" className="text-sm text-text hover:text-white transition-colors">How It Works</a>
-              <Link href="/verify" className="text-sm text-text hover:text-white transition-colors">Fairness</Link>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {user ? (
-              <>
-                <Link href="/verify" className="text-sm font-semibold text-text hover:text-white transition-colors px-4 py-2">
-                  Verify
-                </Link>
-                <Link href="/trade/demo" className="bg-green hover:bg-green-hover text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors shadow-lg shadow-green/20">
-                  Trade
-                </Link>
-                <Link href="/account" title={user.name || user.email || 'Account'}>
-                  {user.image ? (
-                    <img src={user.image} alt="" className="w-9 h-9 rounded-full object-cover border border-border" />
-                  ) : (
-                    <span className="w-9 h-9 rounded-full bg-blue/20 border border-blue/30 flex items-center justify-center text-sm font-bold text-white">
-                      {(user.name || user.email || 'T').charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link href="/login" className="text-sm font-semibold text-text hover:text-white transition-colors px-4 py-2">
-                  Log In
-                </Link>
-                <Link href="/register" className="bg-green hover:bg-green-hover text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors shadow-lg shadow-green/20">
-                  Sign Up
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
-
+    <>
       {/* Hero */}
-      <section className="pt-32 pb-20 px-6">
+      <section className="pt-20 pb-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-green/10 border border-green/20 rounded-full px-4 py-1.5 mb-6">
@@ -277,69 +221,6 @@ export default function LandingPage() {
           </Link>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-12 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-5 gap-8 mb-10">
-            <div>
-              <div className="flex items-center gap-2.5 mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24">
-                  <rect fill="currentColor" height="12" rx="1" width="3" x="2" y="6" />
-                  <rect fill="currentColor" height="18" rx="1" width="3" x="7" y="3" />
-                  <rect fill="currentColor" height="8" rx="1" width="3" x="12" y="8" />
-                  <rect fill="currentColor" height="14" rx="1" width="3" x="17" y="5" />
-                </svg>
-                <span className="text-white font-bold">NEXTORX</span>
-              </div>
-              <p className="text-xs text-text-dark leading-relaxed">Binary options trading platform with high payouts and fast execution.</p>
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Trading</h4>
-              <div className="space-y-2">
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Binary Options</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Digital Options</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">OTC Market</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Tournaments</a>
-              </div>
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Company</h4>
-              <div className="space-y-2">
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">About Us</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Careers</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Blog</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Press</a>
-              </div>
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Support</h4>
-              <div className="space-y-2">
-                <a href="/support" className="block text-xs text-text-dark hover:text-white transition-colors">Help Center</a>
-                <a href="/verify" className="block text-xs text-text-dark hover:text-white transition-colors">Verify Fairness</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Contact Us</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">FAQ</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Community</a>
-              </div>
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">Legal</h4>
-              <div className="space-y-2">
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Terms of Service</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Privacy Policy</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">Risk Disclosure</a>
-                <a href="#" className="block text-xs text-text-dark hover:text-white transition-colors">AML Policy</a>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-border pt-6 flex items-center justify-between">
-            <p className="text-[11px] text-text-dark">&copy; 2026 Nextorx. All rights reserved.</p>
-            <div className="flex items-center gap-4">
-              <span className="text-[10px] text-text-dark bg-surface border border-border px-2.5 py-1 rounded">Risk Warning</span>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </>
   );
 }

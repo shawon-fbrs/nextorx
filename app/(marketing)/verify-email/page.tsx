@@ -79,7 +79,7 @@ function VerifyEmailForm() {
 
   if (!email) {
     return (
-      <div className="min-h-screen bg-background text-text flex items-center justify-center px-6">
+      <div className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md text-center">
           <p className="text-text-dark">No email address provided.</p>
           <Link href="/register" className="text-green hover:text-green-hover mt-4 inline-block">
@@ -91,7 +91,7 @@ function VerifyEmailForm() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-text flex items-center justify-center px-6">
+    <div className="flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
@@ -177,7 +177,7 @@ function VerifyEmailForm() {
 export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-background text-text flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <p className="text-text-dark">Loading...</p>
       </div>
     }>

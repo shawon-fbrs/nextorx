@@ -302,9 +302,10 @@ export default function VerifyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-text px-6 py-12">
+    <div className="px-6 py-12">
       <div className="max-w-xl mx-auto space-y-6">
-        <Link href="/" className="text-xs text-blue font-semibold">← Home</Link>
+        <Link href="/" className="text-xs text-blue font-semibold hover:underline">← Home</Link>
+        <Link href="/seeds" className="text-xs text-blue font-semibold hover:underline float-right">View all seeds →</Link>
         <div>
           <h1 className="text-2xl font-black text-foreground">Verify Fairness</h1>
           <p className="text-sm text-text-dark mt-1">
