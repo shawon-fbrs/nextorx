@@ -25,12 +25,12 @@ export async function GET(request: NextRequest) {
       take: 86400,
     });
     if (candles.length === 0) {
-      return Response.json({ error: "No data for asset/date (1s candles kept 7 days)" }, { status: 404 });
+      return Response.json({ error: "No data for this asset/date. Second candles are retained for 90 days." }, { status: 404 });
     }
-    const lines = ["timestamp,open,high,low,close,ticks"];
+    const lines = ["timestamp,open,high,low,close,ticks,hash,prevHash"];
     for (const c of candles) {
       lines.push(
-        `${c.timestamp},${c.open},${c.high},${c.low},${c.close},${c.ticks}`,
+        `${c.timestamp},${c.open},${c.high},${c.low},${c.close},${c.ticks},${c.hash ?? ""},${c.prevHash ?? ""}`,
       );
     }
     return new Response(lines.join("\n"), {

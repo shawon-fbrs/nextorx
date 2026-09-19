@@ -24,16 +24,13 @@ export function MarketingHeader() {
             <a href="/#features" className="text-sm text-text hover:text-white transition-colors">Features</a>
             <a href="/#assets" className="text-sm text-text hover:text-white transition-colors">Assets</a>
             <a href="/#how-it-works" className="text-sm text-text hover:text-white transition-colors">How It Works</a>
-            <Link href="/verify" className="text-sm text-text hover:text-white transition-colors">Fairness</Link>
             <Link href="/seeds" className="text-sm text-text hover:text-white transition-colors">Seeds</Link>
+            <Link href="/verify" className="text-sm text-text hover:text-white transition-colors">Verify</Link>
           </div>
         </div>
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              <Link href="/verify" className="text-sm font-semibold text-text hover:text-white transition-colors px-4 py-2">
-                Verify
-              </Link>
               <Link href="/trade/demo" className="bg-green hover:bg-green-hover text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors shadow-lg shadow-green/20">
                 Trade
               </Link>

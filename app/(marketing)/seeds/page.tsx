@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 
 interface SeedEntry {
@@ -9,31 +9,47 @@ interface SeedEntry {
   revealed: boolean;
   revealedAt: string | null;
   committedAt: string | null;
-  gistUrl: string | null;
   createdAt: string;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
 
 export default function SeedsPage() {
   const [seeds, setSeeds] = useState<SeedEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'revealed' | 'pending'>('all');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/seeds')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.seeds) setSeeds(data.seeds);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const fetchSeeds = useCallback(async (p: number, f: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/seeds?page=${p}&limit=15&filter=${f}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSeeds(data.seeds ?? []);
+        setPagination(data.pagination ?? null);
+      }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const filtered = seeds.filter((s) => {
-    if (filter === 'revealed') return s.revealed;
-    if (filter === 'pending') return !s.revealed;
-    return true;
-  });
+  useEffect(() => {
+    fetchSeeds(page, filter);
+  }, [page, filter, fetchSeeds]);
+
+  const handleFilter = (f: 'all' | 'revealed' | 'pending') => {
+    setFilter(f);
+    setPage(1);
+  };
 
   const copyHash = (hash: string) => {
     navigator.clipboard.writeText(hash).catch(() => {});
@@ -42,119 +58,98 @@ export default function SeedsPage() {
   };
 
   const now = Date.now();
-  const revealedCount = seeds.filter((s) => s.revealed).length;
-  const pendingCount = seeds.length - revealedCount;
 
   return (
     <div className="px-4 py-8 sm:px-6">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Link href="/" className="text-xs text-blue font-semibold hover:underline">← Home</Link>
+      <div className="max-w-3xl mx-auto space-y-6">
+        <Link href="/" className="text-xs text-blue font-semibold hover:underline">&larr; Home</Link>
 
         <div>
           <h1 className="text-2xl font-black text-foreground">Seed Commitments</h1>
           <p className="text-sm text-textDark mt-1">
-            Every trading day, a random seed is generated and its SHA-256 hash is published here before any trades occur.
+            Every trading day, a random seed is generated and its SHA-256 hash is published before any trades occur.
             After the day ends, the seed is revealed so you can verify every candle was generated fairly.
           </p>
         </div>
 
+        {/* Filter tabs */}
         <div className="flex gap-2 text-xs font-semibold">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${filter === 'all' ? 'bg-blue text-white' : 'bg-surface border border-border text-textDark hover:text-foreground'}`}
-          >
-            All ({seeds.length})
-          </button>
-          <button
-            onClick={() => setFilter('revealed')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${filter === 'revealed' ? 'bg-green text-white' : 'bg-surface border border-border text-textDark hover:text-foreground'}`}
-          >
-            Revealed ({revealedCount})
-          </button>
-          <button
-            onClick={() => setFilter('pending')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${filter === 'pending' ? 'bg-orange text-white' : 'bg-surface border border-border text-textDark hover:text-foreground'}`}
-          >
-            Pending ({pendingCount})
-          </button>
+          {(['all', 'revealed', 'pending'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => handleFilter(f)}
+              className={`px-3 py-1.5 rounded-lg transition-colors capitalize ${
+                filter === f
+                  ? 'bg-blue text-white'
+                  : 'bg-surface border border-border text-textDark hover:text-foreground'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
         </div>
 
+        {/* Seed list */}
         {loading ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-16 bg-surface rounded-xl animate-pulse" />
+              <div key={i} className="h-14 bg-surface rounded-xl animate-pulse" />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : seeds.length === 0 ? (
           <div className="text-center py-12 text-textDark text-sm">
-            {seeds.length === 0 ? 'No seeds published yet. Seeds are created when the first trading day starts.' : 'No seeds match this filter.'}
+            No seeds found. Seeds are created when trading starts.
           </div>
         ) : (
           <div className="space-y-2">
-            {filtered.map((seed) => {
+            {seeds.map((seed) => {
               const committedTime = seed.committedAt ? new Date(seed.committedAt) : new Date(seed.createdAt);
-              const revealedTime = seed.revealedAt ? new Date(seed.revealedAt) : null;
               const daysAgo = Math.floor((now - committedTime.getTime()) / 86400000);
 
               return (
                 <div
                   key={seed.day}
-                  className="bg-surface border border-border rounded-xl p-4 hover:border-border/80 transition-colors"
+                  className="bg-surface border border-border rounded-xl px-4 py-3 flex items-center gap-4 hover:border-border/80 transition-colors"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    {/* Day + Status */}
-                    <div className="flex items-center gap-3 sm:w-40">
-                      <div className="text-lg font-black text-foreground font-mono">{seed.day}</div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${seed.revealed ? 'bg-green/15 text-green' : 'bg-orange/15 text-orange'}`}>
-                        {seed.revealed ? 'REVEALED' : 'PENDING'}
-                      </span>
-                    </div>
+                  {/* Day */}
+                  <div className="font-mono text-sm font-bold text-foreground w-24 shrink-0">
+                    {seed.day}
+                  </div>
 
-                    {/* Hash */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-textDark uppercase tracking-wider">Hash:</span>
-                        <button
-                          onClick={() => copyHash(seed.seedHash)}
-                          className="font-mono text-xs text-textDark hover:text-foreground truncate max-w-[320px] transition-colors"
-                          title="Click to copy"
-                        >
-                          {seed.seedHash.slice(0, 20)}…{seed.seedHash.slice(-8)}
-                          {copiedHash === seed.seedHash ? (
-                            <span className="text-green ml-1">copied!</span>
-                          ) : (
-                            <span className="text-textDark/50 ml-1">⧉</span>
-                          )}
-                        </button>
-                      </div>
-                    </div>
+                  {/* Status badge */}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                    seed.revealed ? 'bg-green/15 text-green' : 'bg-orange/15 text-orange'
+                  }`}>
+                    {seed.revealed ? 'REVEALED' : 'PENDING'}
+                  </span>
 
-                    {/* Timing */}
-                    <div className="text-[10px] text-textDark space-y-0.5 sm:text-right sm:w-36">
-                      <div>Committed: {committedTime.toLocaleDateString()} {committedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                      {revealedTime && (
-                        <div>Revealed: {revealedTime.toLocaleDateString()} {revealedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                      )}
-                      {daysAgo > 0 && <div>{daysAgo}d ago</div>}
-                    </div>
+                  {/* Hash */}
+                  <div className="flex-1 min-w-0 hidden sm:block">
+                    <button
+                      onClick={() => copyHash(seed.seedHash)}
+                      className="font-mono text-[11px] text-textDark hover:text-foreground transition-colors"
+                      title="Click to copy full hash"
+                    >
+                      {seed.seedHash.slice(0, 16)}&hellip;{seed.seedHash.slice(-6)}
+                      {copiedHash === seed.seedHash ? (
+                        <span className="text-green ml-1.5">copied</span>
+                      ) : null}
+                    </button>
+                  </div>
 
-                    {/* Actions */}
-                    <div className="flex gap-2 sm:flex-col">
-                      <Link
-                        href={`/verify?day=${seed.day}`}
-                        className="text-[11px] font-bold bg-blue/10 text-blue px-3 py-1.5 rounded-lg hover:bg-blue/20 transition-colors text-center"
-                      >
-                        Verify
-                      </Link>
-                      <a
-                        href={`/seeds/nextorx-seed-${seed.day}.json`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] font-bold bg-surface-hover text-textDark px-3 py-1.5 rounded-lg hover:bg-border/50 transition-colors text-center"
-                      >
-                        JSON
-                      </a>
-                    </div>
+                  {/* Days ago */}
+                  {daysAgo > 0 && (
+                    <span className="text-[10px] text-textDark shrink-0">{daysAgo}d ago</span>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-1.5 shrink-0">
+                    <Link
+                      href={`/verify?day=${seed.day}`}
+                      className="text-[11px] font-bold bg-blue/10 text-blue px-2.5 py-1 rounded-lg hover:bg-blue/20 transition-colors"
+                    >
+                      Verify
+                    </Link>
                   </div>
                 </div>
               );
@@ -162,16 +157,42 @@ export default function SeedsPage() {
           </div>
         )}
 
+        {/* Pagination */}
+        {pagination && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between text-xs text-textDark">
+            <span>
+              Page {pagination.page} of {pagination.totalPages} ({pagination.total} seeds)
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1.5 rounded-lg bg-surface border border-border font-semibold disabled:opacity-40 hover:text-foreground transition-colors"
+              >
+                &larr; Prev
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                disabled={page >= pagination.totalPages}
+                className="px-3 py-1.5 rounded-lg bg-surface border border-border font-semibold disabled:opacity-40 hover:text-foreground transition-colors"
+              >
+                Next &rarr;
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* How it works */}
         <div className="bg-surface border border-border rounded-xl p-4 text-xs text-textDark space-y-2">
           <h3 className="font-bold text-foreground text-sm">How it works</h3>
           <ol className="list-decimal list-inside space-y-1">
-            <li>Before each trading day, a 32-byte random seed is generated and its SHA-256 hash is published here.</li>
-            <li>The hash is committed <strong>before any trades</strong> — the platform cannot change the seed after seeing positions.</li>
+            <li>Before each trading day, a random seed is generated and its SHA-256 hash is published here.</li>
+            <li>The hash is committed <strong>before any trades</strong> &mdash; the platform cannot change the seed after seeing positions.</li>
             <li>After the day ends, the full seed is revealed and you can verify every candle in your browser.</li>
-            <li>Each candle is also linked in a hash chain — any tampering breaks the chain and is instantly detectable.</li>
+            <li>Each candle is linked in a hash chain &mdash; any tampering breaks the chain and is instantly detectable.</li>
           </ol>
           <p className="mt-2">
-            <Link href="/verify" className="text-blue font-semibold hover:underline">Open Verify Tool →</Link>
+            <Link href="/verify" className="text-blue font-semibold hover:underline">Open Verify Tool &rarr;</Link>
           </p>
         </div>
       </div>

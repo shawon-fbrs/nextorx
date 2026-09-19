@@ -70,7 +70,7 @@ export default function VerifyPage() {
   const [pairId, setPairId] = useState('');
   const [pairs, setPairs] = useState<PairInfo[]>([]);
   const [day, setDay] = useState(() => {
-    const d = new Date(Date.now() - 86400000);
+    const d = new Date();
     return d.toISOString().slice(0, 10);
   });
   const [basePrice, setBasePrice] = useState('');
@@ -348,7 +348,7 @@ export default function VerifyPage() {
             </div>
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Day (UTC)</label>
-              <input type="date" value={day} max={new Date(Date.now() - 86400000).toISOString().slice(0, 10)} onChange={(e) => setDay(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-blue [color-scheme:dark]" />
+              <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-blue [color-scheme:dark]" />
             </div>
           </div>
           {isMirror && pairId !== '' && (
