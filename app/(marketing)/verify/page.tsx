@@ -65,6 +65,11 @@ interface PairInfo {
   feed: string;
 }
 
+interface Availability {
+  validDates: string[];
+  today: string;
+}
+
 function VerifyContent() {
   const searchParams = useSearchParams();
   const urlDay = searchParams.get('day') ?? '';
@@ -74,6 +79,7 @@ function VerifyContent() {
   const [seed, setSeed] = useState('');
   const [pairId, setPairId] = useState('');
   const [pairs, setPairs] = useState<PairInfo[]>([]);
+  const [availability, setAvailability] = useState<Availability | null>(null);
   const [day, setDay] = useState(() => {
     if (urlDay && /^\d{4}-\d{2}-\d{2}$/.test(urlDay)) return urlDay;
     return new Date().toISOString().slice(0, 10);
@@ -92,27 +98,51 @@ function VerifyContent() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/market/pairs')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { pairs?: PairInfo[] } | null) => {
-        if (cancelled || !data?.pairs) return;
-        setPairs(data.pairs);
+    Promise.all([
+      fetch('/api/market/pairs').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/verify/availability').then((r) => (r.ok ? r.json() : null)),
+    ]).then(([pairsData, availData]) => {
+      if (cancelled) return;
+      if (pairsData?.pairs) {
+        setPairs(pairsData.pairs);
         setPairId((cur) => {
-          if (cur && data.pairs!.some((p) => p.id === cur)) return cur;
-          if (urlAsset && data.pairs!.some((p) => p.id === urlAsset)) return urlAsset;
-          const synth = data.pairs!.find((p) => p.feed !== 'mirror');
-          return (synth ?? data.pairs![0])?.id ?? '';
+          if (cur && pairsData.pairs!.some((p: PairInfo) => p.id === cur)) return cur;
+          if (urlAsset && pairsData.pairs!.some((p: PairInfo) => p.id === urlAsset)) return urlAsset;
+          const synth = pairsData.pairs!.find((p: PairInfo) => p.feed !== 'mirror');
+          return (synth ?? pairsData.pairs![0])?.id ?? '';
         });
-      })
-      .catch(() => {});
+      }
+      if (availData) {
+        setAvailability(availData);
+        if (!urlDay && availData.validDates.length > 0) {
+          setDay(availData.validDates[0]);
+        }
+      }
+    }).catch(() => {});
     return () => { cancelled = true; };
-  }, [urlAsset]);
+  }, [urlAsset, urlDay]);
+
+  const isValidDate = (d: string) => {
+    if (!availability) return true;
+    return availability.validDates.includes(d);
+  };
 
   const loadDayData = useCallback(async () => {
     setResult('');
     setOk(null);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !pairId) {
       setResult('Enter the asset and the day first (YYYY-MM-DD).');
+      setOk(false);
+      return;
+    }
+    const today = availability?.today ?? new Date().toISOString().slice(0, 10);
+    if (day >= today) {
+      setResult('Cannot verify today or future dates. Seeds are revealed after the trading day ends.');
+      setOk(false);
+      return;
+    }
+    if (!isValidDate(day)) {
+      setResult(`No seed available for ${day}. Either no candle data exists for this date, or it was generated before the provably fair seed system was in place.`);
       setOk(false);
       return;
     }
@@ -174,14 +204,14 @@ function VerifyContent() {
     } finally {
       setLoadingDay(false);
     }
-  }, [day, pairId, seed]);
+  }, [day, pairId, seed, availability]);
 
   useEffect(() => {
     if (autoLoaded.current) return;
-    if (pairs.length === 0 || !pairId || !day) return;
+    if (pairs.length === 0 || !pairId || !day || !availability) return;
     autoLoaded.current = true;
     loadDayData();
-  }, [pairs, pairId, day, loadDayData]);
+  }, [pairs, pairId, day, availability, loadDayData]);
 
   const selectedPair = pairs.find((p) => p.id === pairId) ?? null;
   const isMirror = selectedPair ? selectedPair.feed === 'mirror' : MIRRORED_PAIR_IDS.includes(pairId);
@@ -359,7 +389,13 @@ function VerifyContent() {
             </div>
             <div>
               <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Day (UTC)</label>
-              <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-blue [color-scheme:dark]" />
+              <select value={day} onChange={(e) => setDay(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-blue [color-scheme:dark]">
+                {availability === null && <option value={day}>{day}</option>}
+                {availability && availability.validDates.length === 0 && <option value="">No verifiable dates</option>}
+                {availability && availability.validDates.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
             </div>
           </div>
           {isMirror && pairId !== '' && (

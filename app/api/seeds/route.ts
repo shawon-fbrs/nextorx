@@ -14,47 +14,100 @@ export async function GET(request: Request) {
     const dateTo = url.searchParams.get("to") ?? "";
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {};
-    if (filter === "revealed") where.revealed = true;
-    else if (filter === "pending") where.revealed = false;
-    if (asset) where.pairId = asset;
-    if (dateFrom || dateTo) {
-      where.day = {};
-      if (dateFrom) (where.day as Record<string, string>).gte = dateFrom;
-      if (dateTo) (where.day as Record<string, string>).lte = dateTo;
-    }
-
-    const [seeds, total] = await Promise.all([
-      prisma.serverSeed.findMany({
-        where,
-        orderBy: { day: "desc" },
-        skip,
-        take: limit,
-        select: {
-          day: true,
-          pairId: true,
-          seedHash: true,
-          revealed: true,
-          revealedAt: true,
-          committedAt: true,
-          createdAt: true,
-        },
-      }),
-      prisma.serverSeed.count({ where }),
-    ]);
-
     const pairs = await prisma.pair.findMany({ select: { id: true, name: true } });
     const pairMap = new Map(pairs.map((p) => [p.id, p.name]));
+    const pairIds = pairs.map((p) => p.id);
 
-    const enriched = seeds.map((s) => ({
-      ...s,
-      pairName: pairMap.get(s.pairId) ?? s.pairId,
-    }));
+    const candleDates = await prisma.$queryRaw<{ day: string }[]>`
+      SELECT DISTINCT to_char(to_timestamp("timestamp" / 1000), 'YYYY-MM-DD') AS day
+      FROM "SecondCandle"
+      WHERE "timestamp" > 0
+      ORDER BY day DESC
+    `;
+    const allDates = candleDates.map((r) => r.day);
+
+    const seeds = await prisma.serverSeed.findMany({
+      orderBy: { day: "desc" },
+      select: {
+        day: true,
+        pairId: true,
+        seedHash: true,
+        revealed: true,
+        revealedAt: true,
+        committedAt: true,
+        createdAt: true,
+      },
+    });
+
+    const seedMap = new Map<string, typeof seeds>();
+    for (const s of seeds) {
+      const key = s.day;
+      if (!seedMap.has(key)) seedMap.set(key, []);
+      seedMap.get(key)!.push(s);
+    }
+
+    type Row = {
+      day: string;
+      pairId: string;
+      pairName: string;
+      seedHash: string;
+      status: "REVEALED" | "PENDING" | "NONE";
+      revealedAt: string | null;
+      committedAt: string | null;
+      createdAt: string;
+    };
+
+    const allRows: Row[] = [];
+    for (const day of allDates) {
+      const daySeeds = seedMap.get(day) ?? [];
+      const seedByPair = new Map(daySeeds.map((s) => [s.pairId, s]));
+      for (const pid of pairIds) {
+        const s = seedByPair.get(pid);
+        if (s) {
+          allRows.push({
+            day,
+            pairId: pid,
+            pairName: pairMap.get(pid) ?? pid,
+            seedHash: s.seedHash,
+            status: s.revealed ? "REVEALED" : "PENDING",
+            revealedAt: s.revealedAt?.toISOString() ?? null,
+            committedAt: s.committedAt?.toISOString() ?? null,
+            createdAt: s.createdAt.toISOString(),
+          });
+        } else {
+          allRows.push({
+            day,
+            pairId: pid,
+            pairName: pairMap.get(pid) ?? pid,
+            seedHash: "",
+            status: "NONE",
+            revealedAt: null,
+            committedAt: null,
+            createdAt: "",
+          });
+        }
+      }
+    }
+
+    let filtered = allRows;
+    if (filter === "revealed") filtered = allRows.filter((r) => r.status === "REVEALED");
+    else if (filter === "pending") filtered = allRows.filter((r) => r.status === "PENDING");
+    else if (filter === "unverifiable") filtered = allRows.filter((r) => r.status === "NONE");
+    if (asset) filtered = filtered.filter((r) => r.pairId === asset);
+    if (dateFrom) filtered = filtered.filter((r) => r.day >= dateFrom);
+    if (dateTo) filtered = filtered.filter((r) => r.day <= dateTo);
+
+    const total = filtered.length;
+    const paginated = filtered.slice(skip, skip + limit);
+
+    const validDates = [...new Set(allRows.filter((r) => r.status === "REVEALED").map((r) => r.day))].sort();
 
     return Response.json({
-      seeds: enriched,
+      seeds: paginated,
       pairs: pairs.map((p) => ({ id: p.id, name: p.name })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      validDates,
+      allDates,
     });
   } catch (e) {
     return toJsonError(e);

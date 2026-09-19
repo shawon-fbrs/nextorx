@@ -8,7 +8,7 @@ interface SeedEntry {
   pairId: string;
   pairName: string;
   seedHash: string;
-  revealed: boolean;
+  status: 'REVEALED' | 'PENDING' | 'NONE';
   revealedAt: string | null;
   committedAt: string | null;
   createdAt: string;
@@ -18,17 +18,32 @@ interface PairOption { id: string; name: string; }
 
 interface Pagination { page: number; limit: number; total: number; totalPages: number; }
 
+const STATUS_STYLES: Record<string, string> = {
+  REVEALED: 'bg-green/15 text-green',
+  PENDING: 'bg-orange/15 text-orange',
+  NONE: 'bg-white/5 text-textDark',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  REVEALED: 'REVEALED',
+  PENDING: 'PENDING',
+  NONE: 'NO SEED',
+};
+
 export default function SeedsPage() {
   const [seeds, setSeeds] = useState<SeedEntry[]>([]);
   const [pairs, setPairs] = useState<PairOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'revealed' | 'pending'>('all');
+  const [filter, setFilter] = useState<'all' | 'revealed' | 'pending' | 'unverifiable'>('all');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [assetFilter, setAssetFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [validDates, setValidDates] = useState<string[]>([]);
+  const [allDates, setAllDates] = useState<string[]>([]);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
   const fetchSeeds = useCallback(async () => {
     setLoading(true);
@@ -43,14 +58,15 @@ export default function SeedsPage() {
         setSeeds(data.seeds ?? []);
         setPairs(data.pairs ?? []);
         setPagination(data.pagination ?? null);
+        setValidDates(data.validDates ?? []);
+        setAllDates(data.allDates ?? []);
       }
     } catch {} finally { setLoading(false); }
   }, [page, filter, assetFilter, dateFrom, dateTo]);
 
   useEffect(() => { fetchSeeds(); }, [fetchSeeds]);
 
-  const handleFilter = (f: 'all' | 'revealed' | 'pending') => { setFilter(f); setPage(1); };
-  const handleSearch = () => { setPage(1); fetchSeeds(); };
+  const handleFilter = (f: 'all' | 'revealed' | 'pending' | 'unverifiable') => { setFilter(f); setPage(1); };
 
   const copyHash = (hash: string) => {
     navigator.clipboard.writeText(hash).catch(() => {});
@@ -58,7 +74,28 @@ export default function SeedsPage() {
     setTimeout(() => setCopiedHash(null), 1500);
   };
 
-  const now = Date.now();
+  const toggleDay = (day: string) => {
+    setExpandedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return next;
+    });
+  };
+
+  const dayGroups = new Map<string, SeedEntry[]>();
+  for (const s of seeds) {
+    if (!dayGroups.has(s.day)) dayGroups.set(s.day, []);
+    dayGroups.get(s.day)!.push(s);
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const earliestDate = allDates.length > 0 ? allDates[allDates.length - 1] : today;
+  const latestDate = allDates.length > 0 ? allDates[0] : today;
+
+  const totalRevealed = seeds.filter((s) => s.status === 'REVEALED').length;
+  const totalPending = seeds.filter((s) => s.status === 'PENDING').length;
+  const totalNone = seeds.filter((s) => s.status === 'NONE').length;
 
   return (
     <div className="px-4 py-8 sm:px-6">
@@ -73,11 +110,26 @@ export default function SeedsPage() {
           </p>
         </div>
 
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-surface border border-border rounded-xl p-3 text-center">
+            <div className="text-lg font-black text-green">{totalRevealed}</div>
+            <div className="text-[10px] font-semibold text-textDark uppercase">Revealed</div>
+          </div>
+          <div className="bg-surface border border-border rounded-xl p-3 text-center">
+            <div className="text-lg font-black text-orange">{totalPending}</div>
+            <div className="text-[10px] font-semibold text-textDark uppercase">Pending</div>
+          </div>
+          <div className="bg-surface border border-border rounded-xl p-3 text-center">
+            <div className="text-lg font-black text-textDark">{totalNone}</div>
+            <div className="text-[10px] font-semibold text-textDark uppercase">No Seed</div>
+          </div>
+        </div>
+
         <div className="bg-surface border border-border rounded-xl p-4 space-y-3">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[160px]">
               <label className="text-[10px] font-semibold text-textDark uppercase tracking-wider mb-1 block">Asset</label>
-              <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)}
+              <select value={assetFilter} onChange={(e) => { setAssetFilter(e.target.value); setPage(1); }}
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-blue [color-scheme:dark]">
                 <option value="">All assets</option>
                 {pairs.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
@@ -85,25 +137,23 @@ export default function SeedsPage() {
             </div>
             <div className="flex-1 min-w-[130px]">
               <label className="text-[10px] font-semibold text-textDark uppercase tracking-wider mb-1 block">From</label>
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+              <input type="date" value={dateFrom} min={earliestDate} max={today}
+                onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-blue [color-scheme:dark]" />
             </div>
             <div className="flex-1 min-w-[130px]">
               <label className="text-[10px] font-semibold text-textDark uppercase tracking-wider mb-1 block">To</label>
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+              <input type="date" value={dateTo} min={earliestDate} max={today}
+                onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-blue [color-scheme:dark]" />
             </div>
-            <button onClick={handleSearch}
-              className="bg-blue hover:bg-blue/80 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors">
-              Search
-            </button>
           </div>
-          <div className="flex gap-2 text-xs font-semibold">
-            {(['all', 'revealed', 'pending'] as const).map((f) => (
+          <div className="flex gap-2 text-xs font-semibold flex-wrap">
+            {(['all', 'revealed', 'pending', 'unverifiable'] as const).map((f) => (
               <button key={f} onClick={() => handleFilter(f)}
                 className={`px-3 py-1.5 rounded-lg transition-colors capitalize ${
                   filter === f ? 'bg-blue text-white' : 'bg-background border border-border text-textDark hover:text-foreground'
-                }`}>{f}</button>
+                }`}>{f === 'unverifiable' ? 'No Seed' : f}</button>
             ))}
           </div>
         </div>
@@ -112,41 +162,79 @@ export default function SeedsPage() {
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (<div key={i} className="h-14 bg-surface rounded-xl animate-pulse" />))}
           </div>
-        ) : seeds.length === 0 ? (
-          <div className="text-center py-12 text-textDark text-sm">No seeds found for the selected filters.</div>
+        ) : dayGroups.size === 0 ? (
+          <div className="text-center py-12 text-textDark text-sm">No data found for the selected filters.</div>
         ) : (
-          <div className="space-y-2">
-            {seeds.map((seed) => {
-              const committedTime = seed.committedAt ? new Date(seed.committedAt) : new Date(seed.createdAt);
-              const daysAgo = Math.floor((now - committedTime.getTime()) / 86400000);
+          <div className="space-y-3">
+            {Array.from(dayGroups.entries()).map(([day, entries]) => {
+              const isExpanded = expandedDays.has(day);
+              const revealedCount = entries.filter((e) => e.status === 'REVEALED').length;
+              const pendingCount = entries.filter((e) => e.status === 'PENDING').length;
+              const noneCount = entries.filter((e) => e.status === 'NONE').length;
+              const allRevealed = revealedCount === entries.length;
+              const allNone = noneCount === entries.length;
+              const daysAgo = Math.floor((Date.now() - Date.parse(day)) / 86400000);
+
               return (
-                <div key={`${seed.day}-${seed.pairId}`} className="bg-surface border border-border rounded-xl p-4 hover:border-border/80 transition-colors">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <div className="flex items-center gap-3 sm:w-44 shrink-0">
-                      <div className="font-mono text-sm font-bold text-foreground">{seed.day}</div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        seed.revealed ? 'bg-green/15 text-green' : 'bg-orange/15 text-orange'
-                      }`}>{seed.revealed ? 'REVEALED' : 'PENDING'}</span>
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-semibold text-foreground">{seed.pairName}</span>
-                      <span className="text-[10px] text-textDark ml-2 font-mono">{seed.pairId}</span>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
+                <div key={day} className="bg-surface border border-border rounded-xl overflow-hidden">
+                  <button onClick={() => toggleDay(day)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors text-left">
+                    <div className="flex items-center gap-3">
+                      <div className="font-mono text-sm font-bold text-foreground">{day}</div>
                       {daysAgo > 0 && <span className="text-[10px] text-textDark">{daysAgo}d ago</span>}
-                      <button onClick={() => copyHash(seed.seedHash)}
-                        className="font-mono text-[10px] text-textDark hover:text-foreground transition-colors max-w-[120px] truncate"
-                        title="Click to copy full hash">
-                        {seed.seedHash.slice(0, 10)}...{copiedHash === seed.seedHash ? <span className="text-green">copied</span> : ''}
-                      </button>
-                      <Link href={`/verify?day=${seed.day}&asset=${seed.pairId}`}
-                        className="text-[11px] font-bold bg-blue/10 text-blue px-2.5 py-1 rounded-lg hover:bg-blue/20 transition-colors">
-                        Verify
-                      </Link>
+                      {allRevealed && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green/15 text-green">ALL REVEALED</span>}
+                      {allNone && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 text-textDark">NO SEEDS</span>}
+                      {!allRevealed && !allNone && (
+                        <div className="flex gap-1.5">
+                          {revealedCount > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green/15 text-green">{revealedCount}R</span>}
+                          {pendingCount > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange/15 text-orange">{pendingCount}P</span>}
+                          {noneCount > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 text-textDark">{noneCount}N</span>}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                    <svg className={`w-4 h-4 text-textDark transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-border">
+                      {entries.map((entry) => (
+                        <div key={`${entry.day}-${entry.pairId}`}
+                          className="flex items-center justify-between px-4 py-2.5 border-b border-border last:border-b-0">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-foreground">{entry.pairName}</span>
+                            <span className="text-[10px] text-textDark font-mono">{entry.pairId}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[entry.status]}`}>
+                              {STATUS_LABELS[entry.status]}
+                            </span>
+                            {entry.status === 'REVEALED' && entry.seedHash && (
+                              <button onClick={() => copyHash(entry.seedHash)}
+                                className="font-mono text-[10px] text-textDark hover:text-foreground transition-colors max-w-[100px] truncate"
+                                title="Click to copy full hash">
+                                {entry.seedHash.slice(0, 10)}...
+                                {copiedHash === entry.seedHash && <span className="text-green ml-1">copied</span>}
+                              </button>
+                            )}
+                            {entry.status === 'REVEALED' && (
+                              <Link href={`/verify?day=${entry.day}&asset=${entry.pairId}`}
+                                className="text-[11px] font-bold bg-blue/10 text-blue px-2.5 py-1 rounded-lg hover:bg-blue/20 transition-colors">
+                                Verify
+                              </Link>
+                            )}
+                            {entry.status === 'PENDING' && (
+                              <span className="text-[11px] text-textDark font-semibold px-2.5 py-1">Reveals after day ends</span>
+                            )}
+                            {entry.status === 'NONE' && (
+                              <span className="text-[11px] text-textDark font-semibold px-2.5 py-1">No seed recorded</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -155,7 +243,7 @@ export default function SeedsPage() {
 
         {pagination && pagination.totalPages > 1 && (
           <div className="flex items-center justify-between text-xs text-textDark">
-            <span>Page {pagination.page} of {pagination.totalPages} ({pagination.total} seeds)</span>
+            <span>Page {pagination.page} of {pagination.totalPages} ({pagination.total} entries)</span>
             <div className="flex gap-2">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
                 className="px-3 py-1.5 rounded-lg bg-surface border border-border font-semibold disabled:opacity-40 hover:text-foreground transition-colors">
