@@ -1,11 +1,10 @@
 import { NextRequest } from "next/server";
-import { toJsonError, requireUser } from "@/lib/api";
+import { toJsonError } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { dayStringUTC } from "@/lib/pf-math";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireUser();
     const asset = request.nextUrl.searchParams.get("asset") ?? "";
     const date = request.nextUrl.searchParams.get("date") ?? dayStringUTC(new Date());
     if (!/^[A-Z0-9]+$/.test(asset)) {

@@ -158,8 +158,18 @@ export async function getDaySeedHash(day: string, pairId: string): Promise<SeedI
 
 export async function getDaySeedReveal(day: string, pairId: string): Promise<{ day: string; pairId: string; seed: string } | null> {
   const row = await prisma.serverSeed.findUnique({ where: { day_pairId: { day, pairId } } });
-  if (!row || !row.revealed) return null;
-  const seed = await readSeedValue(row);
+  if (!row) return null;
+  const { dayStringUTC } = await import("./pf-math");
+  const today = dayStringUTC(new Date());
+  if (!row.revealed && day < today) {
+    await prisma.serverSeed.update({
+      where: { id: row.id },
+      data: { revealed: true, revealedAt: new Date() },
+    });
+  }
+  const updated = await prisma.serverSeed.findUnique({ where: { id: row.id } });
+  if (!updated || !updated.revealed) return null;
+  const seed = await readSeedValue(updated);
   if (!seed) return null;
   return { day, pairId, seed };
 }
