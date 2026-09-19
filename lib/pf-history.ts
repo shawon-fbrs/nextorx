@@ -183,8 +183,8 @@ export async function getDayCandlesWithCache(opts: {
 
   const pair = await prisma.pair.findUnique({ where: { id: pairId } });
   const { ensureSeedDay, getDaySeed } = await import('./seeds');
-  await ensureSeedDay(day).catch(() => {});
-  const seedValue = await getDaySeed(day);
+  await ensureSeedDay(day, pairId).catch(() => {});
+  const seedValue = await getDaySeed(day, pairId);
   if (!pair || !seedValue) return { candles: [], verified: false, source: 'generated' };
   const regimes = await prisma.pairVolRegime.findMany({ where: { pairId, day } });
   const sigmaMults: SigmaSchedule = new Map();

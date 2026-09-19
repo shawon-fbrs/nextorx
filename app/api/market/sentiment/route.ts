@@ -11,13 +11,14 @@ function unit(seed: string, msg: string): number {
 
 const seedCache = new Map<string, string>();
 
-async function daySeed(day: string): Promise<string> {
-  const hit = seedCache.get(day);
+async function pairSeed(day: string, pairId: string): Promise<string> {
+  const key = `${day}:${pairId}`;
+  const hit = seedCache.get(key);
   if (hit) return hit;
-  const s = await getDaySeed(day).catch(() => null);
+  const s = await getDaySeed(day, pairId).catch(() => null);
   if (!s) return day;
-  if (seedCache.size > 7) seedCache.clear();
-  seedCache.set(day, s);
+  if (seedCache.size > 50) seedCache.clear();
+  seedCache.set(key, s);
   return s;
 }
 
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     const now = Date.now();
     const day = dayStringUTC(new Date(now));
     const bucket = Math.floor(now / 5000);
-    const seed = await daySeed(day);
+    const seed = await pairSeed(day, pairId);
     const cur = 30 + unit(seed, `${pairId}:${day}:${bucket}:a`) * 40;
     const prev = 30 + unit(seed, `${pairId}:${day}:${bucket - 1}:a`) * 40;
     const upPct = Math.max(10, Math.min(90, Math.round((cur + prev) / 2)));

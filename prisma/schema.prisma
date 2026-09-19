@@ -449,20 +449,21 @@ model Notification {
 
 model ServerSeed {
   id             String    @id @default(uuid())
-  day            String    @unique
+  day            String
+  pairId         String
   seedHash       String
   seed           String?
   seedEnc        String?
   revealed       Boolean   @default(false)
   revealedAt     DateTime?
   createdAt      DateTime  @default(now())
-  // Provably fair: external commitment
   gistId         String?
   gistUrl        String?
   committedAt    DateTime?
   regimeSnapshot Json?
 
-  @@index([day])
+  @@unique([day, pairId])
+  @@index([day, pairId])
 }
 
 model SecondCandle {

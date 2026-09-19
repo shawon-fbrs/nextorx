@@ -25,15 +25,15 @@ export interface SeedInfo {
   gistUrl?: string | null;
 }
 
-export async function ensureSeedForDay(day: string): Promise<SeedInfo> {
+export async function ensureSeedForDay(day: string, pairId: string): Promise<SeedInfo> {
   const { ensureSeedDay } = await import("./seeds");
-  return ensureSeedDay(day);
+  return ensureSeedDay(day, pairId);
 }
 
-async function getSeedValue(day: string): Promise<string> {
+async function getSeedValue(day: string, pairId: string): Promise<string> {
   const { getDaySeed } = await import("./seeds");
-  await ensureSeedForDay(day);
-  const seed = await getDaySeed(day);
+  await ensureSeedForDay(day, pairId);
+  const seed = await getDaySeed(day, pairId);
   if (!seed) throw new Error("Seed unavailable");
   return seed;
 }
@@ -43,13 +43,13 @@ export async function revealDueSeeds(now = new Date()): Promise<string[]> {
   return reveal(now);
 }
 
-export async function getSeedHash(day: string): Promise<SeedInfo> {
-  return ensureSeedForDay(day);
+export async function getSeedHash(day: string, pairId: string): Promise<SeedInfo> {
+  return ensureSeedForDay(day, pairId);
 }
 
-export async function getSeedReveal(day: string): Promise<{ day: string; seed: string } | null> {
+export async function getSeedReveal(day: string, pairId: string): Promise<{ day: string; pairId: string; seed: string } | null> {
   const { getDaySeedReveal } = await import("./seeds");
-  return getDaySeedReveal(day);
+  return getDaySeedReveal(day, pairId);
 }
 
 export class OTCEngine {
@@ -59,9 +59,9 @@ export class OTCEngine {
   private persistTimer: ReturnType<typeof setInterval> | null = null;
   private seedTimer: ReturnType<typeof setInterval> | null = null;
   private broadcast: ((msg: TickMessage | CandleCloseMessage) => void) | null = null;
-  private onSeedRevealed: ((day: string, seed: string) => void) | null = null;
+  private onSeedRevealed: ((day: string, pairId: string, seed: string) => void) | null = null;
   private currentDay = "";
-  private currentSeed = "";
+  private currentSeeds = new Map<string, string>();
   private secondCloses = new Map<string, number>();
   private pendingSeconds = new Map<string, { timestamp: bigint; open: number; high: number; low: number; close: number }>();
   private lastPersistedSecond = 0;
@@ -177,7 +177,6 @@ export class OTCEngine {
       try {
         const now = new Date();
         this.currentDay = dayStringUTC(now);
-        this.currentSeed = await getSeedValue(this.currentDay);
 
         const pairs = await prisma.pair.findMany({ where: { isActive: true } });
         if (pairs.length === 0) {
@@ -186,6 +185,12 @@ export class OTCEngine {
         for (const p of pairs) {
           await this.loadPairState(p.id);
         }
+
+        for (const [pairId] of this.pairs) {
+          const seed = await getSeedValue(this.currentDay, pairId);
+          if (seed) this.currentSeeds.set(pairId, seed);
+        }
+
         await this.refreshAnchors();
         await this.refreshRegimes(this.currentDay);
         await this.measureRegimes(now);
@@ -237,7 +242,7 @@ export class OTCEngine {
       try {
         const day = dayStringUTC(new Date(now));
         const { getDaySeed } = await import("./seeds");
-        const seedValue = await getDaySeed(day);
+        const seedValue = await getDaySeed(day, pairId);
         if (seedValue) {
           const regimes = await prisma.pairVolRegime.findMany({ where: { pairId, day } });
           const sigmaMults = new Map<number, { mult: number; fromMs: number }>();
@@ -327,7 +332,7 @@ export class OTCEngine {
         const secondOfDay = s % SECONDS_PER_DAY;
         const utcHour = new Date(s * 1000).getUTCHours();
         const r = computeSecond(
-          this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+          this.currentSeeds.get(state.pairId) ?? "", state.pairId, day, secondOfDay, prevClose,
           state.basePrice, this.effVol(state, day, utcHour), this.categoryOf(state.pairId), utcHour,
         );
         const open = prevClose;
@@ -410,14 +415,14 @@ export class OTCEngine {
     this.broadcast = fn;
   }
 
-  setSeedRevealedListener(fn: (day: string, seed: string) => void) {
+  setSeedRevealedListener(fn: (day: string, pairId: string, seed: string) => void) {
     this.onSeedRevealed = fn;
   }
 
   start() {
     if (this.tickTimer) return;
-    if (!this.currentSeed) {
-      throw new Error("OTC engine has no seed — refusing to start rather than generating uncommitted prices");
+    if (this.currentSeeds.size === 0) {
+      throw new Error("OTC engine has no seeds — refusing to start rather than generating uncommitted prices");
     }
     if (!this.bootedAt) this.bootedAt = Date.now();
     if (this.hasMirrorPairs()) {
@@ -481,7 +486,7 @@ export class OTCEngine {
       try {
         const prevClose = this.secondCloses.get(state.pairId) ?? state.currentPrice;
         const r = computeSecond(
-          this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+          this.currentSeeds.get(state.pairId) ?? "", state.pairId, day, secondOfDay, prevClose,
           state.basePrice, this.effVol(state, day, utcHour), state.category, utcHour,
         );
         const price = r.ticks[Math.min(idx, r.ticks.length - 1)];
@@ -571,7 +576,11 @@ export class OTCEngine {
   private async rolloverDay(day: string) {
     console.log(`[OTC] Rolling to new trading day ${day}`);
     this.currentDay = day;
-    this.currentSeed = await getSeedValue(day);
+    this.currentSeeds.clear();
+    for (const [pairId] of this.pairs) {
+      const seed = await getSeedValue(day, pairId);
+      if (seed) this.currentSeeds.set(pairId, seed);
+    }
     this.secondCloses.clear();
     this.regimes.clear();
     await this.refreshAnchors();
@@ -593,8 +602,10 @@ export class OTCEngine {
     const revealed = await revealDueSeeds(new Date());
     for (const revealedDay of revealed) {
       const { getDaySeed } = await import("./seeds");
-      const seedValue = await getDaySeed(revealedDay);
-      if (seedValue && this.onSeedRevealed) this.onSeedRevealed(revealedDay, seedValue);
+      for (const [pairId] of this.pairs) {
+        const seedValue = await getDaySeed(revealedDay, pairId);
+        if (seedValue && this.onSeedRevealed) this.onSeedRevealed(revealedDay, pairId, seedValue);
+      }
     }
   }
 
@@ -609,8 +620,10 @@ export class OTCEngine {
       const revealed = await revealDueSeeds(now);
       for (const revealedDay of revealed) {
         const { getDaySeed } = await import("./seeds");
-        const seedValue = await getDaySeed(revealedDay);
-        if (seedValue && this.onSeedRevealed) this.onSeedRevealed(revealedDay, seedValue);
+        for (const [pairId] of this.pairs) {
+          const seedValue = await getDaySeed(revealedDay, pairId);
+          if (seedValue && this.onSeedRevealed) this.onSeedRevealed(revealedDay, pairId, seedValue);
+        }
       }
       await this.measureRegimes(now);
       try {
@@ -625,6 +638,10 @@ export class OTCEngine {
       }).catch(() => {});
       await prisma.candle.deleteMany({
         where: { timestamp: { lt: BigInt(now.getTime() - 32 * 24 * 60 * 60 * 1000) } },
+      }).catch(() => {});
+      const seedCutoff = dayStringUTC(new Date(now.getTime() - 90 * 86400000));
+      await prisma.serverSeed.deleteMany({
+        where: { day: { lt: seedCutoff } },
       }).catch(() => {});
     } catch (e) {
       console.error("[OTC] Seed check error:", e);
@@ -868,8 +885,8 @@ export class OTCEngine {
     }
   }
 
-  async getSeedHash(): Promise<SeedInfo> {
-    const info = await getSeedHash(this.currentDay || dayStringUTC(new Date()));
+  async getSeedHash(pairId: string): Promise<SeedInfo> {
+    const info = await getSeedHash(this.currentDay || dayStringUTC(new Date()), pairId);
     return info;
   }
 
@@ -1013,7 +1030,7 @@ export class OTCEngine {
         const secondOfDay = lastSecond % SECONDS_PER_DAY;
         const utcHour = new Date(minuteStart).getUTCHours();
         const r = computeSecond(
-          this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+          this.currentSeeds.get(state.pairId) ?? "", state.pairId, day, secondOfDay, prevClose,
           state.basePrice, this.effVol(state, day, utcHour), category, utcHour,
         );
         prevClose = r.close;
@@ -1042,7 +1059,7 @@ export class OTCEngine {
       const secondOfDay = lastSecond % SECONDS_PER_DAY;
       const utcHour = new Date(minuteStart).getUTCHours();
       const r = computeSecond(
-        this.currentSeed, state.pairId, day, secondOfDay, prevClose,
+        this.currentSeeds.get(state.pairId) ?? "", state.pairId, day, secondOfDay, prevClose,
         state.basePrice, this.effVol(state, day, utcHour), category, utcHour,
       );
       const open = prevClose;

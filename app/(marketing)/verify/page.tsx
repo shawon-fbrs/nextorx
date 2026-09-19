@@ -120,7 +120,7 @@ function VerifyContent() {
     try {
       const asset = pairId.toUpperCase();
       const [seedRes, pairsRes, regimeRes, csvRes] = await Promise.all([
-        fetch(`/api/market/seed/reveal?day=${encodeURIComponent(day)}`),
+        fetch(`/api/market/seed/reveal?day=${encodeURIComponent(day)}&pairId=${encodeURIComponent(pairId)}`),
         fetch('/api/market/pairs'),
         fetch(`/api/market/verify/regime?asset=${encodeURIComponent(asset)}&date=${encodeURIComponent(day)}`),
         fetch(`/api/market/verify/download?asset=${encodeURIComponent(asset)}&date=${encodeURIComponent(day)}`),
@@ -226,7 +226,7 @@ function VerifyContent() {
           throw new Error('Volatility schedule is not valid JSON.');
         }
       }
-      const hashRes = await fetch(`/api/market/seed/hash?day=${encodeURIComponent(day)}`);
+      const hashRes = await fetch(`/api/market/seed/hash?day=${encodeURIComponent(day)}&pairId=${encodeURIComponent(pairId)}`);
       let gistUrl: string | null = null;
       if (hashRes.ok) {
         const hashInfo = await hashRes.json() as { seedHash?: string; gistUrl?: string };

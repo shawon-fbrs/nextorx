@@ -4,6 +4,7 @@ import { logAudit } from "./services/audit";
 
 export interface SeedInfo {
   day: string;
+  pairId: string;
   seedHash: string;
   revealed: boolean;
   gistUrl?: string | null;
@@ -50,17 +51,18 @@ export async function readSeedValue(row: { seed: string | null; seedEnc: string 
   return row.seed;
 }
 
-async function publishSeedHashExternally(day: string, seedHash: string): Promise<{ id: string; url: string } | null> {
+async function publishSeedHashExternally(day: string, pairId: string, seedHash: string): Promise<{ id: string; url: string } | null> {
   const { writeFile, mkdir } = await import("fs/promises");
   const { join } = await import("path");
   try {
     const dir = join(process.cwd(), "public", "seeds");
     await mkdir(dir, { recursive: true });
-    const filename = `nextorx-seed-${day}.json`;
+    const filename = `nextorx-seed-${day}-${pairId}.json`;
     const payload = JSON.stringify({
       platform: "nextorx",
       version: 1,
       day,
+      pairId,
       seedHash,
       committedAt: new Date().toISOString(),
       algorithm: "HMAC-SHA512",
@@ -73,7 +75,7 @@ async function publishSeedHashExternally(day: string, seedHash: string): Promise
   }
 }
 
-export async function ensureSeedDay(day: string): Promise<SeedInfo> {
+export async function ensureSeedDay(day: string, pairId: string): Promise<SeedInfo> {
   const seed = randomBytes(32).toString("hex");
   const seedHash = createHash("sha256").update(seed, "utf8").digest("hex");
   const seedEnc = encryptSeed(seed);
@@ -82,10 +84,11 @@ export async function ensureSeedDay(day: string): Promise<SeedInfo> {
   const regimeSnapshot = await captureRegimeSnapshot();
 
   const row = await prisma.serverSeed.upsert({
-    where: { day },
+    where: { day_pairId: { day, pairId } },
     update: {},
     create: {
       day,
+      pairId,
       seedHash,
       seed: seedEnc ? null : seed,
       seedEnc: seedEnc ?? null,
@@ -95,7 +98,7 @@ export async function ensureSeedDay(day: string): Promise<SeedInfo> {
   });
   if (row.seedHash === seedHash) {
     // Publish to external commitment (public JSON file)
-    const commitResult = await publishSeedHashExternally(day, seedHash);
+    const commitResult = await publishSeedHashExternally(day, pairId, seedHash);
 
     if (commitResult) {
       await prisma.serverSeed.update({
@@ -109,15 +112,16 @@ export async function ensureSeedDay(day: string): Promise<SeedInfo> {
     }
 
     try {
-      await logAudit(null, "seed.minted", "ServerSeed", day, {
+      await logAudit(null, "seed.minted", "ServerSeed", `${day}:${pairId}`, {
         seedHash,
+        pairId,
         encrypted: !!seedEnc,
         committed: !!commitResult,
         gistUrl: commitResult?.url,
       });
     } catch {}
   }
-  return { day, seedHash: row.seedHash, revealed: row.revealed, gistUrl: row.gistUrl };
+  return { day, pairId, seedHash: row.seedHash, revealed: row.revealed, gistUrl: row.gistUrl };
 }
 
 async function captureRegimeSnapshot(): Promise<Record<string, unknown> | null> {
@@ -135,8 +139,8 @@ async function captureRegimeSnapshot(): Promise<Record<string, unknown> | null> 
   }
 }
 
-export async function getDaySeed(day: string): Promise<string | null> {
-  const row = await prisma.serverSeed.findUnique({ where: { day } });
+export async function getDaySeed(day: string, pairId: string): Promise<string | null> {
+  const row = await prisma.serverSeed.findUnique({ where: { day_pairId: { day, pairId } } });
   if (!row) return null;
   const value = await readSeedValue(row);
   if (value && row.seed && !row.seedEnc && encKey()) {
@@ -148,16 +152,16 @@ export async function getDaySeed(day: string): Promise<string | null> {
   return value;
 }
 
-export async function getDaySeedHash(day: string): Promise<SeedInfo> {
-  return ensureSeedDay(day);
+export async function getDaySeedHash(day: string, pairId: string): Promise<SeedInfo> {
+  return ensureSeedDay(day, pairId);
 }
 
-export async function getDaySeedReveal(day: string): Promise<{ day: string; seed: string } | null> {
-  const row = await prisma.serverSeed.findUnique({ where: { day } });
+export async function getDaySeedReveal(day: string, pairId: string): Promise<{ day: string; pairId: string; seed: string } | null> {
+  const row = await prisma.serverSeed.findUnique({ where: { day_pairId: { day, pairId } } });
   if (!row || !row.revealed) return null;
   const seed = await readSeedValue(row);
   if (!seed) return null;
-  return { day, seed };
+  return { day, pairId, seed };
 }
 
 export async function revealDueSeeds(now = new Date()): Promise<string[]> {

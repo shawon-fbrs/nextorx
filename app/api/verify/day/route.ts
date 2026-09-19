@@ -14,9 +14,9 @@ export async function GET(request: NextRequest) {
     const INTERVAL_MS_MAP: Record<string, number> = { "5s": 5_000, "30s": 30_000, "1m": 60_000, "5m": 300_000, "10m": 600_000, "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000, "4h": 14_400_000 };
     if (!(interval in INTERVAL_MS_MAP)) throw new ApiError(400, 'Invalid interval');
     const intervalMs = INTERVAL_MS_MAP[interval];
-    const seedRow = await prisma.serverSeed.findUnique({ where: { day } });
-    if (!seedRow) throw new ApiError(404, 'Seed not found for day');
-    const reveal = await getDaySeedReveal(day);
+    const seedRow = await prisma.serverSeed.findUnique({ where: { day_pairId: { day, pairId } } });
+    if (!seedRow) throw new ApiError(404, 'Seed not found for this asset/day');
+    const reveal = await getDaySeedReveal(day, pairId);
     const { candles, verified, source } = await getDayCandlesWithCache({ pairId, day, intervalMs });
     const root = merkleRoot(candles);
     const archive = await prisma.candleDayArchive.findUnique({ where: { day_pairId_intervalMs: { day, pairId, intervalMs } } });

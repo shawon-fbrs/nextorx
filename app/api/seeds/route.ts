@@ -17,8 +17,12 @@ export async function GET(request: Request) {
     const where: Record<string, unknown> = {};
     if (filter === "revealed") where.revealed = true;
     else if (filter === "pending") where.revealed = false;
-    if (dateFrom) where.day = { ...(where.day as Record<string, string>), gte: dateFrom };
-    if (dateTo) where.day = { ...(where.day as Record<string, string>), lte: dateTo };
+    if (asset) where.pairId = asset;
+    if (dateFrom || dateTo) {
+      where.day = {};
+      if (dateFrom) (where.day as Record<string, string>).gte = dateFrom;
+      if (dateTo) (where.day as Record<string, string>).lte = dateTo;
+    }
 
     const [seeds, total] = await Promise.all([
       prisma.serverSeed.findMany({
@@ -28,6 +32,7 @@ export async function GET(request: Request) {
         take: limit,
         select: {
           day: true,
+          pairId: true,
           seedHash: true,
           revealed: true,
           revealedAt: true,
@@ -38,42 +43,17 @@ export async function GET(request: Request) {
       prisma.serverSeed.count({ where }),
     ]);
 
-    const pairs = await prisma.pair.findMany({
-      select: { id: true, name: true },
-    });
+    const pairs = await prisma.pair.findMany({ select: { id: true, name: true } });
     const pairMap = new Map(pairs.map((p) => [p.id, p.name]));
 
-    const enriched = await Promise.all(
-      seeds.map(async (s) => {
-        const start = Date.parse(`${s.day}T00:00:00.000Z`);
-        const end = start + 86400000;
-
-        let assets: { pairId: string; pairName: string; count: number }[] = [];
-        try {
-          const counts = await prisma.secondCandle.groupBy({
-            by: ["pairId"],
-            where: {
-              timestamp: { gte: BigInt(start), lt: BigInt(end) },
-            },
-            _count: { id: true },
-          });
-          assets = counts.map((c) => ({
-            pairId: c.pairId,
-            pairName: pairMap.get(c.pairId) ?? c.pairId,
-            count: c._count.id,
-          }));
-        } catch {}
-
-        return { ...s, assets };
-      }),
-    );
-
-    const filtered = asset
-      ? enriched.filter((s) => s.assets.some((a) => a.pairId === asset || a.pairName.toLowerCase().includes(asset.toLowerCase())))
-      : enriched;
+    const enriched = seeds.map((s) => ({
+      ...s,
+      pairName: pairMap.get(s.pairId) ?? s.pairId,
+    }));
 
     return Response.json({
-      seeds: filtered,
+      seeds: enriched,
+      pairs: pairs.map((p) => ({ id: p.id, name: p.name })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (e) {
