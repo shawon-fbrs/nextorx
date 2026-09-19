@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { MIRRORED_PAIR_IDS } from '@/lib/mirror-feed';
 
 const TICKS_PER_SECOND = 10;
 const SECONDS_PER_DAY = 86400;
-// ENGINE PARAMS v2 — must match lib/pf-math.ts exactly, or verification fails.
 const SIGMA_PER_SECOND = 0.00008;
 
 const JUMPS: Record<string, { lambda: number; min: number; max: number }> = {
@@ -65,13 +65,18 @@ interface PairInfo {
   feed: string;
 }
 
-export default function VerifyPage() {
+function VerifyContent() {
+  const searchParams = useSearchParams();
+  const urlDay = searchParams.get('day') ?? '';
+  const urlAsset = searchParams.get('asset') ?? '';
+  const autoLoaded = useRef(false);
+
   const [seed, setSeed] = useState('');
   const [pairId, setPairId] = useState('');
   const [pairs, setPairs] = useState<PairInfo[]>([]);
   const [day, setDay] = useState(() => {
-    const d = new Date();
-    return d.toISOString().slice(0, 10);
+    if (urlDay && /^\d{4}-\d{2}-\d{2}$/.test(urlDay)) return urlDay;
+    return new Date().toISOString().slice(0, 10);
   });
   const [basePrice, setBasePrice] = useState('');
   const [volatility, setVolatility] = useState('');
@@ -94,20 +99,16 @@ export default function VerifyPage() {
         setPairs(data.pairs);
         setPairId((cur) => {
           if (cur && data.pairs!.some((p) => p.id === cur)) return cur;
+          if (urlAsset && data.pairs!.some((p) => p.id === urlAsset)) return urlAsset;
           const synth = data.pairs!.find((p) => p.feed !== 'mirror');
           return (synth ?? data.pairs![0])?.id ?? '';
         });
       })
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    return () => { cancelled = true; };
+  }, [urlAsset]);
 
-  const selectedPair = pairs.find((p) => p.id === pairId) ?? null;
-  const isMirror = selectedPair ? selectedPair.feed === 'mirror' : MIRRORED_PAIR_IDS.includes(pairId);
-
-  const loadDayData = async () => {
+  const loadDayData = useCallback(async () => {
     setResult('');
     setOk(null);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !pairId) {
@@ -173,7 +174,17 @@ export default function VerifyPage() {
     } finally {
       setLoadingDay(false);
     }
-  };
+  }, [day, pairId, seed]);
+
+  useEffect(() => {
+    if (autoLoaded.current) return;
+    if (pairs.length === 0 || !pairId || !day) return;
+    autoLoaded.current = true;
+    loadDayData();
+  }, [pairs, pairId, day, loadDayData]);
+
+  const selectedPair = pairs.find((p) => p.id === pairId) ?? null;
+  const isMirror = selectedPair ? selectedPair.feed === 'mirror' : MIRRORED_PAIR_IDS.includes(pairId);
 
   const runVerify = async () => {
     setResult('');
@@ -377,5 +388,13 @@ export default function VerifyPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={<div className="px-6 py-12"><div className="max-w-xl mx-auto text-center text-textDark text-sm">Loading...</div></div>}>
+      <VerifyContent />
+    </Suspense>
   );
 }

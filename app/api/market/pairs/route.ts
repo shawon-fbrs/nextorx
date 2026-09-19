@@ -46,6 +46,8 @@ export async function GET(request: NextRequest) {
         name: p.name,
         symbol: p.symbol,
         category: p.category,
+        basePrice: Number(p.basePrice),
+        volatility: Number(p.volatility),
         payoutPercent: Number(p.payoutPercent),
         weekendPayout: p.weekendPayout != null ? Number(p.weekendPayout) : null,
         minTrade: Number(p.minTrade),
