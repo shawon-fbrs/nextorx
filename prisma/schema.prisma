@@ -215,6 +215,10 @@ model DepositRequest {
   promoPercent     Int?
   promoMaxBonusInt Int?
   createdAt        DateTime      @default(now())
+  // RedotPay Connect gateway fields (null for legacy manual deposits)
+  gatewayRef       String?       @unique
+  gatewayOrderId   String?       @unique
+  gatewayRaw       String?
 
   @@index([status, createdAt(sort: Desc)])
 }

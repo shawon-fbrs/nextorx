@@ -271,3 +271,89 @@ export async function rejectDeposit(depositId: string, reviewedById: string, not
   );
   return rejected;
 }
+
+export const GATEWAY_METHOD = "REDOTPay".toUpperCase();
+
+// Create a PENDING deposit for the RedotPay Connect flow (no txHash yet —
+// it arrives via webhook). Same limit / daily-limit / promo validation as
+// manual deposits. Callers must delete the row if gateway order creation fails
+// so failed attempts don't pollute the admin panel or daily limits.
+export async function createGatewayDepositRequest(
+  userId: string,
+  amount: number,
+  gatewayRef: string,
+  promoCode?: string,
+) {
+  const paymentMethod = await prisma.paymentMethod.findFirst({
+    where: { name: GATEWAY_METHOD },
+  });
+  const minDeposit = paymentMethod?.minDeposit ?? 1000;
+  if (amount < minDeposit) {
+    throw new DepositError(`Minimum deposit is $${(minDeposit / 100).toFixed(2)}`);
+  }
+  const maxDeposit = paymentMethod?.maxDeposit ?? 10000000;
+  if (amount > maxDeposit) {
+    throw new DepositError(`Maximum deposit is $${(maxDeposit / 100).toFixed(2)}`);
+  }
+
+  const depositor = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { depositLimitDaily: true },
+  });
+  if (depositor?.depositLimitDaily != null) {
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const todayAgg = await prisma.depositRequest.aggregate({
+      where: { userId, createdAt: { gte: dayStart } },
+      _sum: { amount: true },
+    });
+    const todayTotal = todayAgg._sum.amount ?? 0;
+    if (todayTotal + amount > depositor.depositLimitDaily) {
+      throw new DepositError("Daily deposit limit reached");
+    }
+  }
+
+  let promoPercent: number | null = null;
+  let promoMaxBonus: number | null = null;
+  if (promoCode?.trim()) {
+    const promo = await prisma.promoCode.findUnique({
+      where: { code: promoCode.trim().toUpperCase() },
+    });
+    if (!promo || !promo.active) {
+      throw new DepositError("Invalid promo code");
+    }
+    if (promo.validUntil && promo.validUntil < new Date()) {
+      throw new DepositError("Promo code expired");
+    }
+    if (promo.minDeposit > 0 && amount < promo.minDeposit) {
+      throw new DepositError(`Minimum deposit for this promo is $${(promo.minDeposit / 100).toFixed(2)}`);
+    }
+    const uses = await prisma.promoCodeUse.count({ where: { promoId: promo.id } });
+    if (promo.maxUses > 0 && uses >= promo.maxUses) {
+      throw new DepositError("Promo code usage limit reached");
+    }
+    const userUses = await prisma.promoCodeUse.count({
+      where: { promoId: promo.id, userId },
+    });
+    if (promo.usesPerUser > 0 && userUses >= promo.usesPerUser) {
+      throw new DepositError("You have already used this promo code");
+    }
+    promoPercent = promo.percent;
+    promoMaxBonus = promo.maxBonus;
+  }
+
+  return prisma.depositRequest.create({
+    data: {
+      userId,
+      amount,
+      method: GATEWAY_METHOD,
+      network: "USDT",
+      txHash: null,
+      walletAddress: null,
+      gatewayRef,
+      promoCode: promoCode?.trim().toUpperCase() ?? null,
+      promoPercent,
+      promoMaxBonusInt: promoMaxBonus,
+    },
+  });
+}
