@@ -28,6 +28,8 @@ function DepositContent() {
   const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
   const [returnStatus, setReturnStatus] = useState<'PENDING' | 'VERIFIED' | 'REJECTED' | null>(null);
   const [returnNote, setReturnNote] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
   const pollStarted = useRef(false);
 
   useEffect(() => {
@@ -86,6 +88,36 @@ function DepositContent() {
     );
   }
 
+  const checkStatus = async () => {
+    if (!returnOrderId || syncing) return;
+    setSyncing(true);
+    setSyncMsg('');
+    try {
+      const res = await fetch('/api/trade/deposit/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: returnOrderId }),
+      });
+      const data = await res.json();
+      if (data.status === 'VERIFIED') {
+        await refresh();
+        router.push('/trade/real');
+        router.refresh();
+      } else if (data.status === 'REJECTED') {
+        setReturnStatus('REJECTED');
+        setReturnNote(data.note ?? null);
+      } else if (!res.ok) {
+        setSyncMsg(data.error || 'Could not check status yet');
+      } else {
+        setSyncMsg('Still pending at provider — check again in a minute');
+      }
+    } catch {
+      setSyncMsg('Could not check status yet');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const minUsd = limits.min / 100;
   const maxUsd = limits.max / 100;
   const amountUsd = Number(amount);
@@ -141,6 +173,13 @@ function DepositContent() {
                 <div className="mx-auto w-10 h-10 rounded-full border-2 border-blue border-t-transparent animate-spin" />
                 <p className="text-base font-bold text-foreground">Confirming your payment…</p>
                 <p className="text-xs text-textDark">This usually takes under a minute. You will be redirected automatically once confirmed.</p>
+                <button
+                  onClick={checkStatus} disabled={syncing}
+                  className="mt-1 text-xs font-bold text-blue hover:underline disabled:opacity-50"
+                >
+                  {syncing ? 'Checking…' : 'I’ve paid — check status now'}
+                </button>
+                {syncMsg && <p className="text-[11px] text-textDark">{syncMsg}</p>}
               </>
             )}
           </div>
