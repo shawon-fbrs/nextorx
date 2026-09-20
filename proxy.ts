@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, type RateLimitRule } from "@/lib/rate-limit";
 
-const ADMIN_ROLES = new Set([
-  "super_admin",
-  "finance",
-  "support",
-  "risk",
-]);
-
 const PUBLIC_PATHS = [
   "/",
   "/login",
@@ -33,7 +26,7 @@ const PUBLIC_PATHS = [
 const RATE_LIMITS: Array<{ match: (pathname: string, method: string) => boolean; rule: RateLimitRule }> = [
   { match: (p, m) => m === "POST" && p === "/api/auth/verify-email", rule: { max: 3, windowMs: 5 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/auth/send-verification", rule: { max: 3, windowMs: 5 * 60 * 1000 } },
-  { match: (p, m) => m === "POST" && p === "/api/auth/forgot-password", rule: { max: 3, windowMs: 15 * 60 * 1000 } },
+  { match: (p, m) => m === "POST" && p === "/api/auth/forgot-password", rule: { max: 5, windowMs: 15 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/auth/set-password", rule: { max: 5, windowMs: 15 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/auth/2fa", rule: { max: 10, windowMs: 5 * 60 * 1000 } },
   { match: (p, m) => m === "POST" && p === "/api/auth/change-password", rule: { max: 5, windowMs: 15 * 60 * 1000 } },
@@ -68,96 +61,11 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
-function isAdminRoute(pathname: string): boolean {
-  return (
-    pathname.startsWith("/console-panel") ||
-    pathname.startsWith("/api/admin")
-  );
-}
-
-function getSessionDataCookie(request: NextRequest): string | undefined {
-  return (
-    request.cookies.get("__Secure-better-auth.session_data")?.value ||
-    request.cookies.get("better-auth.session_data")?.value
-  );
-}
-
 function getSessionTokenCookie(request: NextRequest): string | undefined {
   return (
     request.cookies.get("__Secure-better-auth.session_token")?.value ||
     request.cookies.get("better-auth.session_token")?.value
   );
-}
-
-function base64UrlDecode(input: string): ArrayBuffer {
-  const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = base64.length % 4;
-  const padded = pad ? base64 + "=".repeat(4 - pad) : base64;
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
-
-async function verifyCompactCacheSignature(
-  data: { session: Record<string, unknown>; expiresAt: number },
-  signature: string,
-  secret: string,
-): Promise<boolean> {
-  const payload = JSON.stringify({ ...data.session, expiresAt: data.expiresAt });
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["verify"],
-  );
-    const sigBytes = new Uint8Array(base64UrlDecode(signature));
-  const valid = await crypto.subtle.verify(
-    "HMAC",
-    key,
-    sigBytes,
-    encoder.encode(payload),
-  );
-  return valid;
-}
-
-async function extractUserRoleFromCache(
-  request: NextRequest,
-): Promise<string | null> {
-  const secret = process.env.BETTER_AUTH_SECRET;
-  if (!secret) return null;
-
-  const cookieValue = getSessionDataCookie(request);
-  if (!cookieValue) return null;
-
-  try {
-    const decoded = new TextDecoder().decode(base64UrlDecode(cookieValue));
-    const parsed = JSON.parse(decoded);
-    if (!parsed || !parsed.session || !parsed.signature) return null;
-
-    const valid = await verifyCompactCacheSignature(
-      parsed,
-      parsed.signature,
-      secret,
-    );
-    if (!valid) return null;
-
-    if (typeof parsed.expiresAt === "number" && parsed.expiresAt < Date.now()) {
-      return null;
-    }
-
-    const user = parsed.session?.user;
-    if (user && typeof user.role === "string") {
-      return user.role;
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 function redirectToLogin(request: NextRequest): NextResponse {
@@ -191,12 +99,12 @@ export async function proxy(request: NextRequest) {
     return redirectToLogin(request);
   }
 
-  if (isAdminRoute(pathname)) {
-    const role = await extractUserRoleFromCache(request);
-    if (!role || !ADMIN_ROLES.has(role)) {
-      return NextResponse.redirect(new URL("/trade/demo", request.url));
-    }
-  }
+  // Admin authorization is enforced server-side (console-panel layout checks
+  // session + role + 2FA; /api/admin routes use requirePermission). The proxy
+  // deliberately does NOT parse the role out of cookies here — a previous
+  // revision did that via the signed session_data cache and locked out
+  // legitimate admins with a redirect loop, so the proxy only gates on
+  // session presence.
 
   return NextResponse.next();
 }

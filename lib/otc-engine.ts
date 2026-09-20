@@ -370,6 +370,16 @@ export class OTCEngine {
       const basePrice = gp.basePrice;
       const volatility = gp.volatility;
       const category = gp.category;
+      // Load what's already persisted: skip present seconds (no wasted
+      // recompute/rewrite every minute) AND chain prevClose from stored closes
+      // so inserted rows align with their persisted neighbors.
+      const existing = await prisma.secondCandle.findMany({
+        where: { pairId: state.pairId, timestamp: { gte: BigInt(startOfDay * 1000), lt: BigInt(currentSecond * 1000) } },
+        select: { timestamp: true, close: true },
+        orderBy: { timestamp: "asc" },
+      }).catch(() => []);
+      const closeBySec = new Map<number, number>();
+      for (const row of existing) closeBySec.set(Math.floor(Number(row.timestamp) / 1000), Number(row.close));
       let prevClose = basePrice;
       const rows: Array<{
         pairId: string;
@@ -381,6 +391,11 @@ export class OTCEngine {
         ticks: number;
       }> = [];
       for (let s = startOfDay; s < currentSecond; s++) {
+        const known = closeBySec.get(s);
+        if (known !== undefined) {
+          prevClose = known;
+          continue;
+        }
         const secondOfDay = s % SECONDS_PER_DAY;
         const utcHour = new Date(s * 1000).getUTCHours();
         const r = computeSecond(
