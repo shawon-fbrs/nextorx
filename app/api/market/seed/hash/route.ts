@@ -13,7 +13,17 @@ export async function GET(request: NextRequest) {
     if (!pairId) {
       return Response.json({ error: "pairId is required" }, { status: 400 });
     }
-    const info = await getSeedHash(day, pairId);
+    let info;
+    try {
+      info = await getSeedHash(day, pairId);
+    } catch (e) {
+      // Past day without a seed row: seeds are only born at day start, never
+      // minted retroactively. Report 404, not 500.
+      if (e instanceof Error && /No seed exists for past day/.test(e.message)) {
+        return Response.json({ error: "Seed not found for this asset/day" }, { status: 404 });
+      }
+      throw e;
+    }
     return Response.json(info);
   } catch (e) {
     return toJsonError(e);

@@ -182,8 +182,8 @@ export async function getDayCandlesWithCache(opts: {
   }
 
   const pair = await prisma.pair.findUnique({ where: { id: pairId } });
-  const { ensureSeedDay, getDaySeed } = await import('./seeds');
-  await ensureSeedDay(day, pairId).catch(() => {});
+  const { getDaySeed, getDayParams } = await import('./seeds');
+  // Find-only: a read path must NEVER mint retroactive seeds.
   const seedValue = await getDaySeed(day, pairId);
   if (!pair || !seedValue) return { candles: [], verified: false, source: 'generated' };
   const regimes = await prisma.pairVolRegime.findMany({ where: { pairId, day } });
@@ -196,13 +196,15 @@ export async function getDayCandlesWithCache(opts: {
     const startSec = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
     upToSecond = Math.max(0, Math.min(SECONDS_PER_DAY, nowSec - startSec));
   }
+  const snap = await getDayParams(day, pairId).catch(() => null);
   const candles = await generateDayCandles({
     pairId,
     day,
     intervalMs,
-    basePrice: Number(pair.basePrice),
-    volatility: Number(pair.volatility),
-    category: pair.category,
+    // Frozen daily inputs when available (same values generation used).
+    basePrice: snap?.basePrice ?? Number(pair.basePrice),
+    volatility: snap?.volatility ?? Number(pair.volatility),
+    category: snap?.category ?? pair.category,
     seed: seedValue,
     sigmaMults,
     upToSecond,

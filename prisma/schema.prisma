@@ -496,6 +496,23 @@ model PairVolRegime {
   @@index([day, hour])
 }
 
+// Provably fair: frozen daily candle-math inputs. Captured once per (day,
+// pair) at seed creation (first-writer-wins). Engine generation AND the verify
+// tool both use these values, so mid-day admin edits to Pair params can never
+// break verification of already-persisted candles. Edits take effect next day.
+model PairDayParams {
+  id         String   @id @default(uuid())
+  day        String
+  pairId     String
+  basePrice  Decimal  @db.Decimal(16, 8)
+  volatility Decimal  @db.Decimal(12, 6)
+  category   String
+  createdAt  DateTime @default(now())
+
+  @@unique([day, pairId])
+  @@index([day, pairId])
+}
+
 // ─────────────────────────── media library ───────────────────────────
 
 model ResourceCategory {

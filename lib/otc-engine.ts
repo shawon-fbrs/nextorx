@@ -10,6 +10,7 @@ import {
   TICKS_PER_SECOND,
 } from "./pf-math";
 import type { PairState, CandleData, TickMessage, CandleCloseMessage } from "./otc-types";
+import type { DayParams } from "./seeds";
 import { WebSocket } from "ws";
 
 export type { PairState, CandleData, TickMessage, CandleCloseMessage };
@@ -23,6 +24,16 @@ export interface SeedInfo {
   seedHash: string;
   revealed: boolean;
   gistUrl?: string | null;
+}
+
+// Explicit generation inputs for backfill. When omitted, live state values
+// are used (today's path). Past-day healing always passes explicit values so
+// it never depends on whatever happens to be in memory.
+export interface BackfillParams {
+  seed: string;
+  basePrice: number;
+  volatility: number;
+  category: string;
 }
 
 export async function ensureSeedForDay(day: string, pairId: string): Promise<SeedInfo> {
@@ -75,6 +86,10 @@ export class OTCEngine {
   private regimes = new Map<string, number>();
   private lastMeasuredHour = -1;
   private lastHashes = new Map<string, string>();
+  // Frozen daily candle-math inputs, keyed `${pairId}:${day}`. Populated from
+  // PairDayParams (captured at seed creation). Generation ALWAYS reads these —
+  // never live state — so mid-day admin edits can't break verification.
+  private dayParams = new Map<string, DayParams>();
 
   static computeCandleHash(prevHash: string, pairId: string, timestamp: number, open: number, high: number, low: number, close: number, ticks: number): string {
     const data = `${prevHash}|${pairId}|${timestamp}|${open}|${high}|${low}|${close}|${ticks}`;
@@ -89,8 +104,27 @@ export class OTCEngine {
     return this.regimes.get(this.regimeKey(pairId, day, hour)) ?? 1;
   }
 
-  private effVol(state: PairState, day: string, hour: number): number {
-    return state.volatility * this.regimeMult(state.pairId, day, hour);
+  // Generation inputs for (pair, day): frozen snapshot first, live state only
+  // as a fallback for pre-snapshot days (best effort — those days predate the
+  // snapshot system and may already be unverifiable for other reasons).
+  private async getGenParams(pairId: string, day: string): Promise<DayParams> {
+    const key = `${pairId}:${day}`;
+    const cached = this.dayParams.get(key);
+    if (cached) return cached;
+    try {
+      const { getDayParams } = await import("./seeds");
+      const snap = await getDayParams(day, pairId);
+      if (snap) {
+        this.dayParams.set(key, snap);
+        return snap;
+      }
+    } catch {}
+    const state = this.pairs.get(pairId);
+    return {
+      basePrice: state?.basePrice ?? 1,
+      volatility: state?.volatility ?? 1,
+      category: state?.category ?? this.categoryOf(pairId),
+    };
   }
 
   async refreshRegimes(day?: string) {
@@ -196,6 +230,9 @@ export class OTCEngine {
         await this.measureRegimes(now);
         void this.backfillRecentSeconds().then(() => {
           console.log("[OTC] Full-day backfill complete");
+          return this.backfillRecentDays();
+        }).then(() => {
+          console.log("[OTC] Past-day backfill complete");
         }).catch((e) => {
           console.error("[OTC] Full-day backfill failed:", e);
         });
@@ -295,20 +332,9 @@ export class OTCEngine {
     const day = dayStringUTC(new Date(now));
     const startOfDay = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 1000);
     for (const state of Array.from(this.pairs.values())) {
-      const existingCount = await prisma.secondCandle.count({
-        where: { pairId: state.pairId, timestamp: { gte: BigInt(startOfDay * 1000) } },
-      }).catch(() => 0);
-      const latest = existingCount > 0
-        ? await prisma.secondCandle.findFirst({
-            where: { pairId: state.pairId },
-            orderBy: { timestamp: "desc" },
-            select: { timestamp: true },
-          }).catch(() => null)
-        : null;
-      const latestAgeSec = latest ? Math.max(0, currentSecond - Math.floor(Number(latest.timestamp) / 1000)) : Infinity;
-      const expected = Math.max(0, currentSecond - startOfDay);
-      if (existingCount >= expected * 0.9 && expected > 60 && latestAgeSec < 300) {
-        console.log(`[OTC] Backfill skip ${state.pairId}: ${existingCount}/${expected} present, latest ${latestAgeSec}s ago`);
+      const { existing, expected } = await this.dayCoverage(state.pairId, startOfDay * 1000, currentSecond * 1000);
+      if (!this.needsBackfill(existing, expected)) {
+        console.log(`[OTC] Backfill skip ${state.pairId}: ${existing}/${expected} present`);
         continue;
       }
       const filled = await this.backfillPairDay(state, day, startOfDay, currentSecond);
@@ -317,8 +343,34 @@ export class OTCEngine {
     }
   }
 
-  private async backfillPairDay(state: PairState, day: string, startOfDay: number, currentSecond: number): Promise<number> {
-      let prevClose = state.basePrice;
+  // Coverage of persisted 1s candles in [fromMs, toMs). Bounded range scan on
+  // the indexed timestamp column — cheap enough to run every minute per pair.
+  private async dayCoverage(pairId: string, fromMs: number, toMs: number): Promise<{ existing: number; expected: number }> {
+    const expected = Math.max(0, Math.floor(toMs / 1000) - Math.floor(fromMs / 1000));
+    const existing = await prisma.secondCandle.count({
+      where: { pairId, timestamp: { gte: BigInt(fromMs), lt: BigInt(toMs) } },
+    }).catch(() => -1);
+    return { existing, expected };
+  }
+
+  // True when seconds are actually missing. Skips only when coverage is
+  // complete (minus 2 in-flight seconds) — small gaps get healed, not ignored.
+  // Returns false on DB errors (existing < 0) so we never thrash.
+  private needsBackfill(existing: number, expected: number): boolean {
+    if (existing < 0) return false;
+    if (expected <= 60) return false;
+    return existing < expected - 2;
+  }
+
+  private async backfillPairDay(state: PairState, day: string, startOfDay: number, currentSecond: number, params?: BackfillParams): Promise<number> {
+      const seed = params?.seed ?? this.currentSeeds.get(state.pairId) ?? "";
+      // Frozen daily inputs when no explicit override — same values the live
+      // ticks used, so backfilled rows verify identically.
+      const gp: DayParams = params ?? await this.getGenParams(state.pairId, day);
+      const basePrice = gp.basePrice;
+      const volatility = gp.volatility;
+      const category = gp.category;
+      let prevClose = basePrice;
       const rows: Array<{
         pairId: string;
         timestamp: bigint;
@@ -332,8 +384,8 @@ export class OTCEngine {
         const secondOfDay = s % SECONDS_PER_DAY;
         const utcHour = new Date(s * 1000).getUTCHours();
         const r = computeSecond(
-          this.currentSeeds.get(state.pairId) ?? "", state.pairId, day, secondOfDay, prevClose,
-          state.basePrice, this.effVol(state, day, utcHour), this.categoryOf(state.pairId), utcHour,
+          seed, state.pairId, day, secondOfDay, prevClose,
+          basePrice, volatility * this.regimeMult(state.pairId, day, utcHour), category, utcHour,
         );
         const open = prevClose;
         rows.push({
@@ -411,6 +463,43 @@ export class OTCEngine {
     return this.pairs.get(pairId)?.category ?? "forex";
   }
 
+  // Heal one full day (used for past days after cross-midnight outages).
+  // HARD GUARD: only touches days that already have a seed row. getDaySeed is
+  // find-only — it never creates. A day without a seed stays honestly
+  // unverifiable; we must never mint retroactive seeds (their candles, if any,
+  // were generated with a different seed and would fail verification).
+  private async backfillDayIfNeeded(day: string, startMs: number, endMs: number): Promise<void> {
+    await this.refreshRegimes(day);
+    const { getDaySeed } = await import("./seeds");
+    const startSec = Math.floor(startMs / 1000);
+    const endSec = Math.floor(endMs / 1000);
+    for (const state of Array.from(this.pairs.values())) {
+      try {
+        const seed = await getDaySeed(day, state.pairId).catch(() => null);
+        if (!seed) continue;
+        const { existing, expected } = await this.dayCoverage(state.pairId, startMs, endMs);
+        if (!this.needsBackfill(existing, expected)) continue;
+        // Explicit frozen inputs: past-day seed (never today's) + the day's
+        // param snapshot. Identical to what live ticks used — rows verify.
+        const gp = await this.getGenParams(state.pairId, day);
+        const filled = await this.backfillPairDay(state, day, startSec, endSec, { seed, ...gp });
+        await this.backfillMinutes(state.pairId, day, startSec, endSec);
+        console.log(`[OTC] Healed ${day} ${state.pairId}: ${existing}/${expected} present, ${filled} 1s rows recomputed (idempotent)`);
+      } catch (e) {
+        console.error(`[OTC] Day-heal failed for ${day} ${state.pairId}:`, e instanceof Error ? e.message : e);
+      }
+    }
+  }
+
+  private async backfillRecentDays() {
+    const now = Date.now();
+    for (let d = 2; d >= 1; d--) {
+      const day = dayStringUTC(new Date(now - d * 86400000));
+      const startMs = Date.parse(`${day}T00:00:00.000Z`);
+      await this.backfillDayIfNeeded(day, startMs, startMs + 86400000);
+    }
+  }
+
   setBroadcast(fn: (msg: TickMessage | CandleCloseMessage) => void) {
     this.broadcast = fn;
   }
@@ -485,9 +574,11 @@ export class OTCEngine {
     for (const state of Array.from(this.pairs.values())) {
       try {
         const prevClose = this.secondCloses.get(state.pairId) ?? state.currentPrice;
+        // Frozen daily inputs — immune to mid-day admin edits.
+        const gp = await this.getGenParams(state.pairId, day);
         const r = computeSecond(
           this.currentSeeds.get(state.pairId) ?? "", state.pairId, day, secondOfDay, prevClose,
-          state.basePrice, this.effVol(state, day, utcHour), state.category, utcHour,
+          gp.basePrice, gp.volatility * this.regimeMult(state.pairId, day, utcHour), gp.category, utcHour,
         );
         const price = r.ticks[Math.min(idx, r.ticks.length - 1)];
         state.currentPrice = Number(price.toFixed(8));
@@ -583,6 +674,7 @@ export class OTCEngine {
     }
     this.secondCloses.clear();
     this.regimes.clear();
+    this.dayParams.clear();
     await this.refreshAnchors();
     for (const state of Array.from(this.pairs.values())) {
       if (state.feed === "mirror") {
@@ -607,6 +699,10 @@ export class OTCEngine {
         if (seedValue && this.onSeedRevealed) this.onSeedRevealed(revealedDay, pairId, seedValue);
       }
     }
+    // Heal yesterday's tail in case the outage spanned midnight.
+    const prevDay = dayStringUTC(new Date(Date.parse(`${day}T00:00:00.000Z`) - 1000));
+    const prevStart = Date.parse(`${prevDay}T00:00:00.000Z`);
+    await this.backfillDayIfNeeded(prevDay, prevStart, prevStart + 86400000).catch(() => {});
   }
 
   private async checkSeeds() {
@@ -863,15 +959,17 @@ export class OTCEngine {
       const census: string[] = [];
       for (const state of Array.from(this.pairs.values())) {
         try {
-          const latest = await prisma.secondCandle.findFirst({
+          const { existing, expected } = await this.dayCoverage(
+            state.pairId, startOfDay * 1000, currentSecond * 1000,
+          );
+          const latestAgeSec = await prisma.secondCandle.findFirst({
             where: { pairId: state.pairId },
             orderBy: { timestamp: "desc" },
             select: { timestamp: true },
-          });
-          const ageSec = latest ? Math.max(0, currentSecond - Math.floor(Number(latest.timestamp) / 1000)) : -1;
-          census.push(`${state.pairId}:${ageSec}s`);
-          if (ageSec !== -1 && ageSec <= 90) continue;
-          console.error(`[OTC] SELF-HEAL ${state.pairId}: latest second ${ageSec}s old, rebuilding missing history`);
+          }).then((latest) => latest ? Math.max(0, currentSecond - Math.floor(Number(latest.timestamp) / 1000)) : -1).catch(() => -1);
+          census.push(`${state.pairId}:${latestAgeSec}s`);
+          if (!this.needsBackfill(existing, expected)) continue;
+          console.error(`[OTC] SELF-HEAL ${state.pairId}: ${existing}/${expected} present, latest ${latestAgeSec}s old, rebuilding missing history`);
           const filled = await this.backfillPairDay(state, day, startOfDay, currentSecond);
           await this.backfillMinutes(state.pairId, day, startOfDay, currentSecond);
           console.error(`[OTC] SELF-HEAL ${state.pairId}: done, ${filled} 1s rows recomputed (idempotent)`);
@@ -988,6 +1086,11 @@ export class OTCEngine {
     console.log(`[OTC] Removed pair: ${pairId}`);
   }
 
+  // Admin/runtime pair updates. NOTE: volatility/basePrice/category feed the
+  // provably-fair candle math, which reads the day's FROZEN snapshot
+  // (PairDayParams via getGenParams) — so edits here affect live display and
+  // trading settings immediately, but candle generation only from next day.
+  // This is what keeps already-persisted candles verifiable.
   async updatePair(
     pairId: string,
     changes: Partial<Pick<PairState, "volatility" | "payoutPercent" | "spread" | "basePrice" | "feed">> & { isActive?: boolean },
@@ -1018,7 +1121,10 @@ export class OTCEngine {
     const now = Date.now();
     const candleStart = Math.floor(now / CANDLE_INTERVAL_MS) * CANDLE_INTERVAL_MS;
     const day = dayStringUTC(new Date(now));
-    const category = state.category;
+    // Frozen daily inputs so display history matches verifiable data.
+    const gp = await this.getGenParams(state.pairId, day);
+    const category = gp.category;
+    const basePrice = gp.basePrice;
     const targetEnd = state.currentPrice;
 
     const runChain = (start: number) => {
@@ -1031,7 +1137,7 @@ export class OTCEngine {
         const utcHour = new Date(minuteStart).getUTCHours();
         const r = computeSecond(
           this.currentSeeds.get(state.pairId) ?? "", state.pairId, day, secondOfDay, prevClose,
-          state.basePrice, this.effVol(state, day, utcHour), category, utcHour,
+          basePrice, gp.volatility * this.regimeMult(state.pairId, day, utcHour), category, utcHour,
         );
         prevClose = r.close;
         end = r.close;
@@ -1039,8 +1145,8 @@ export class OTCEngine {
       return end;
     };
 
-    const trialEnd = runChain(state.basePrice);
-    const factor = trialEnd / state.basePrice;
+    const trialEnd = runChain(basePrice);
+    const factor = trialEnd / basePrice;
     const adjustedStart = trialEnd === 0 ? targetEnd : targetEnd / factor;
 
     const rows: Array<{
@@ -1060,7 +1166,7 @@ export class OTCEngine {
       const utcHour = new Date(minuteStart).getUTCHours();
       const r = computeSecond(
         this.currentSeeds.get(state.pairId) ?? "", state.pairId, day, secondOfDay, prevClose,
-        state.basePrice, this.effVol(state, day, utcHour), category, utcHour,
+        basePrice, gp.volatility * this.regimeMult(state.pairId, day, utcHour), category, utcHour,
       );
       const open = prevClose;
       rows.push({

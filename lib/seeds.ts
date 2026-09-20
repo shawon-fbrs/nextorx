@@ -76,12 +76,27 @@ async function publishSeedHashExternally(day: string, pairId: string, seedHash: 
 }
 
 export async function ensureSeedDay(day: string, pairId: string): Promise<SeedInfo> {
+  const { dayStringUTC } = await import("./pf-math");
+  const today = dayStringUTC(new Date());
+  if (day < today) {
+    // Seeds are born at day start. NEVER mint retroactive seeds: any candles
+    // already persisted for that day were generated with a different (lost)
+    // seed, and a fresh seed would fail verification against them.
+    const existing = await prisma.serverSeed.findUnique({ where: { day_pairId: { day, pairId } } });
+    if (!existing) throw new Error(`No seed exists for past day ${day} (pair ${pairId})`);
+    return { day, pairId, seedHash: existing.seedHash, revealed: existing.revealed, gistUrl: existing.gistUrl };
+  }
   const seed = randomBytes(32).toString("hex");
   const seedHash = createHash("sha256").update(seed, "utf8").digest("hex");
   const seedEnc = encryptSeed(seed);
 
   // Capture regime snapshot at seed creation time
   const regimeSnapshot = await captureRegimeSnapshot();
+
+  // Capture frozen daily candle-math inputs (first-writer-wins per day).
+  // Engine generation AND the verify tool both use these, so mid-day admin
+  // edits to Pair params can never break verification of persisted candles.
+  await captureDayParams(day, pairId).catch(() => {});
 
   const row = await prisma.serverSeed.upsert({
     where: { day_pairId: { day, pairId } },
@@ -137,6 +152,45 @@ async function captureRegimeSnapshot(): Promise<Record<string, unknown> | null> 
   } catch {
     return null;
   }
+}
+
+export interface DayParams {
+  basePrice: number;
+  volatility: number;
+  category: string;
+}
+
+// Freeze the day's candle-math inputs. First-writer-wins via upsert with
+// empty update — whoever captures first (seed creation) fixes the values for
+// the whole day. Later admin edits land in the Pair row and take effect for
+// generation starting next day.
+async function captureDayParams(day: string, pairId: string): Promise<void> {
+  const pair = await prisma.pair.findUnique({
+    where: { id: pairId },
+    select: { basePrice: true, volatility: true, category: true },
+  });
+  if (!pair) return;
+  await prisma.pairDayParams.upsert({
+    where: { day_pairId: { day, pairId } },
+    update: {},
+    create: {
+      day,
+      pairId,
+      basePrice: pair.basePrice,
+      volatility: pair.volatility,
+      category: pair.category,
+    },
+  });
+}
+
+export async function getDayParams(day: string, pairId: string): Promise<DayParams | null> {
+  const row = await prisma.pairDayParams.findUnique({ where: { day_pairId: { day, pairId } } });
+  if (!row) return null;
+  return {
+    basePrice: Number(row.basePrice),
+    volatility: Number(row.volatility),
+    category: row.category,
+  };
 }
 
 export async function getDaySeed(day: string, pairId: string): Promise<string | null> {

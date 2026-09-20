@@ -87,6 +87,7 @@ function VerifyContent() {
   const [basePrice, setBasePrice] = useState('');
   const [volatility, setVolatility] = useState('');
   const [category, setCategory] = useState('forex');
+  const [paramsSource, setParamsSource] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [regimeJson, setRegimeJson] = useState('');
   const [result, setResult] = useState<string>('');
@@ -149,11 +150,12 @@ function VerifyContent() {
     setLoadingDay(true);
     try {
       const asset = pairId.toUpperCase();
-      const [seedRes, pairsRes, regimeRes, csvRes] = await Promise.all([
+      const [seedRes, pairsRes, regimeRes, csvRes, paramsRes] = await Promise.all([
         fetch(`/api/market/seed/reveal?day=${encodeURIComponent(day)}&pairId=${encodeURIComponent(pairId)}`),
         fetch('/api/market/pairs'),
         fetch(`/api/market/verify/regime?asset=${encodeURIComponent(asset)}&date=${encodeURIComponent(day)}`),
         fetch(`/api/market/verify/download?asset=${encodeURIComponent(asset)}&date=${encodeURIComponent(day)}`),
+        fetch(`/api/verify/day-params?asset=${encodeURIComponent(asset)}&date=${encodeURIComponent(day)}`),
       ]);
       let haveSeed = seed.trim().length > 0;
       if (seedRes.ok) {
@@ -163,13 +165,27 @@ function VerifyContent() {
           haveSeed = true;
         }
       }
-      if (pairsRes.ok) {
+      // Frozen daily inputs first (exact values generation used). Live pair
+      // values only as a fallback for pre-snapshot days (best effort).
+      let snapApplied = false;
+      if (paramsRes.ok) {
+        const pdata = await paramsRes.json() as { snapshot?: boolean; basePrice?: number; volatility?: number; category?: string };
+        if (pdata.snapshot && pdata.basePrice != null && pdata.volatility != null && pdata.category) {
+          setBasePrice(String(pdata.basePrice));
+          setVolatility(String(pdata.volatility));
+          setCategory(pdata.category);
+          setParamsSource('frozen snapshot');
+          snapApplied = true;
+        }
+      }
+      if (!snapApplied && pairsRes.ok) {
         const data = await pairsRes.json() as { pairs?: Array<{ id: string; basePrice: number | string; volatility: number | string; category: string }> };
         const found = (data.pairs ?? []).find(p => String(p.id).toUpperCase() === asset);
         if (found) {
           setBasePrice(String(found.basePrice));
           setVolatility(String(found.volatility));
           setCategory(found.category);
+          setParamsSource('live values (no snapshot for this day)');
         }
       }
       if (regimeRes.ok) {
@@ -405,7 +421,7 @@ function VerifyContent() {
           )}
           {(basePrice !== '' || volatility !== '') && (
             <p className="text-[11px] text-text-dark font-mono">
-              auto-detected · base {basePrice || '—'} · vol {volatility || '—'} · {category}{regimeJson !== '' ? ' · schedule on' : ''}
+              auto-detected · base {basePrice || '—'} · vol {volatility || '—'} · {category}{regimeJson !== '' ? ' · schedule on' : ''}{paramsSource !== '' ? ` · ${paramsSource}` : ''}
             </p>
           )}
           <div>

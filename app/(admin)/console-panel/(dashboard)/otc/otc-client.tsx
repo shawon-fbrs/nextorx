@@ -418,8 +418,8 @@ export default function OtcClient({ initialData }: { initialData: Pair[] }) {
               </div>
             )}
             <Select label="Category" options={CATEGORY_OPTIONS} value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} />
-            <Input label="Base Price" type="number" step="any" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
-            <Input label="Volatility" type="number" step="any" value={form.volatility} onChange={(e) => setForm({ ...form, volatility: e.target.value })} helperText="Uncalibrated (Track B). Higher = more price movement" />
+            <Input label="Base Price" type="number" step="any" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} helperText="Frozen daily for fairness — takes effect next trading day" />
+            <Input label="Volatility" type="number" step="any" value={form.volatility} onChange={(e) => setForm({ ...form, volatility: e.target.value })} helperText="Frozen daily for fairness — takes effect next trading day" />
             <Input label="Spread" type="number" step="any" value={form.spread} onChange={(e) => setForm({ ...form, spread: e.target.value })} />
             <Input label="Payout %" type="number" min="50" max="95" value={form.payoutPercent} onChange={(e) => setForm({ ...form, payoutPercent: e.target.value })} />
             <Input label="Weekend Payout %" type="number" min="50" max="95" value={form.weekendPayout} onChange={(e) => setForm({ ...form, weekendPayout: e.target.value })} helperText="Optional lower payout on weekends" />
@@ -473,8 +473,8 @@ export default function OtcClient({ initialData }: { initialData: Pair[] }) {
               </div>
             )}
             <Select label="Category" options={CATEGORY_OPTIONS} value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} />
-            <Input label="Base Price" type="number" step="any" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
-            <Input label="Volatility" type="number" step="any" value={form.volatility} onChange={(e) => setForm({ ...form, volatility: e.target.value })} />
+            <Input label="Base Price" type="number" step="any" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} helperText="Frozen daily for fairness — takes effect next trading day" />
+            <Input label="Volatility" type="number" step="any" value={form.volatility} onChange={(e) => setForm({ ...form, volatility: e.target.value })} helperText="Frozen daily for fairness — takes effect next trading day" />
             <Input label="Spread" type="number" step="any" value={form.spread} onChange={(e) => setForm({ ...form, spread: e.target.value })} />
             <Input label="Payout %" type="number" min="50" max="95" value={form.payoutPercent} onChange={(e) => setForm({ ...form, payoutPercent: e.target.value })} />
             <Input label="Weekend Payout %" type="number" min="50" max="95" value={form.weekendPayout} onChange={(e) => setForm({ ...form, weekendPayout: e.target.value })} />
