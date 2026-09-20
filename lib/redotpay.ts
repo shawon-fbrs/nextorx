@@ -45,37 +45,62 @@ function platformPublicKey(version: string): string | null {
 }
 
 function loadPrivateKey(): string {
-  const raw = env.REDOTPAY_PRIVATE_KEY.trim();
-  // Coolify single-line secrets arrive with literal \n — restore real newlines.
-  if (raw.includes("\\n") && !raw.includes("\n")) {
-    return raw.replace(/\\n/g, "\n");
+  let raw = env.REDOTPAY_PRIVATE_KEY.trim();
+  // Strip surrounding quotes if the value was pasted with them.
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    raw = raw.slice(1, -1).trim();
+  }
+  // Literal \n sequences (single-line secrets) → real newlines.
+  if (raw.includes("\\n")) raw = raw.replace(/\\n/g, "\n");
+  raw = raw.replace(/\r\n/g, "\n");
+  if (!raw.includes("\n")) {
+    // Single line with spaces instead of newlines (some dashboards collapse
+    // multiline secrets). Rebuild proper PEM with 64-char wrapped body.
+    const m = raw.match(/^(-----BEGIN [A-Z0-9 ]+-----)\s+(.+?)\s+(-----END [A-Z0-9 ]+-----)$/);
+    if (m) {
+      const chunks = m[2].replace(/\s+/g, "").match(/.{1,64}/g) ?? [];
+      raw = `${m[1]}\n${chunks.join("\n")}\n${m[3]}\n`;
+    }
   }
   return raw;
 }
 
 function signRequest(method: string, uri: string, body: string, timestamp: number): string {
   const stringToSign = `${method} ${uri}\n${env.REDOTPAY_APP_KEY}.${timestamp}.${body}`;
-  const signer = createSign("RSA-SHA256");
-  signer.update(stringToSign, "utf8");
-  return signer.sign(loadPrivateKey()).toString("base64");
+  try {
+    const signer = createSign("RSA-SHA256");
+    signer.update(stringToSign, "utf8");
+    return signer.sign(loadPrivateKey()).toString("base64");
+  } catch {
+    throw new RedotPayError("Payment signing failed — check REDOTPAY_PRIVATE_KEY format in server env");
+  }
 }
 
 async function postJson<T>(uri: string, payload: Record<string, unknown>): Promise<T> {
   // Single stringify — the SAME bytes are signed and sent (key order matters).
   const body = JSON.stringify(payload);
   const timestamp = Date.now();
-  const res = await fetch(`${env.REDOTPAY_BASE_URL}${uri}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-R-Ak": env.REDOTPAY_APP_KEY,
-      "X-R-Ts": String(timestamp),
-      "X-R-Key-Version": env.REDOTPAY_KEY_VERSION,
-      "X-R-Signature": signRequest("POST", uri, body, timestamp),
-    },
-    body,
-    signal: AbortSignal.timeout(20000),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${env.REDOTPAY_BASE_URL}${uri}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-R-Ak": env.REDOTPAY_APP_KEY,
+        "X-R-Ts": String(timestamp),
+        "X-R-Key-Version": env.REDOTPAY_KEY_VERSION,
+        "X-R-Signature": signRequest("POST", uri, body, timestamp),
+      },
+      body,
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch (e) {
+    console.error(`[RedotPay] ${uri} network error:`, e instanceof Error ? e.message : e);
+    throw new RedotPayError("Payment provider unreachable, please try again");
+  }
   const json = (await res.json().catch(() => null)) as {
     code?: string;
     msg?: string;
@@ -84,10 +109,9 @@ async function postJson<T>(uri: string, payload: Record<string, unknown>): Promi
     data?: T;
   } | null;
   if (!json || json.code !== "SUCCESS") {
-    throw new RedotPayError(
-      json?.msg ?? json?.message ?? `RedotPay request failed (HTTP ${res.status})`,
-      json?.code,
-    );
+    const msg = json?.msg ?? json?.message ?? `RedotPay request failed (HTTP ${res.status})`;
+    console.error(`[RedotPay] ${uri} failed:`, msg, `code=${json?.code ?? "-"}`);
+    throw new RedotPayError(msg, json?.code);
   }
   return json.data as T;
 }
