@@ -1,15 +1,16 @@
 import { prisma } from "@/lib/db";
 import { requireUser, getSessionUser } from "@/lib/api";
+import { isAdminRole } from "@/lib/dal";
 import { getSettings, SETTING_DEFAULTS } from "@/lib/settings";
 import { getVaultSnapshot } from "@/lib/vault";
 import { redirect } from "next/navigation";
 
 async function requireAdmin() {
-  try {
-    return await requireAdmin();
-  } catch {
+  const user = await getSessionUser();
+  if (!user || !isAdminRole(user.role)) {
     redirect("/login");
   }
+  return user;
 }
 
 async function requireAuth() {
