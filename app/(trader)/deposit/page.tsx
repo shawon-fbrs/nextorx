@@ -22,7 +22,8 @@ function DepositContent() {
   const { user, refresh } = useAuth();
   const [amount, setAmount] = useState('');
   const [promoCode, setPromoCode] = useState('');
-  const [limits, setLimits] = useState({ min: 1000, max: 10000000 });
+  const [provider, setProvider] = useState<'nowpayments' | 'redotpay'>('nowpayments');
+  const [methods, setMethods] = useState<MethodRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
@@ -38,9 +39,7 @@ function DepositContent() {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        const methods: MethodRow[] = data.methods ?? [];
-        const gw = methods.find((m) => m.name === 'REDOTPAY');
-        if (gw) setLimits({ min: gw.minDeposit, max: gw.maxDeposit });
+        setMethods((data.methods ?? []) as MethodRow[]);
       })
       .catch(() => {});
     return () => {
@@ -118,8 +117,9 @@ function DepositContent() {
     }
   };
 
-  const minUsd = limits.min / 100;
-  const maxUsd = limits.max / 100;
+  const methodRow = methods.find((m) => m.name === (provider === 'nowpayments' ? 'NOWPAYMENTS' : 'REDOTPAY'));
+  const minUsd = (methodRow?.minDeposit ?? 1000) / 100;
+  const maxUsd = (methodRow?.maxDeposit ?? 10000000) / 100;
   const amountUsd = Number(amount);
   const validAmount = Number.isFinite(amountUsd) && amountUsd >= minUsd && amountUsd <= maxUsd;
 
@@ -135,6 +135,7 @@ function DepositContent() {
         body: JSON.stringify({
           amount: Math.round(amountUsd * 100),
           promoCode: promoCode.trim() || undefined,
+          provider,
         }),
       });
       const data = await res.json();
@@ -190,7 +191,25 @@ function DepositContent() {
               <p className="text-2xl font-bold text-foreground">${((user.balance || 0) / 100).toFixed(2)}</p>
             </div>
             <h2 className="text-base font-bold text-foreground mb-1">Deposit with crypto</h2>
-            <p className="text-[11px] text-textDark mb-4">Pay with USDT (and more) on our secure checkout page. Funds are credited automatically after confirmation.</p>
+            <p className="text-[11px] text-textDark mb-4">Pay with USDT TRC20 on our secure checkout page. Funds are credited automatically after confirmation.</p>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              {([
+                { id: 'nowpayments', label: 'NOWPayments', sub: 'USDT · 0.5% fee' },
+                { id: 'redotpay', label: 'RedotPay', sub: 'USDT · card & wallet' },
+              ] as const).map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setProvider(p.id)}
+                  className={`rounded-2xl border-2 p-4 text-left transition-all ${
+                    provider === p.id ? 'border-green/60 bg-surface' : 'border-border bg-surface hover:border-green/30'
+                  }`}
+                >
+                  <div className="text-sm font-bold text-foreground">{p.label}</div>
+                  <div className="text-[11px] text-textDark mt-0.5">{p.sub}</div>
+                </button>
+              ))}
+            </div>
             <form onSubmit={submit} className="space-y-5 bg-surface border border-border rounded-2xl p-6">
               <div>
                 <label className="text-xs font-semibold text-text-dark uppercase tracking-wider mb-1.5 block">Amount (USD)</label>

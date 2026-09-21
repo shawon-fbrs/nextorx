@@ -272,20 +272,23 @@ export async function rejectDeposit(depositId: string, reviewedById: string, not
   return rejected;
 }
 
-export const GATEWAY_METHOD = "REDOTPay".toUpperCase();
+export const GATEWAY_METHOD = "REDOTPAY";
+export const NOWPAYMENTS_METHOD = "NOWPAYMENTS";
 
-// Create a PENDING deposit for the RedotPay Connect flow (no txHash yet —
-// it arrives via webhook). Same limit / daily-limit / promo validation as
-// manual deposits. Callers must delete the row if gateway order creation fails
-// so failed attempts don't pollute the admin panel or daily limits.
+// Create a PENDING deposit for a gateway flow (no txHash yet — it arrives via
+// webhook/IPN). Same limit / daily-limit / promo validation as manual
+// deposits. Callers must delete the row if provider order creation fails so
+// failed attempts don't pollute the admin panel or daily limits.
 export async function createGatewayDepositRequest(
   userId: string,
   amount: number,
   gatewayRef: string,
+  method: string = GATEWAY_METHOD,
+  network = "USDT",
   promoCode?: string,
 ) {
   const paymentMethod = await prisma.paymentMethod.findFirst({
-    where: { name: GATEWAY_METHOD },
+    where: { name: method },
   });
   const minDeposit = paymentMethod?.minDeposit ?? 1000;
   if (amount < minDeposit) {
@@ -346,8 +349,8 @@ export async function createGatewayDepositRequest(
     data: {
       userId,
       amount,
-      method: GATEWAY_METHOD,
-      network: "USDT",
+      method,
+      network,
       txHash: null,
       walletAddress: null,
       gatewayRef,
