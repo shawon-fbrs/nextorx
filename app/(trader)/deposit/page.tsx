@@ -191,7 +191,7 @@ function DepositContent() {
               <p className="text-2xl font-bold text-foreground">${((user.balance || 0) / 100).toFixed(2)}</p>
             </div>
             <h2 className="text-base font-bold text-foreground mb-1">Deposit with crypto</h2>
-            <p className="text-[11px] text-textDark mb-4">Pay with USDT TRC20 on our secure checkout page. Funds are credited automatically after confirmation.</p>
+            <p className="text-[11px] text-textDark mb-4">Pay with USDT on BNB Chain on our secure checkout page. Funds are credited automatically after confirmation.</p>
             <div className="grid grid-cols-2 gap-3 mb-5">
               {([
                 { id: 'nowpayments', label: 'NOWPayments', sub: 'USDT · 0.5% fee' },

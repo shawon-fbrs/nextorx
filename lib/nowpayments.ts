@@ -73,7 +73,10 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<NowInvoi
   const invoice = await api<NowInvoice>("POST", "/invoice", {
     price_amount: input.amountUsd,
     price_currency: "usd",
-    pay_currency: "usdttrc20",
+    // USDT on BNB Chain: cents-level gas keeps $5 deposits viable.
+    // Payer covers service + network via is_fee_paid_by_user so we net full.
+    pay_currency: "usdtbsc",
+    is_fee_paid_by_user: true,
     order_id: input.orderId,
     order_description: input.description,
     ipn_callback_url: input.ipnCallbackUrl,
